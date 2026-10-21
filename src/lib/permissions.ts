@@ -15,14 +15,20 @@ export function getUserType(): UserType | null {
     return null;
   }
 
+  // Invité (profil du compte principal) : rôle « local » ou session serveur d'invité (`pls1.`)
+  // sans jeton cloud. Vérifié AVANT le jeton cloud pour qu'un invité ne soit jamais
+  // considéré comme le compte principal.
+  if (user.role === 'local') {
+    return 'local';
+  }
+  const serverSession = TokenManager.getServerSessionToken();
+  if (!TokenManager.getCloudAccessToken() && serverSession && serverSession.startsWith('pls1.')) {
+    return 'local';
+  }
+
   // Si l'utilisateur a un token cloud, c'est un compte principal
   if (TokenManager.getCloudAccessToken()) {
     return 'cloud';
-  }
-
-  // Si l'utilisateur a un role "local", c'est un utilisateur local
-  if (user.role === 'local') {
-    return 'local';
   }
 
   // Si le role n'est pas défini ou est différent de 'local', c'est un compte principal (cloud)
@@ -58,23 +64,25 @@ export function canAccess(feature: Permission): boolean {
     return true;
   }
 
-  // Pour les utilisateurs locaux, vérifier les permissions spécifiques
+  // Invités (utilisateurs locaux) = profils de lecture du compte principal : ils parcourent,
+  // lisent et TÉLÉCHARGENT tout ; seuls les réglages / l'administration sont réservés.
   const localUserPermissions: Record<Permission, boolean> = {
-    // Accès complet
+    // Accès complet : catalogue, lecture, téléchargements (ajout de torrents, progression)
     'library.view': true,
-    'library.manage': true,
     'torrents.view': true,
     'torrents.download': true,
     'media.view': true,
     'media.stream': true,
     'downloads.view': true,
-    
-    // Paramètres limités
+
+    // Réglages personnels uniquement
     'settings.language': true,
     'settings.ui_preferences': true,
-    'settings.download_location': true,
-    
-    // Accès refusé
+    'settings.profile': true,
+
+    // Accès refusé (gestion du serveur et du compte principal)
+    'library.manage': false,
+    'settings.download_location': false,
     'settings.indexers': false,
     'settings.tmdb': false,
     'settings.sync': false,
@@ -104,6 +112,8 @@ export type Permission =
   | 'downloads.view'
   // Paramètres
   | 'settings.language'
+  /** Profil personnel (nom affiché, avatar, déconnexion) : ouvert aux invités. */
+  | 'settings.profile'
   | 'settings.ui_preferences'
   | 'settings.download_location'
   | 'settings.indexers'
