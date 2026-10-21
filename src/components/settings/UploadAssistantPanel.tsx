@@ -1495,7 +1495,7 @@ export default function UploadAssistantPanel() {
       title: t('settings.uploadTrackerPanel.wizardSummaryTrackers'),
       current: selectedTrackers.length,
       target: trackersTarget,
-      color: '#a855f7',
+      color: '#f2545b',
       accent: 'violet' as const,
     },
     {
@@ -1535,7 +1535,7 @@ export default function UploadAssistantPanel() {
       title: t('settings.uploadTrackerPanel.factoryHash'),
       current: hashProgressPct,
       target: hashTarget,
-      color: '#6366f1',
+      color: '#f2545b',
       accent: 'violet' as const,
     },
     {
