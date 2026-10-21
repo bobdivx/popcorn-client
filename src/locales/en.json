@@ -1975,7 +1975,7 @@
       "title": "Local users",
       "description": "Manage local accounts with limited permissions",
       "inviteTitle": "Invite a user",
-      "inviteDescription": "Send an invitation by email. The person will receive a link to set their password and can then sign in to your Popcornn server with limited permissions.",
+      "inviteDescription": "Just enter the person's email: they get a link, pick a profile name and they're in (no password). A guest can see and play everything and start downloads; only settings stay reserved to your account.",
       "emailRequired": "Email *",
       "emailPlaceholder": "user@example.com",
       "displayNameOptional": "Display name (optional)",
@@ -2003,8 +2003,7 @@
       "mainAccountOnly": "This page is reserved for the main account. Please sign in with your cloud account.",
       "linkTitle": "Manage local users",
       "linkDescription": "Invite and manage local accounts with limited permissions",
-      "shareDefaultNone": "By default a guest sees no media (sharing “None”). Choose what they can see in",
-      "manageSharing": "Settings › Friends (sharing)"
+      "inviteEmailNotSent": "The invitation was created but the email could not be sent. Retry with “Resend invitation”."
     },
     "documentation": {
       "title": "Documentation",
@@ -2392,6 +2391,17 @@
       "invalidCredentials": "Invalid email or password",
       "serverError": "Server error. The server may not be properly configured.",
       "networkError": "Connection error. Check your network connection and the server URL in settings."
+    },
+    "guestLink": {
+      "open": "Guest profile? Get a sign-in link by email",
+      "help": "Enter the address your invitation was sent to: we'll email you a sign-in link valid for 15 minutes (no password needed).",
+      "send": "Send the link",
+      "sending": "Sending…",
+      "sent": "If this address matches a guest profile, a sign-in link has just been sent. Check your spam folder too.",
+      "error": "Could not send the link right now. Please retry.",
+      "tooMany": "Too many requests. Try again in a few minutes.",
+      "connecting": "Signing you in to your profile…",
+      "failed": "This sign-in link has expired or was already used. Request a new one below."
     }
   },
   "registerForm": {
@@ -2849,10 +2859,7 @@
     "noActivity": "No activity.",
     "selectMediaToShare": "Select media to share",
     "noMediaSelectable": "No selectable media (ensure your library is enriched).",
-    "apply": "Apply",
-    "localGuestsTitle": "Guests (local users)",
-    "localGuestsDescription": "The guests you created under “Local users”. By default a guest sees nothing (sharing “None”): choose “All” or a selection of media here.",
-    "noLocalGuests": "No active guest. Invite one from “Local users”."
+    "apply": "Apply"
   },
   "quickConnectAuthorize": {
     "title": "Quick connect",
