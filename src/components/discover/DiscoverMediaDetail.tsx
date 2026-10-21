@@ -119,7 +119,7 @@ export default function DiscoverMediaDetail({
 
   if (loading) {
     return (
-      <div class="min-h-[70vh] flex items-center justify-center bg-[var(--ed-bg,#0c0d10)]">
+      <div class="min-h-app-screen flex items-center justify-center bg-[var(--ed-bg,#0c0d10)]">
         <HLSLoadingSpinner size="lg" text="Chargement" />
       </div>
     );

@@ -27,7 +27,7 @@ export default function DemoEntry() {
   }, []);
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-base-100">
+    <div className="flex justify-center items-center min-h-app-screen bg-base-100">
       <div className="text-center max-w-md mx-4">
         <HLSLoadingSpinner size="lg" text={t('demo.entryLoading')} />
       </div>
