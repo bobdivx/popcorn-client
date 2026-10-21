@@ -2002,7 +2002,9 @@
       "tokenExpired": "Your cloud session has expired. Please sign in again.",
       "mainAccountOnly": "This page is reserved for the main account. Please sign in with your cloud account.",
       "linkTitle": "Manage local users",
-      "linkDescription": "Invite and manage local accounts with limited permissions"
+      "linkDescription": "Invite and manage local accounts with limited permissions",
+      "shareDefaultNone": "By default a guest sees no media (sharing “None”). Choose what they can see in",
+      "manageSharing": "Settings › Friends (sharing)"
     },
     "documentation": {
       "title": "Documentation",
@@ -2847,7 +2849,25 @@
     "noActivity": "No activity.",
     "selectMediaToShare": "Select media to share",
     "noMediaSelectable": "No selectable media (ensure your library is enriched).",
-    "apply": "Apply"
+    "apply": "Apply",
+    "localGuestsTitle": "Guests (local users)",
+    "localGuestsDescription": "The guests you created under “Local users”. By default a guest sees nothing (sharing “None”): choose “All” or a selection of media here.",
+    "noLocalGuests": "No active guest. Invite one from “Local users”."
+  },
+  "quickConnectAuthorize": {
+    "title": "Quick connect",
+    "description": "Authorize a new device to sign in by entering the quick connect code shown on that device.",
+    "codeLabel": "Quick connect code",
+    "codeHint": "Enter the 6-character code shown on the new device",
+    "codeLengthError": "Please enter a 6-character code",
+    "accountLabel": "Account to sign in",
+    "myAccount": "My account",
+    "guestOption": "Guest: {name}",
+    "guestHint": "A guest only gets the media you share with them (nothing by default).",
+    "authorizing": "Authorizing...",
+    "submit": "Authorize sign-in",
+    "success": "Code authorized! The device can now sign in.",
+    "authorizeError": "Authorization failed"
   },
   "torrentSyncManager": {
     "status": "Status",
