@@ -560,8 +560,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           text-align: center;
         }
         .auth-tab.active {
-          background: rgba(124,58,237,0.2);
-          color: #c4b5fd;
+          background: rgba(242,84,91,0.2);
+          color: #ffa1a6;
           box-shadow: 0 1px 4px rgba(0,0,0,0.3);
         }
         .auth-tab:hover:not(.active) { color: rgba(255,255,255,0.7); }
@@ -571,8 +571,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           margin-bottom: 12px;
         }
         .auth-qr-side {
-          background: rgba(124,58,237,0.06);
-          border: 1px solid rgba(124,58,237,0.15);
+          background: rgba(242,84,91,0.06);
+          border: 1px solid rgba(242,84,91,0.15);
           border-radius: 12px;
           padding: 20px;
           display: flex;
@@ -582,14 +582,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         }
         .auth-qr-icon {
           width: 40px; height: 40px;
-          background: rgba(124,58,237,0.15);
+          background: rgba(242,84,91,0.15);
           border-radius: 10px;
           display: flex; align-items: center; justify-content: center;
           margin-bottom: 10px;
         }
         .auth-2fa-box {
-          background: rgba(124,58,237,0.06);
-          border: 1px solid rgba(124,58,237,0.2);
+          background: rgba(242,84,91,0.06);
+          border: 1px solid rgba(242,84,91,0.2);
           border-radius: 12px;
           padding: 20px;
           margin-bottom: 20px;
@@ -607,8 +607,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           transition: border-color 0.15s, box-shadow 0.15s;
         }
         .auth-code-input:focus {
-          border-color: rgba(124,58,237,0.6);
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+          border-color: rgba(242,84,91,0.6);
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.12);
         }
         .auth-restore-banner {
           background: rgba(59,130,246,0.07);
@@ -638,17 +638,17 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           transition: background 0.2s, border-color 0.2s, transform 0.1s;
         }
         .auth-step-tv__email-cta:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); }
-        .auth-step-tv__email-cta:focus { outline: none; box-shadow: 0 0 0 4px rgba(124,58,237,0.4); }
+        .auth-step-tv__email-cta:focus { outline: none; box-shadow: 0 0 0 4px rgba(242,84,91,0.4); }
         .auth-step-tv__form-block { text-align: left; margin-top: 16px; }
         .auth-step-tv__back {
           margin-bottom: 20px; padding: 10px 0;
-          background: none; border: none; color: rgba(167,139,250,0.9);
+          background: none; border: none; color: rgba(251,122,128,0.9);
           font-size: 1rem; font-weight: 600; cursor: pointer;
           min-height: 48px; border-radius: 10px;
           transition: color 0.2s, background 0.2s;
         }
-        .auth-step-tv__back:hover { color: #c4b5fd; background: rgba(124,58,237,0.1); }
-        .auth-step-tv__back:focus { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.3); }
+        .auth-step-tv__back:hover { color: #ffa1a6; background: rgba(242,84,91,0.1); }
+        .auth-step-tv__back:focus { outline: none; box-shadow: 0 0 0 3px rgba(242,84,91,0.3); }
         .auth-step-tv__tabs { margin-bottom: 20px; }
         .auth-step-tv__tab { font-size: 1rem !important; padding: 12px 16px !important; min-height: 48px; }
         .auth-step-tv__form { max-width: 420px; }
@@ -662,11 +662,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           margin-top: 8px; margin-bottom: 16px;
         }
         .auth-step-tv__link {
-          background: none; border: none; color: rgba(167,139,250,0.85);
+          background: none; border: none; color: rgba(251,122,128,0.85);
           font-size: 1rem; text-decoration: underline; cursor: pointer;
           padding: 8px 0; display: block; width: 100%;
         }
-        .auth-step-tv__link:hover { color: #c4b5fd; }
+        .auth-step-tv__link:hover { color: #ffa1a6; }
       `}</style>
 
       {/* En-tête (sur TV, affiché seulement pour 2FA / config sauvegardée ; sinon le layout TV a le sien) */}
@@ -729,7 +729,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
       {view === '2fa' && (
         <div>
           <div class="auth-2fa-box">
-            <div style="font-weight:600;color:#c4b5fd;margin-bottom:6px;font-size:13.5px;">Code de vérification requis</div>
+            <div style="font-weight:600;color:#ffa1a6;margin-bottom:6px;font-size:13.5px;">Code de vérification requis</div>
             <p style="color:rgba(255,255,255,0.5);font-size:13px;margin:0;">
               Un code à 6 chiffres a été envoyé à <strong style="color:rgba(255,255,255,0.75);">{loginEmail}</strong>.
             </p>
@@ -874,7 +874,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 <div style="margin-top:16px;text-align:center;">
                   <button
                     type="button"
-                    style="background:none;border:none;cursor:pointer;font-size:12.5px;color:rgba(167,139,250,0.7);text-decoration:underline;text-underline-offset:2px;"
+                    style="background:none;border:none;cursor:pointer;font-size:12.5px;color:rgba(251,122,128,0.7);text-decoration:underline;text-underline-offset:2px;"
                     onClick={() => { setView('register'); setError(null); }}
                   >
                     Pas encore de compte ? S'inscrire
@@ -885,7 +885,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               {/* Colonne droite : QR code */}
               <div class="auth-qr-side">
                 <div class="auth-qr-icon">
-                  <svg style="width:20px;height:20px;color:#a78bfa;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg style="width:20px;height:20px;color:#fb7a80;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                   </svg>
                 </div>
