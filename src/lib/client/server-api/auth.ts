@@ -8,6 +8,21 @@ import { TokenManager } from '../storage.js';
 import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister, completeOidcTicket } from '../../api/popcorn-web.js';
 import { hasBackendUrl, hasDeploymentBackend } from '../../backend-config.js';
 
+/**
+ * Session délivrée par le serveur aux utilisateurs locaux (invités) à la connexion (`pls1.…`).
+ * C'est leur seule identité vérifiable côté serveur : on la stocke et on retire un éventuel
+ * token cloud d'un autre compte resté sur l'appareil (il serait prioritaire).
+ */
+function applyServerSession(token: unknown): void {
+  if (typeof window === 'undefined') return;
+  if (typeof token === 'string' && token.startsWith('pls1.')) {
+    TokenManager.clearCloudTokens();
+    TokenManager.setServerSessionToken(token);
+  } else {
+    TokenManager.clearServerSessionToken();
+  }
+}
+
 /** Attente max de la synchro utilisateur vers le serveur avant de rendre la main à l’UI. */
 const CLOUD_USER_SYNC_WAIT_MS = 5000;
 
@@ -136,7 +151,7 @@ export const authMethods = {
     // Sans secret JWT : tenter d'abord le backend (compte local invité), puis le cloud
     if (!hasJWTSecret) {
       console.log('[server-api] Aucun secret JWT, tentative de connexion au backend (compte local possible)...');
-      const backendRes = await this.backendRequest<{ user: { id: string; email?: string; username?: string }; jwt_secret?: string }>(
+      const backendRes = await this.backendRequest<{ user: { id: string; email?: string; username?: string; role?: string }; jwt_secret?: string; access_token?: string }>(
         '/api/client/auth/login',
         { method: 'POST', body: JSON.stringify({ email, password }) }
       );
@@ -155,6 +170,7 @@ export const authMethods = {
         if (secret) {
           TokenManager.setJWTSecret(secret);
         }
+        applyServerSession(backendRes.data.access_token);
         const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
         this.saveTokens(accessToken, refreshToken);
         this.saveUser({ id: userId, email: user.email || email, username });
@@ -251,6 +267,7 @@ export const authMethods = {
     }
 
     const user = res.data?.user || res.data;
+    applyServerSession(res.data?.access_token);
     const userId = user?.id || '';
     const userEmail = user?.email || email;
     const username = user?.username || (email.split('@')[0] || email || 'user').trim();
