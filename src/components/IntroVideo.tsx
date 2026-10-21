@@ -9,6 +9,8 @@ import {
 interface IntroVideoProps {
   onEnded: () => void;
   onSkip?: () => void;
+  /** Première image réellement affichée (vidéo en lecture ou GIF) : l'écran de chargement peut s'effacer. */
+  onStarted?: () => void;
   /** Variante visuelle : sting marque type Netflix (défaut) ou overlay pédagogique. */
   variant?: 'brand' | 'tutorial';
 }
@@ -41,9 +43,23 @@ function isBackKey(e: KeyboardEvent): boolean {
  * Intro d’ouverture type Netflix : plein écran, animation marque, lecture jusqu’à la fin.
  * Sur Android TV / webOS : pas de skip forcé, Retour pour passer, fallback GIF si le MP4 échoue.
  */
-export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: IntroVideoProps) {
+export default function IntroVideo({ onEnded, onSkip, onStarted, variant = 'brand' }: IntroVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const doneRef = useRef(false);
+  const startedRef = useRef(false);
+  const onStartedRef = useRef(onStarted);
+  onStartedRef.current = onStarted;
+  const markStarted = useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    onStartedRef.current?.();
+  }, []);
+
+  // Filet : ne jamais laisser l'écran de chargement par-dessus l'intro si `playing` ne part pas.
+  useEffect(() => {
+    const t = window.setTimeout(markStarted, 2500);
+    return () => window.clearTimeout(t);
+  }, [markStarted]);
   const [useGifFallback, setUseGifFallback] = useState(false);
   const [introSrc] = useState(resolveIntroMp4);
   const [gifSrc] = useState(resolveIntroGif);
@@ -51,10 +67,11 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
   const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
+    markStarted();
     videoRef.current?.pause();
     onSkip?.();
     onEnded();
-  }, [onEnded, onSkip]);
+  }, [onEnded, onSkip, markStarted]);
 
   // Pas de bouton « Passer » : l'intro va jusqu'au bout. Plafond absolu (30 s) en plus des
   // garde-fous ci-dessous, pour ne jamais bloquer l'app si la vidéo cale en cours de lecture.
@@ -125,9 +142,11 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
     return () => window.removeEventListener('keydown', onKey, true);
   }, [finish]);
 
+  // z-[9000] : au-dessus de la navbar (z-200) et de l'accueil pré-rendu dessous ;
+  // sous l'écran de chargement unique (#popcorn-loading-fallback, z-9999).
   return (
     <div
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+      className="fixed inset-0 z-[9000] bg-black flex items-center justify-center"
       role="dialog"
       aria-label="Introduction Popcornn"
       data-intro-variant={variant}
@@ -148,6 +167,7 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
           src={gifSrc}
           alt=""
           className="w-full h-full object-contain"
+          onLoad={markStarted}
           onError={() => finish()}
         />
       ) : (
@@ -157,6 +177,7 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
           playsInline
           preload="auto"
           onEnded={finish}
+          onPlaying={markStarted}
           onError={() => {
             console.warn('[IntroVideo] Erreur MP4 intro, fallback GIF');
             setUseGifFallback(true);
