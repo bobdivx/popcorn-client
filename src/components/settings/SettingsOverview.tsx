@@ -43,7 +43,7 @@ const TILES: TileDef[] = [
   { id: 'downloads', titleKey: 'settingsMenu.category.downloads', hintKey: 'settingsMenu.hub.hint.downloads', href: '/settings/downloads/', icon: Download, permission: 'settings.server' },
   { id: 'library', titleKey: 'settingsMenu.category.library', hintKey: 'settingsMenu.hub.hint.library', href: '/settings/library/', icon: Library, permissions: ['settings.server', 'settings.friends'] },
   { id: 'discovery', titleKey: 'settingsMenu.category.discovery', hintKey: 'settingsMenu.hub.hint.discovery', href: '/settings/discovery/', icon: Globe, permission: 'settings.server' },
-  { id: 'account', titleKey: 'settingsMenu.category.account', hintKey: 'settingsMenu.hub.hint.account', href: '/settings/account/', icon: UserCircle, permission: 'settings.account' },
+  { id: 'account', titleKey: 'settingsMenu.category.account', hintKey: 'settingsMenu.hub.hint.account', href: '/settings/account/', icon: UserCircle, permission: 'settings.profile' },
 ];
 
 function isVisible(item: TileDef): boolean {
