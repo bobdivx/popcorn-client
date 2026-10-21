@@ -1,7 +1,9 @@
 import type { ComponentChildren } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { canAccess } from '../../lib/permissions';
+import { canAccess, isLocalUser } from '../../lib/permissions';
+import { serverApi } from '../../lib/client/server-api';
+import { redirectTo } from '../../lib/utils/navigation.js';
 import { getPopcornWebBaseUrl } from '../../lib/api/popcorn-web';
 import {
   User,
@@ -13,6 +15,7 @@ import {
   MessageCircle,
   BookOpen,
   CreditCard,
+  LogOut,
 } from 'lucide-preact';
 import AccountSettings from './AccountSettings';
 import ConnectivityAlertCard from './ConnectivityAlertCard';
@@ -59,10 +62,10 @@ type AccountItem =
 
 const ACCOUNT_ITEMS: AccountItem[] = [
   { id: 'subscription', titleKey: 'settingsMenu.subscription.title', descriptionKey: 'settingsMenu.subscription.description', icon: CreditCard, permission: 'settings.account', kind: 'sub' },
-  { id: 'profile', titleKey: 'account.profile', descriptionKey: 'account.avatar', icon: User, permission: 'settings.account', kind: 'sub' },
+  { id: 'profile', titleKey: 'account.profile', descriptionKey: 'account.avatar', icon: User, permission: 'settings.profile', kind: 'sub' },
   { id: 'info', titleKey: 'account.subMenu.accountInfo', descriptionKey: 'account.subMenu.accountInfoDesc', icon: Info, permission: 'settings.account', kind: 'sub' },
   { id: 'devices', titleKey: 'account.devices.title', descriptionKey: 'account.devices.description', icon: Smartphone, permission: 'settings.account', kind: 'sub' },
-  { id: 'interface', titleKey: 'account.interfaceSettings', descriptionKey: 'account.interfaceSettingsDescription', icon: Palette, permission: 'settings.account', kind: 'link', href: '/settings/ui-preferences' },
+  { id: 'interface', titleKey: 'account.interfaceSettings', descriptionKey: 'account.interfaceSettingsDescription', icon: Palette, permission: 'settings.ui_preferences', kind: 'link', href: '/settings/ui-preferences' },
   { id: '2fa', titleKey: 'account.twoFactor.title', descriptionKey: 'account.twoFactor.title', icon: Shield, permission: 'settings.account', kind: 'sub' },
   { id: 'quick-connect', titleKey: 'account.quickConnect.title', descriptionKey: 'account.quickConnect.description', icon: Smartphone, permission: 'settings.account', kind: 'sub' },
   { id: 'local-users', titleKey: 'settingsMenu.localUsers.title', descriptionKey: 'settingsMenu.localUsers.description', icon: Users, permission: 'settings.local_users', kind: 'sub' },
@@ -165,6 +168,27 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
         );
       })}
       </div>
+      {isLocalUser() && (
+        <div className="flex justify-start">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+            onClick={async () => {
+              try {
+                await serverApi.logout();
+              } catch {
+                // ignore : on quitte la session locale quoi qu'il arrive
+              }
+              redirectTo('/login');
+            }}
+            tabIndex={0}
+            data-focusable
+          >
+            <LogOut className="w-4 h-4" />
+            {t('account.logout')}
+          </button>
+        </div>
+      )}
       {subItem && sub === 'subscription' && <SubPageFrame item={subItem} baseUrl={baseUrl}><SubscriptionStatusPanel /></SubPageFrame>}
       {subItem && sub === 'profile' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="profile" /></SubPageFrame>}
       {subItem && sub === 'info' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="info" /></SubPageFrame>}
