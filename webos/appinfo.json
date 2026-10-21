@@ -12,6 +12,6 @@
     "disableBackHistoryAPI":  true,
     "transparent":  false,
     "handlesRelaunch":  false,
-    "bgColor":  "#D1C4E9",
+    "bgColor":  "#0c0d10",
     "requiredACG":  []
 }
