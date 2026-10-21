@@ -220,7 +220,7 @@ export default function Wizard() {
   // ─── Écran de chargement ─────────────────────────────────────────────────
   if (loading) {
     return (
-      <div class="flex justify-center items-center min-h-screen" style="background:#07070e">
+      <div class="flex justify-center items-center min-h-screen" style="background:#0c0d10">
         <HLSLoadingSpinner size="lg" text="Chargement..." />
       </div>
     );
@@ -228,7 +228,7 @@ export default function Wizard() {
 
   if (!setupStatus && hasBackendUrl()) {
     return (
-      <div class="min-h-screen flex items-center justify-center p-6" style="background:#07070e">
+      <div class="min-h-screen flex items-center justify-center p-6" style="background:#0c0d10">
         <div class="wizard-card max-w-md w-full text-center p-8">
           <div class="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4">
             <svg class="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -491,7 +491,7 @@ export default function Wizard() {
       <style>{`
         .wizard-root {
           min-height: 100vh;
-          background: #07070e;
+          background: #0c0d10;
           display: flex;
           font-family: system-ui, -apple-system, sans-serif;
         }
@@ -499,7 +499,7 @@ export default function Wizard() {
         .wizard-sidebar {
           width: 280px;
           flex-shrink: 0;
-          background: linear-gradient(180deg, #0e0815 0%, #0a0812 100%);
+          background: linear-gradient(180deg, #121318 0%, #0c0d10 100%);
           border-right: 1px solid rgba(255,255,255,0.05);
           display: flex;
           flex-direction: column;
@@ -512,7 +512,7 @@ export default function Wizard() {
           position: absolute;
           top: -80px; left: -80px;
           width: 300px; height: 300px;
-          background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(242,84,91,0.12) 0%, transparent 70%);
           pointer-events: none;
         }
         .wizard-sidebar::after {
@@ -520,7 +520,7 @@ export default function Wizard() {
           position: absolute;
           bottom: -60px; right: -60px;
           width: 240px; height: 240px;
-          background: radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(242,84,91,0.07) 0%, transparent 70%);
           pointer-events: none;
         }
         @media (max-width: 1023px) {
@@ -538,13 +538,13 @@ export default function Wizard() {
         .wizard-logo-icon {
           width: 40px; height: 40px;
           border-radius: 12px;
-          background: rgba(124,58,237,0.15);
-          border: 1px solid rgba(124,58,237,0.3);
+          background: rgba(242,84,91,0.15);
+          border: 1px solid rgba(242,84,91,0.3);
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
         }
         .wizard-logo-text { color: #fff; font-weight: 700; font-size: 15px; line-height: 1.2; }
-        .wizard-logo-sub { color: rgba(167,139,250,0.7); font-size: 11px; margin-top: 1px; }
+        .wizard-logo-sub { color: rgba(251,122,128,0.7); font-size: 11px; margin-top: 1px; }
         /* Sidebar steps */
         .wizard-step-item {
           display: flex; align-items: center; gap: 10px;
@@ -560,8 +560,8 @@ export default function Wizard() {
           border-color: rgba(255,255,255,0.06);
         }
         .wizard-step-item.active {
-          background: rgba(124,58,237,0.12);
-          border-color: rgba(124,58,237,0.25);
+          background: rgba(242,84,91,0.12);
+          border-color: rgba(242,84,91,0.25);
         }
         .wizard-step-item.completed { opacity: 0.7; }
         .wizard-step-item.completed:hover { opacity: 1; }
@@ -576,11 +576,11 @@ export default function Wizard() {
           transition: all 0.2s ease;
         }
         .wizard-step-bubble.active {
-          background: #7c3aed; color: #fff;
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.25);
+          background: #f2545b; color: #fff;
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.25);
         }
         .wizard-step-bubble.completed {
-          background: rgba(124,58,237,0.5); color: #ddd6fe;
+          background: rgba(242,84,91,0.5); color: #ffc8cb;
         }
         .wizard-step-bubble.pending {
           background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3);
@@ -600,7 +600,7 @@ export default function Wizard() {
         .wizard-step-item.skipped .wizard-step-label { color: rgba(255,255,255,0.3); font-style: italic; }
         .wizard-step-dot {
           width: 6px; height: 6px; border-radius: 50%;
-          background: #a78bfa; margin-left: auto; flex-shrink: 0;
+          background: #fb7a80; margin-left: auto; flex-shrink: 0;
           animation: wizard-pulse 2s ease-in-out infinite;
         }
         @keyframes wizard-pulse {
@@ -610,7 +610,7 @@ export default function Wizard() {
         .wizard-step-edit-hint {
           margin-left: auto; flex-shrink: 0;
           font-size: 9.5px; font-weight: 600;
-          color: rgba(167,139,250,0.45);
+          color: rgba(251,122,128,0.45);
           letter-spacing: 0.3px;
           opacity: 0;
           transition: opacity 0.15s;
@@ -636,7 +636,7 @@ export default function Wizard() {
           position: absolute;
           top: 0; right: 0;
           width: 500px; height: 500px;
-          background: radial-gradient(circle at top right, rgba(124,58,237,0.04) 0%, transparent 60%);
+          background: radial-gradient(circle at top right, rgba(242,84,91,0.04) 0%, transparent 60%);
           pointer-events: none;
         }
         .wizard-content {
@@ -673,7 +673,7 @@ export default function Wizard() {
           display: none;
           padding: 16px 20px;
           border-bottom: 1px solid rgba(255,255,255,0.05);
-          background: rgba(14,8,21,0.8);
+          background: rgba(18,19,24,0.8);
           backdrop-filter: blur(8px);
           position: sticky; top: 0; z-index: 10;
         }
@@ -684,7 +684,7 @@ export default function Wizard() {
         }
         .wizard-mobile-progress-fill {
           height: 100%; border-radius: 9999px;
-          background: linear-gradient(90deg, #7c3aed, #a78bfa);
+          background: linear-gradient(90deg, #f2545b, #fb7a80);
           transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         /* Step animation */
@@ -719,23 +719,23 @@ export default function Wizard() {
         }
         .wizard-input::placeholder { color: rgba(255,255,255,0.25); }
         .wizard-input:focus {
-          border-color: rgba(124,58,237,0.6);
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+          border-color: rgba(242,84,91,0.6);
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.12);
         }
         /* Buttons */
         .wizard-btn-primary {
           display: inline-flex; align-items: center; justify-content: center; gap: 8px;
           padding: 11px 24px;
-          background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+          background: linear-gradient(135deg, #f2545b 0%, #e03a42 100%);
           color: #fff;
           font-size: 14px; font-weight: 600;
           border-radius: 10px; border: none; cursor: pointer;
           transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
-          box-shadow: 0 4px 14px rgba(124,58,237,0.3);
+          box-shadow: 0 4px 14px rgba(242,84,91,0.3);
         }
         .wizard-btn-primary:hover:not(:disabled) {
           opacity: 0.92; transform: translateY(-1px);
-          box-shadow: 0 6px 18px rgba(124,58,237,0.4);
+          box-shadow: 0 6px 18px rgba(242,84,91,0.4);
         }
         .wizard-btn-primary:active:not(:disabled) { transform: translateY(0); }
         .wizard-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -837,7 +837,7 @@ export default function Wizard() {
                 <span class="wizard-step-label">{SIDEBAR_LABELS[stepId]}</span>
                 {isActive && <div class="wizard-step-dot" />}
                 {isSkipped && (
-                  <span style="margin-left:auto;flex-shrink:0;font-size:10px;color:rgba(167,139,250,0.4);" title="Configuré, cliquez pour modifier">✓</span>
+                  <span style="margin-left:auto;flex-shrink:0;font-size:10px;color:rgba(251,122,128,0.4);" title="Configuré, cliquez pour modifier">✓</span>
                 )}
                 {!isActive && !isSkipped && (
                   <span class="wizard-step-edit-hint">modifier</span>
@@ -863,7 +863,7 @@ export default function Wizard() {
               <img src="/popcorn_logo.png" alt="" style="width:20px;height:20px;object-fit:contain;opacity:0.8;" />
               <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);">Popcorn</span>
             </div>
-            <span style="font-size:12px;color:rgba(167,139,250,0.8);font-weight:500;">
+            <span style="font-size:12px;color:rgba(251,122,128,0.8);font-weight:500;">
               {currentStep}/{totalSteps} · {steps[currentStep - 1]?.label || ''}
             </span>
           </div>
