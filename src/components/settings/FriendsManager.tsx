@@ -58,13 +58,6 @@ export default function FriendsManager() {
     return map;
   }, [localUsers]);
 
-  // Invités (utilisateurs locaux actifs) qui ne sont pas déjà des amis cloud : partage réglable
-  // ici aussi. Sans réglage, un invité ne voit rien (« Aucun ») sur le serveur.
-  const localGuests = useMemo(() => {
-    const friendEmails = new Set(friends.map((f) => (f.email || '').toLowerCase()).filter(Boolean));
-    return localUsers.filter((u) => u.isActive && !friendEmails.has((u.email || '').toLowerCase()));
-  }, [friends, localUsers]);
-
   const shareTypeLabel = (st: ShareType) => {
     switch (st) {
       case 'none': return t('friendsManager.shareNone');
@@ -98,33 +91,6 @@ export default function FriendsManager() {
       setFriends(friendsRes || []);
       setLocalUsers(localUsersRes || []);
       setActivity(activityRes || []);
-
-      // Partage des invités : chargé d'emblée (la synchro serveur remplace tout le partage).
-      const friendEmails = new Set((friendsRes || []).map((f) => (f.email || '').toLowerCase()).filter(Boolean));
-      const guests = (localUsersRes || []).filter(
-        (u) => u.isActive && !friendEmails.has((u.email || '').toLowerCase())
-      );
-      type GuestShare = { shareType: ShareType; mediaIds: string[]; loading: boolean };
-      const guestShares: Array<[string, GuestShare]> = await Promise.all(
-        guests.map(async (g): Promise<[string, GuestShare]> => {
-          try {
-            const res = await getFriendShare(g.id);
-            if (res.success && res.data) {
-              return [g.id, { shareType: res.data.shareType, mediaIds: res.data.mediaIds || [], loading: false }];
-            }
-          } catch {
-            // ignore : « Aucun » par défaut
-          }
-          return [g.id, { shareType: 'none', mediaIds: [], loading: false }];
-        })
-      );
-      if (guestShares.length > 0) {
-        setShareState((s) => {
-          const next = { ...s };
-          for (const [id, st] of guestShares) next[id] = st;
-          return next;
-        });
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('friendsManager.errorLoading'));
     } finally {
@@ -158,17 +124,6 @@ export default function FriendsManager() {
         return { local_user_id: localUserId, share_type: shareType, media_ids: shareType === 'selected' ? mediaIds : [] };
       })
       .filter(Boolean) as Array<{ local_user_id: string; share_type: ShareType; media_ids: string[] }>;
-
-    // Invités : même id que sur le serveur ; « none » par défaut.
-    for (const g of localGuests) {
-      const share = shareOf(g.id);
-      const shareType = share?.shareType || 'none';
-      payloadFriends.push({
-        local_user_id: g.id,
-        share_type: shareType,
-        media_ids: shareType === 'selected' ? share?.mediaIds || [] : [],
-      });
-    }
 
     if (payloadFriends.length === 0) return;
 
@@ -482,53 +437,6 @@ export default function FriendsManager() {
         )}
       </div>
 
-      {/* Invités (utilisateurs locaux) */}
-      <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
-        <h3 class="text-lg font-semibold text-white mb-2">{t('friendsManager.localGuestsTitle')}</h3>
-        <p class="text-sm text-gray-400 mb-4">{t('friendsManager.localGuestsDescription')}</p>
-        {localGuests.length === 0 ? (
-          <p class="text-gray-400">{t('friendsManager.noLocalGuests')}</p>
-        ) : (
-          <div class="space-y-3">
-            {localGuests.map((g) => {
-              const st: ShareType = shareState[g.id]?.shareType || 'none';
-              return (
-                <div key={g.id} class="p-4 rounded-lg bg-gray-800/40 border border-gray-700">
-                  <div class="text-white font-semibold">{g.displayName ? `${g.displayName} (${g.email})` : g.email}</div>
-                  <div class="text-sm text-gray-400">{t('friendsManager.currentShare')}: {shareTypeLabel(st)}</div>
-                  <div class="mt-3 flex flex-col md:flex-row gap-3 md:items-center">
-                    <label class="text-sm text-gray-300">{t('friendsManager.shareType')}</label>
-                    <select
-                      class="px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
-                      value={st}
-                      disabled={shareState[g.id]?.loading}
-                      onChange={(e) => handleShareTypeChange(g.id, (e.target as HTMLSelectElement).value as ShareType)}
-                    >
-                      <option value="none">{t('friendsManager.shareNone')}</option>
-                      <option value="all">{t('friendsManager.shareAll')}</option>
-                      <option value="selected">{t('friendsManager.shareSelected')}</option>
-                    </select>
-                    {st === 'selected' && (
-                      <>
-                        <button
-                          class="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
-                          onClick={() => openMediaSelector(g.id)}
-                        >
-                          {t('friendsManager.selectMedia')}
-                        </button>
-                        <div class="text-sm text-gray-400">
-                          {t('friendsManager.mediaSelectedCount', { count: shareState[g.id]?.mediaIds?.length || 0 })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
       {/* Activité */}
       <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
         <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -594,4 +502,3 @@ export default function FriendsManager() {
     </div>
   );
 }
-
