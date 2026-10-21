@@ -37,7 +37,7 @@ async function getChart() {
 /*  Helpers Chart.js communs                                                   */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const TOOLTIP_BASE = {
-  backgroundColor: 'rgba(8,8,18,0.95)',
+  backgroundColor: 'rgba(12,13,16,0.95)',
   padding: 10,
   cornerRadius: 10,
   borderColor: 'rgba(255,255,255,0.08)',
@@ -71,8 +71,8 @@ function SyncHistoryChart({ history, animKey }: { history: SyncHistoryEntry[]; a
         type: 'bar' as const,
         label: 'Torrents',
         data: h.map(e => e.total_count),
-        backgroundColor: h.map(e => e.success ? 'rgba(139,92,246,0.65)' : 'rgba(239,68,68,0.55)'),
-        borderColor: h.map(e => e.success ? 'rgba(167,139,250,0.9)' : 'rgba(239,68,68,0.9)'),
+        backgroundColor: h.map(e => e.success ? 'rgba(242,84,91,0.65)' : 'rgba(239,68,68,0.55)'),
+        borderColor: h.map(e => e.success ? 'rgba(251,122,128,0.9)' : 'rgba(239,68,68,0.9)'),
         borderWidth: 1,
         borderRadius: 6,
         borderSkipped: false,
@@ -87,7 +87,7 @@ function SyncHistoryChart({ history, animKey }: { history: SyncHistoryEntry[]; a
         backgroundColor: 'rgba(251,191,36,0.05)',
         borderWidth: 1.5,
         pointRadius: h.map(e => e.success ? 3 : 4),
-        pointBackgroundColor: h.map(e => e.success ? 'rgba(167,139,250,0.9)' : 'rgba(239,68,68,0.9)'),
+        pointBackgroundColor: h.map(e => e.success ? 'rgba(251,122,128,0.9)' : 'rgba(239,68,68,0.9)'),
         pointBorderWidth: 0,
         tension: 0.35,
         fill: false,
@@ -249,7 +249,7 @@ function SyncDonutChart({ films, series, others, animKey }: {
           labels: ['Films', 'Séries', 'Autres'],
           datasets: [{
             data: [films || 0.001, series || 0.001, others || 0.001],
-            backgroundColor: ['rgba(251,191,36,0.88)', 'rgba(139,92,246,0.88)', 'rgba(34,197,94,0.88)'],
+            backgroundColor: ['rgba(251,191,36,0.88)', 'rgba(242,84,91,0.88)', 'rgba(34,197,94,0.88)'],
             borderColor: 'rgba(255,255,255,0.03)',
             borderWidth: 2,
             hoverOffset: 8,
@@ -391,7 +391,7 @@ function SyncIndexerBarChart({ indexers, statsByIndexer, animKey }: {
     labels: indexers.map(i => i.name),
     datasets: [
       { label: '🎬 Films',  data: indexers.map(i => getStats(i).films),  backgroundColor: 'rgba(251,191,36,0.8)',  borderRadius: 5, borderSkipped: false },
-      { label: '📺 Séries', data: indexers.map(i => getStats(i).series), backgroundColor: 'rgba(139,92,246,0.8)',  borderRadius: 5, borderSkipped: false },
+      { label: '📺 Séries', data: indexers.map(i => getStats(i).series), backgroundColor: 'rgba(242,84,91,0.8)',  borderRadius: 5, borderSkipped: false },
       { label: '📦 Autres', data: indexers.map(i => getStats(i).others), backgroundColor: 'rgba(34,197,94,0.75)',  borderRadius: 5, borderSkipped: false },
     ],
   });
@@ -883,7 +883,7 @@ export default function SyncDashboard() {
               <SyncDonutChart films={films} series={series} others={others} animKey={animKey} />
               <div class="sync-legend">
                 <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(251,191,36,0.9)" /><span class="sync-legend-name">Films</span><span class="sync-legend-val">{films.toLocaleString()}</span></div>
-                <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(139,92,246,0.9)" /><span class="sync-legend-name">Séries</span><span class="sync-legend-val">{series.toLocaleString()}</span></div>
+                <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(242,84,91,0.9)" /><span class="sync-legend-name">Séries</span><span class="sync-legend-val">{series.toLocaleString()}</span></div>
                 <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(34,197,94,0.9)" /><span class="sync-legend-name">Autres</span><span class="sync-legend-val">{others.toLocaleString()}</span></div>
               </div>
             </div>
