@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'preact/hooks';
-import { inviteLocalUser, getLocalUsers, deleteLocalUser, resendLocalUserInvitation, type LocalUser } from '../../lib/api/popcorn-web';
+import {
+  inviteLocalUser,
+  getLocalUsers,
+  deleteLocalUser,
+  resendLocalUserInvitation,
+  createLocalUserInviteLink,
+  getLocalUserInviteLinks,
+  revokeLocalUserInviteLink,
+  type LocalUser,
+  type LocalUserInviteLink,
+} from '../../lib/api/popcorn-web';
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
+import { Mail, Trash2, RefreshCw, UserPlus, Link2, Copy, Share2, Check } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { syncLocalUsersToBackend, removeLocalUserFromBackend } from '../../lib/client/local-users-sync';
 
@@ -15,6 +25,11 @@ export default function LocalUsersManager() {
   const [success, setSuccess] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [email, setEmail] = useState('');
+  const [links, setLinks] = useState<LocalUserInviteLink[]>([]);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [newLinkId, setNewLinkId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const canShare = typeof navigator !== 'undefined' && typeof (navigator as Navigator & { share?: unknown }).share === 'function';
 
   const hasCloudToken = TokenManager.getCloudAccessToken() !== null;
 
@@ -31,7 +46,8 @@ export default function LocalUsersManager() {
     try {
       setLoading(true);
       setError(null);
-      const localUsers = await getLocalUsers();
+      const [localUsers, inviteLinks] = await Promise.all([getLocalUsers(), getLocalUserInviteLinks()]);
+      if (inviteLinks) setLinks(inviteLinks);
       if (localUsers) {
         setUsers(localUsers);
         // Les invités activés doivent exister sur le serveur pour pouvoir s'y connecter.
@@ -142,6 +158,103 @@ export default function LocalUsersManager() {
     }
   };
 
+  /** Copie dans le presse-papiers, avec repli pour les navigateurs TV / anciens WebView. */
+  const copyText = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      /* repli ci-dessous */
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopyLink = async (link: LocalUserInviteLink) => {
+    setError(null);
+    const ok = await copyText(link.url);
+    if (ok) {
+      setCopiedId(link.id);
+      setSuccess(t('settingsMenu.localUsers.linkCopied'));
+      window.setTimeout(() => setCopiedId((id) => (id === link.id ? null : id)), 2500);
+    } else {
+      setError(t('settingsMenu.localUsers.copyFailed'));
+    }
+  };
+
+  const handleShareLink = async (link: LocalUserInviteLink) => {
+    try {
+      await (navigator as Navigator & { share: (d: ShareData) => Promise<void> }).share({
+        title: t('settingsMenu.localUsers.shareTitle'),
+        text: t('settingsMenu.localUsers.shareText'),
+        url: link.url,
+      });
+    } catch {
+      /* partage annulé par l'utilisateur */
+    }
+  };
+
+  const handleCreateLink = async () => {
+    try {
+      setCreatingLink(true);
+      setError(null);
+      setSuccess(null);
+      const result = await createLocalUserInviteLink();
+      if (result.success && result.link) {
+        const link = result.link;
+        setLinks((prev) => [link, ...prev.filter((l) => l.id !== link.id)]);
+        setNewLinkId(link.id);
+        const copied = await copyText(link.url);
+        if (copied) setCopiedId(link.id);
+        setSuccess(t(copied ? 'settingsMenu.localUsers.linkCreatedCopied' : 'settingsMenu.localUsers.linkCreated'));
+      } else {
+        setError(result.message || t('settingsMenu.localUsers.linkCreateError'));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('settingsMenu.localUsers.linkCreateError'));
+    } finally {
+      setCreatingLink(false);
+    }
+  };
+
+  const handleRevokeLink = async (link: LocalUserInviteLink) => {
+    if (!(await confirm({
+      title: t('settingsMenu.localUsers.revokeLink'),
+      message: t('settingsMenu.localUsers.revokeConfirm'),
+      danger: true,
+      confirmLabel: t('settingsMenu.localUsers.revokeLink'),
+    }))) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    const result = await revokeLocalUserInviteLink(link.id);
+    if (result.success) {
+      setLinks((prev) => prev.filter((l) => l.id !== link.id));
+      setSuccess(t('settingsMenu.localUsers.revokeSuccess'));
+    } else {
+      setError(result.message || t('settingsMenu.localUsers.revokeError'));
+      await loadUsers();
+    }
+  };
+
+  const iconBtn =
+    'ds-focus-glow inline-flex items-center justify-center gap-1.5 min-h-[40px] min-w-[40px] px-3 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm hover:bg-[var(--ds-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-brand)]';
+
   if (!hasCloudToken) {
     return (
       <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-border-error)] bg-[var(--ds-surface-error-muted)] p-4">
@@ -217,6 +330,104 @@ export default function LocalUsersManager() {
 
       <div class="sc-frame">
         <div class="sc-frame-body">
+          <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-2 flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-[var(--ds-brand)]" strokeWidth={1.8} />
+            {t('settingsMenu.localUsers.linkInviteTitle')}
+          </h3>
+          <p className="ds-text-secondary text-sm mb-4">{t('settingsMenu.localUsers.linkInviteDescription')}</p>
+          <button
+            type="button"
+            onClick={handleCreateLink}
+            disabled={creatingLink}
+            className="ds-focus-glow inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-brand)] text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-brand)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {creatingLink ? (
+              <>
+                <span className="loading loading-spinner loading-sm" aria-hidden />
+                {t('settingsMenu.localUsers.creatingLink')}
+              </>
+            ) : (
+              <>
+                <Link2 className="w-4 h-4" strokeWidth={1.8} />
+                {t('settingsMenu.localUsers.createLink')}
+              </>
+            )}
+          </button>
+
+          <h4 className="text-sm font-semibold text-[var(--ds-text-secondary)] mt-6 mb-3">
+            {t('settingsMenu.localUsers.pendingLinksTitle', { count: links.length })}
+          </h4>
+          {links.length === 0 ? (
+            <p className="ds-text-tertiary text-sm">{t('settingsMenu.localUsers.noPendingLinks')}</p>
+          ) : (
+            <div className="space-y-3">
+              {links.map((link) => (
+                <div
+                  key={link.id}
+                  className={`p-4 rounded-[var(--ds-radius-sm)] bg-[var(--ds-surface)] border ${link.id === newLinkId ? 'border-[var(--ds-brand)]' : 'border-[var(--ds-border)]'}`}
+                >
+                  <input
+                    type="text"
+                    readOnly
+                    value={link.url}
+                    aria-label={t('settingsMenu.localUsers.linkInviteTitle')}
+                    onFocus={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full px-3 py-2 mb-2 bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ds-brand)]"
+                  />
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className={`text-xs ${link.expired ? 'text-[var(--ds-accent-red)]' : 'ds-text-tertiary'}`}>
+                      {link.expired
+                        ? t('settingsMenu.localUsers.linkExpired')
+                        : link.expiresAt
+                          ? t('settingsMenu.localUsers.linkExpiresOn', { date: new Date(link.expiresAt).toLocaleString() })
+                          : ''}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {!link.expired && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyLink(link)}
+                          className={iconBtn}
+                          title={t('settingsMenu.localUsers.copyLink')}
+                          aria-label={t('settingsMenu.localUsers.copyLink')}
+                        >
+                          {copiedId === link.id ? <Check className="w-4 h-4" strokeWidth={1.8} /> : <Copy className="w-4 h-4" strokeWidth={1.8} />}
+                          <span>{copiedId === link.id ? t('settingsMenu.localUsers.copied') : t('settingsMenu.localUsers.copyLink')}</span>
+                        </button>
+                      )}
+                      {!link.expired && canShare && (
+                        <button
+                          type="button"
+                          onClick={() => handleShareLink(link)}
+                          className={iconBtn}
+                          title={t('settingsMenu.localUsers.shareLink')}
+                          aria-label={t('settingsMenu.localUsers.shareLink')}
+                        >
+                          <Share2 className="w-4 h-4" strokeWidth={1.8} />
+                          <span>{t('settingsMenu.localUsers.shareLink')}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeLink(link)}
+                        className="ds-focus-glow inline-flex items-center justify-center gap-1.5 min-h-[40px] min-w-[40px] px-3 rounded-[var(--ds-radius-sm)] border border-[var(--ds-accent-red-muted)] bg-[var(--ds-surface-elevated)] text-[var(--ds-accent-red)] text-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)]"
+                        title={t('settingsMenu.localUsers.revokeLink')}
+                        aria-label={t('settingsMenu.localUsers.revokeLink')}
+                      >
+                        <Trash2 className="w-4 h-4" strokeWidth={1.8} />
+                        <span>{t('settingsMenu.localUsers.revokeLink')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-4">
             {t('settingsMenu.localUsers.listTitle', { count: users.length })}
           </h3>
@@ -237,6 +448,9 @@ export default function LocalUsersManager() {
                         <span className="ds-status-badge ds-status-badge--success">{t('settingsMenu.localUsers.active')}</span>
                       ) : (
                         <span className="ds-status-badge ds-status-badge--warning">{t('settingsMenu.localUsers.pending')}</span>
+                      )}
+                      {user.inviteKind === 'link' && (
+                        <span className="ds-status-badge">{t('settingsMenu.localUsers.viaLink')}</span>
                       )}
                       {!user.emailVerified && (
                         <span className="ds-status-badge ds-status-badge--error">{t('settingsMenu.localUsers.emailNotVerified')}</span>
