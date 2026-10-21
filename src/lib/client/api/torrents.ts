@@ -15,7 +15,7 @@ import { clientIdentityHeaders } from '../../client-identity.js';
 function authHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   try {
-    const t = TokenManager.getCloudAccessToken();
+    const t = TokenManager.getServerAuthToken();
     return t ? { Authorization: `Bearer ${t}` } : {};
   } catch {
     return {};
@@ -234,7 +234,7 @@ export class TorrentsService {
     let url = await this.getRequestUrl('librqbit/stream_logs');
     if (typeof window !== 'undefined') {
       try {
-        const t = TokenManager.getCloudAccessToken();
+        const t = TokenManager.getServerAuthToken();
         if (t) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(t);
       } catch { /* ignore */ }
     }
