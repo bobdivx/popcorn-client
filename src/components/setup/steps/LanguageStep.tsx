@@ -44,9 +44,9 @@ export function LanguageStep({ focusedButtonIndex, buttonRefs, onNext }: Languag
           background: rgba(255,255,255,0.05);
         }
         .lang-card.selected {
-          border-color: rgba(124,58,237,0.5);
-          background: rgba(124,58,237,0.08);
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+          border-color: rgba(242,84,91,0.5);
+          background: rgba(242,84,91,0.08);
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.1);
         }
         .lang-flag {
           font-size: 32px; line-height: 1; flex-shrink: 0;
@@ -54,10 +54,10 @@ export function LanguageStep({ focusedButtonIndex, buttonRefs, onNext }: Languag
         }
         .lang-check {
           width: 20px; height: 20px; border-radius: 50%;
-          background: #7c3aed;
+          background: #f2545b;
           display: flex; align-items: center; justify-content: center;
           margin-left: auto; flex-shrink: 0;
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.25);
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.25);
         }
         .lang-check-empty {
           width: 20px; height: 20px; border-radius: 50%;
