@@ -2,6 +2,7 @@
 import Layout from './Layout.astro';
 import TranscodeWarningBanner from '../components/settings/TranscodeWarningBanner';
 import SettingsHubBack from '../components/settings/SettingsHubBack';
+import GuestSettingsGuard from '../components/settings/GuestSettingsGuard';
 import '../styles/settings-hub.css';
 
 interface Props {
@@ -21,6 +22,7 @@ const { title = 'Paramètres - Popcornn' } = Astro.props;
       transition:name="settings-content"
       data-tv-settings-content
     >
+      <GuestSettingsGuard client:only="preact" />
       <SettingsHubBack client:load />
       <slot />
     </div>
