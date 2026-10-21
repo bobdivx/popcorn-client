@@ -2037,7 +2037,9 @@
       "loadError": "Erreur lors du chargement des utilisateurs locaux",
       "noToken": "Vous devez être connecté avec votre compte cloud pour gérer les utilisateurs locaux.",
       "tokenExpired": "Votre session cloud a expiré. Veuillez vous reconnecter.",
-      "mainAccountOnly": "Cette page est réservée au compte principal. Veuillez vous connecter avec votre compte cloud."
+      "mainAccountOnly": "Cette page est réservée au compte principal. Veuillez vous connecter avec votre compte cloud.",
+      "linkTitle": "Gérer les utilisateurs locaux",
+      "linkDescription": "Invitez et gérez les comptes locaux avec permissions limitées"
     },
     "documentation": {
       "title": "Documentation",
