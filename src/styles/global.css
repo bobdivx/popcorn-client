@@ -67,15 +67,15 @@ body { color: #fff; }
 
 /* ── Thème clair : surcharger les variables dark du fond et du glassmorphism ── */
 [data-theme="light"] {
-  --bg-primary: #ede9f5;
-  --page-bg: #e8e5f0;
+  --bg-primary: #f0f0f2;
+  --page-bg: #e6e6e8;
   --bg-glass: rgba(189, 42, 49, 0.04);
   --bg-glass-hover: rgba(189, 42, 49, 0.08);
   --bg-glass-active: rgba(189, 42, 49, 0.13);
 }
 
 [data-theme="light"] body {
-  color: #1a1530;
+  color: #18181b;
 }
 
 /* Lecteur plein écran : toujours des commandes blanches, même en thème clair. */
@@ -105,17 +105,17 @@ body { color: #fff; }
 
 [data-theme="light"] .dropdown-menu,
 [data-theme="light"] .dropdown-menu-mobile {
-  background: linear-gradient(135deg, rgba(245, 242, 252, 0.98) 0%, rgba(237, 233, 248, 0.99) 100%);
+  background: linear-gradient(135deg, rgba(246, 246, 247, 0.98) 0%, rgba(240, 240, 242, 0.99) 100%);
   border-color: rgba(189, 42, 49, 0.12);
-  box-shadow: 0 8px 32px rgba(26, 21, 48, 0.12), 0 0 0 1px rgba(189, 42, 49, 0.06) inset;
+  box-shadow: 0 8px 32px rgba(24, 24, 27, 0.12), 0 0 0 1px rgba(189, 42, 49, 0.06) inset;
 }
 
 [data-theme="light"] .navbar-scrolled {
   background: linear-gradient(
     to bottom,
-    rgba(237, 233, 245, 0.97) 0%,
-    rgba(232, 229, 240, 0.88) 60%,
-    rgba(232, 229, 240, 0.50) 100%
+    rgba(240, 240, 242, 0.97) 0%,
+    rgba(230, 230, 232, 0.88) 60%,
+    rgba(230, 230, 232, 0.50) 100%
   ) !important;
 }
 
@@ -756,7 +756,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   will-change: transform;
 }
 
-/* Même violet que l’icône Paramètres / design system (#D1C4E9) */
+/* Même accent que l’icône Paramètres / design system (corail #f2545b, ex-violet) */
 .gtv-icon-btn:hover:not(:disabled),
 .gtv-pill-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.05);
@@ -1061,7 +1061,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.2),
     0 8px 24px -8px rgba(0, 0, 0, 0.25),
-    0 0 40px -12px rgba(209, 196, 233, 0.4);
+    0 0 40px -12px rgba(242, 84, 91, 0.4);
   animation: sync-card-glow 2.5s ease-in-out infinite;
 }
 
@@ -1081,13 +1081,13 @@ html[data-tv-platform="true"] .search-progress-fill {
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.2),
       0 8px 24px -8px rgba(0, 0, 0, 0.25),
-      0 0 40px -12px rgba(209, 196, 233, 0.35);
+      0 0 40px -12px rgba(242, 84, 91, 0.35);
   }
   50% {
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.35),
       0 8px 28px -6px rgba(0, 0, 0, 0.3),
-      0 0 56px -8px rgba(209, 196, 233, 0.5);
+      0 0 56px -8px rgba(242, 84, 91, 0.5);
   }
 }
 
@@ -1797,11 +1797,11 @@ html[data-tv-platform="true"] .search-progress-fill {
   border-left: 1px solid rgba(255, 255, 255, 0.12);
 }
 [data-theme="light"] .nav-status-cluster {
-  border-color: rgba(26, 21, 48, 0.12);
+  border-color: rgba(24, 24, 27, 0.12);
   background: rgba(255, 255, 255, 0.65);
 }
 [data-theme="light"] .nav-status-cluster > * + * {
-  border-left-color: rgba(26, 21, 48, 0.1);
+  border-left-color: rgba(24, 24, 27, 0.1);
 }
 
 /* Padding TV pour nav-tab */
@@ -2370,9 +2370,9 @@ form button[type="submit"]:focus-visible,
 [data-theme="light"] nav.navbar-tv {
   background: linear-gradient(
     to bottom,
-    rgba(232, 229, 240, 0.97) 0%,
-    rgba(232, 229, 240, 0.88) 60%,
-    rgba(232, 229, 240, 0.55) 85%,
+    rgba(230, 230, 232, 0.97) 0%,
+    rgba(230, 230, 232, 0.88) 60%,
+    rgba(230, 230, 232, 0.55) 85%,
     transparent 100%
   );
 }
@@ -2382,9 +2382,9 @@ form button[type="submit"]:focus-visible,
 [data-theme="light"] nav.navbar-tv.navbar-scrolled {
   background: linear-gradient(
     to bottom,
-    rgba(237, 233, 245, 0.98) 0%,
-    rgba(232, 229, 240, 0.95) 60%,
-    rgba(232, 229, 240, 0.65) 100%
+    rgba(240, 240, 242, 0.98) 0%,
+    rgba(230, 230, 232, 0.95) 60%,
+    rgba(230, 230, 232, 0.65) 100%
   ) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -2397,36 +2397,36 @@ form button[type="submit"]:focus-visible,
 [data-theme="light"] nav .text-white\/85,
 [data-theme="light"] nav .text-white\/90,
 [data-theme="light"] nav .text-white\/60 {
-  color: #1a1530 !important;
+  color: #18181b !important;
 }
 
 /* Nom de la marque */
 [data-theme="light"] nav span.font-extrabold {
-  color: #1a1530 !important;
+  color: #18181b !important;
 }
 
 /* Onglets de navigation */
 [data-theme="light"] nav .nav-tab {
-  color: rgba(26, 21, 48, 0.58) !important;
+  color: rgba(24, 24, 27, 0.58) !important;
 }
 [data-theme="light"] nav .nav-tab:hover {
-  color: #1a1530 !important;
+  color: #18181b !important;
   background: rgba(189, 42, 49, 0.08) !important;
 }
 [data-theme="light"] nav .nav-tab-active {
-  color: #1a1530 !important;
+  color: #18181b !important;
   background: rgba(189, 42, 49, 0.10) !important;
   font-weight: 700;
 }
 
 /* Boutons icône (search, downloads, settings, hamburger) */
 [data-theme="light"] nav .gtv-icon-btn {
-  color: rgba(26, 21, 48, 0.70) !important;
+  color: rgba(24, 24, 27, 0.70) !important;
   background-color: rgba(189, 42, 49, 0.06) !important;
   border: 1px solid rgba(189, 42, 49, 0.10);
 }
 [data-theme="light"] nav .gtv-icon-btn:hover:not(:disabled) {
-  color: #1a1530 !important;
+  color: #18181b !important;
   background-color: rgba(189, 42, 49, 0.12) !important;
   transform: none;
   box-shadow: none;
@@ -2439,12 +2439,12 @@ form button[type="submit"]:focus-visible,
 
 /* Boutons pill invité (Connexion / S'inscrire) */
 [data-theme="light"] nav .gtv-pill-btn {
-  color: rgba(26, 21, 48, 0.78) !important;
+  color: rgba(24, 24, 27, 0.78) !important;
   background-color: rgba(189, 42, 49, 0.06) !important;
   border: 1px solid rgba(189, 42, 49, 0.12) !important;
 }
 [data-theme="light"] nav .gtv-pill-btn:hover:not(:disabled) {
-  color: #1a1530 !important;
+  color: #18181b !important;
   background-color: rgba(189, 42, 49, 0.11) !important;
 }
 [data-theme="light"] nav .gtv-pill-btn-primary,
@@ -2459,12 +2459,12 @@ form button[type="submit"]:focus-visible,
 
 /* Horloge */
 [data-theme="light"] nav .tabular-nums {
-  color: rgba(26, 21, 48, 0.58) !important;
+  color: rgba(24, 24, 27, 0.58) !important;
 }
 
 /* Dropdown hamburger mobile en mode clair */
 [data-theme="light"] nav .dropdown-menu-mobile a.text-white {
-  color: #1a1530 !important;
+  color: #18181b !important;
 }
 [data-theme="light"] nav .dropdown-menu-mobile a:hover {
   background-color: rgba(0, 0, 0, 0.05) !important;
@@ -2477,7 +2477,7 @@ form button[type="submit"]:focus-visible,
 [data-theme="light"] nav select {
   background-color: rgba(189, 42, 49, 0.06) !important;
   border-color: rgba(189, 42, 49, 0.14) !important;
-  color: #1a1530 !important;
+  color: #18181b !important;
 }
 
 /* --- Premium Animations for Overlays --- */
