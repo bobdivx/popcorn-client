@@ -1669,7 +1669,7 @@ export interface LocalUser {
 /**
  * Invite un utilisateur local par email
  */
-export async function inviteLocalUser(email: string, displayName?: string): Promise<{ success: boolean; message?: string; userId?: string; emailSent?: boolean }> {
+export async function inviteLocalUser(email: string, displayName?: string): Promise<{ success: boolean; message?: string; userId?: string; emailSent?: boolean; emailError?: string }> {
   try {
     const apiUrl = `${getPopcornWebApiUrl()}/local-users/invite`;
     const res = await requestWithTokenRefresh(
@@ -1681,7 +1681,8 @@ export async function inviteLocalUser(email: string, displayName?: string): Prom
         },
         body: JSON.stringify({ email, displayName }),
       },
-      10000
+      // L'envoi SMTP peut prendre jusqu'à ~30 s (repli 587 -> 465) : ne pas couper avant.
+      45000
     );
 
     if (!res.ok) {
@@ -1697,6 +1698,7 @@ export async function inviteLocalUser(email: string, displayName?: string): Prom
       userId: res.data?.data?.userId,
       // false : invitation créée mais email non envoyé (service email indisponible).
       emailSent: res.data?.data?.emailSent,
+      emailError: res.data?.data?.emailError,
     };
   } catch (error) {
     console.error('[POPCORN-WEB] Erreur lors de l\'invitation:', error);
@@ -1984,7 +1986,7 @@ export async function suggestTmdbEnrichmentRules(): Promise<{
 /**
  * Réenvoie une invitation pour un utilisateur local
  */
-export async function resendLocalUserInvitation(userId: string): Promise<{ success: boolean; message?: string }> {
+export async function resendLocalUserInvitation(userId: string): Promise<{ success: boolean; message?: string; emailSent?: boolean; emailError?: string }> {
   try {
     const apiUrl = `${getPopcornWebApiUrl()}/local-users/${userId}/resend-invitation`;
     const res = await requestWithTokenRefresh(
@@ -1995,7 +1997,7 @@ export async function resendLocalUserInvitation(userId: string): Promise<{ succe
           'Content-Type': 'application/json',
         },
       },
-      10000
+      45000
     );
 
     if (!res.ok) {
@@ -2008,6 +2010,8 @@ export async function resendLocalUserInvitation(userId: string): Promise<{ succe
     return {
       success: true,
       message: res.data?.data?.message || 'Invitation renvoyée avec succès',
+      emailSent: res.data?.data?.emailSent,
+      emailError: res.data?.data?.emailError,
     };
   } catch (error) {
     console.error('[POPCORN-WEB] Erreur lors du réenvoi de l\'invitation:', error);
