@@ -188,10 +188,38 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       })();
     </script>
     <script is:inline>
-      /* Splash éditorial POPCORNN/CHARGEMENT : afficher pendant les navigations View Transitions
-         (script dans le head pour survivre au swap du body). */
+      /* Écran de chargement UNIQUE (#popcorn-loading-fallback) : splash de démarrage, navigations
+         View Transitions, vérifs auth/setup/serveur, données de l'accueil, gardes de route.
+         Script dans le head : existe avant les îlots Preact et survit au swap du body.
+         « holds » : l'écran reste visible tant qu'au moins un hold est actif (plafond par hold,
+         jamais bloqué) — évite la cascade splash → loader → skeleton (flashs / re-montages).
+         ES5 uniquement (anciens webOS). API : src/lib/boot/pageLoader.ts. */
       (function () {
+        var holds = {};
+        var timers = {};
+        var appReady = false;
         function el() { return document.getElementById('popcorn-loading-fallback'); }
+        function hasHolds() {
+          var now = Date.now();
+          for (var k in holds) {
+            if (Object.prototype.hasOwnProperty.call(holds, k)) {
+              if (holds[k] > now) return true;
+              delete holds[k];
+            }
+          }
+          return false;
+        }
+        function setMsg(text) {
+          var m = document.getElementById('popcorn-loading-msg');
+          if (!m) return;
+          if (text) {
+            m.textContent = String(text).substring(0, 160);
+            m.style.display = '';
+          } else {
+            m.textContent = '';
+            m.style.display = 'none';
+          }
+        }
         function show() {
           var n = el();
           if (!n) return;
@@ -200,23 +228,68 @@ const isWebOS = import.meta.env.WEBOS === 'true';
           n.style.transition = '';
         }
         function hide() {
+          if (hasHolds()) return;
           var n = el();
           if (!n || n.style.display === 'none') return;
           n.style.opacity = '0';
           n.style.transition = 'opacity 0.15s ease';
           setTimeout(function () {
-            if (n.style.opacity === '0') n.style.display = 'none';
+            if (n.style.opacity === '0' && !hasHolds()) {
+              n.style.display = 'none';
+              setMsg(null);
+            }
           }, 150);
         }
-        document.addEventListener('astro:before-preparation', show);
-        document.addEventListener('astro:after-swap', show);
+        function release(key) {
+          if (timers[key]) { clearTimeout(timers[key]); delete timers[key]; }
+          if (!Object.prototype.hasOwnProperty.call(holds, key)) return;
+          delete holds[key];
+          if (appReady && !hasHolds()) hide();
+        }
+        function hold(key, maxMs) {
+          var ms = typeof maxMs === 'number' && maxMs > 0 ? maxMs : 20000;
+          holds[key] = Date.now() + ms;
+          if (timers[key]) clearTimeout(timers[key]);
+          timers[key] = setTimeout(function () { release(key); }, ms + 20);
+          show();
+        }
+        /* Route logique (http : /dashboard ; file:// webOS : …/dashboard.html). */
+        function route() {
+          var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+          var m = p.match(/\/([^\/]+)\.html?$/i);
+          if (m) p = m[1].toLowerCase() === 'index' ? '/' : '/' + m[1].toLowerCase();
+          return p;
+        }
+        function holdForRoute() {
+          var r = route();
+          /* IndexRedirect (auth / setup / serveur, puis intro) relâche ce hold. */
+          if (r === '/' || r === '/demo') hold('index-boot', 60000);
+          /* Accueil : un seul écran jusqu'aux premières données (pas de skeleton intermédiaire). */
+          if (r === '/dashboard') {
+            window.__popcornHomeReady = false;
+            hold('home-data', 15000);
+          }
+        }
+        holdForRoute();
+        document.addEventListener('astro:before-preparation', function () {
+          appReady = false;
+          show();
+        });
+        document.addEventListener('astro:after-swap', function () {
+          show();
+          holdForRoute();
+        });
         /* page-load : léger délai pour laisser les îlots Preact peindre ; popcorn-app-ready masque dès que l’app est prête. */
         document.addEventListener('astro:page-load', function () {
-          setTimeout(hide, 120);
+          setTimeout(function () { appReady = true; hide(); }, 120);
         });
-        window.addEventListener('popcorn-app-ready', hide);
+        window.addEventListener('popcorn-app-ready', function () { appReady = true; hide(); });
         window.__popcornShowPageLoader = show;
         window.__popcornHidePageLoader = hide;
+        window.__popcornHoldPageLoader = hold;
+        window.__popcornReleasePageLoader = release;
+        window.__popcornSetPageLoaderMessage = setMsg;
+        window.__popcornPageLoaderAppReady = function () { return appReady; };
       })();
     </script>
     <script is:inline>
@@ -428,11 +501,17 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         @keyframes plb-run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
         @media (prefers-reduced-motion: reduce){#popcorn-loading-fallback .plb-l::after{animation:none;width:100%}}
         #popcorn-loading-fallback .pl-boot-error{color:#f2545b;border:1px solid rgba(242,84,91,.4)}
+        #popcorn-loading-fallback .plb-m{margin:0;max-width:min(32rem,100%);font-family:'Jost',sans-serif;font-weight:300;font-size:12px;font-size:clamp(11px,.9vw,18px);letter-spacing:.24em;text-transform:uppercase;color:rgba(244,241,236,.6);text-align:center;overflow-wrap:anywhere}
+        #popcorn-loading-fallback .plb-x{position:absolute;left:0;right:0;top:calc(50% + 5.5rem);display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:0 1.5rem;text-align:center}
       </style>
       <div class="plb" role="status" aria-busy="true">
         <div class="plb-k">Popcornn</div>
         <h1 class="plb-t">Chargement</h1>
         <div class="plb-l"></div>
+      </div>
+      <!-- Infos secondaires sous le bloc centré (ne décalent jamais le titre du centre de l'écran) -->
+      <div class="plb-x">
+        <p id="popcorn-loading-msg" class="plb-m" aria-live="polite" style="display: none;"></p>
         <p id="popcorn-loading-hint" class="pl-boot-hint text-sm mt-2 max-w-xs text-center hidden" style="display: none;">Si rien ne s&#39;affiche, quittez et rouvrez l&#39;app.</p>
         <p id="popcorn-loading-error" class="pl-boot-error mt-3 max-w-lg text-center px-3 py-2 text-sm font-medium hidden" style="display: none;"></p>
       </div>
@@ -592,10 +671,17 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var isDev = document.documentElement.getAttribute('data-dev') === 'true';
         var hintDelay = isDev ? 15000 : 8000;
         var slowMsgDelay = isDev ? 20000 : 5000;
+        // Écran unique : il peut rester affiché volontairement (données de l'accueil, serveur lent).
+        // Les messages « bloqué » ne concernent que le cas où l'app n'a jamais démarré.
+        function appStarted() {
+          try { return !!(window.__popcornPageLoaderAppReady && window.__popcornPageLoaderAppReady()); } catch (e) { return false; }
+        }
         setTimeout(function() {
+          if (appStarted()) return;
           if (fallback && fallback.style.display !== 'none' && hint) hint.style.display = 'block';
         }, hintDelay);
         setTimeout(function() {
+          if (appStarted()) return;
           if (!fallback || fallback.style.display === 'none') return;
           if (!errEl || !errEl.textContent) {
             var isWebOSEnv = document.documentElement.getAttribute('data-webos') === 'true';
