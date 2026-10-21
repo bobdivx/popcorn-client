@@ -229,6 +229,8 @@ export class TokenManager {
   private static readonly CLOUD_ACCESS_TOKEN_KEY = 'cloud_access_token';
   private static readonly CLOUD_REFRESH_TOKEN_KEY = 'cloud_refresh_token';
   private static readonly JWT_SECRET_KEY = 'jwt_secret';
+  /** Session délivrée par le serveur Popcornn aux utilisateurs locaux (invités sans compte cloud). */
+  private static readonly SERVER_SESSION_TOKEN_KEY = 'server_session_token';
 
   /**
    * Stocke les tokens locaux
@@ -262,6 +264,39 @@ export class TokenManager {
   static getCloudAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(this.CLOUD_ACCESS_TOKEN_KEY);
+  }
+
+  /**
+   * Stocke la session serveur d'un utilisateur local (invité) : jeton `pls1.…` signé par le serveur.
+   */
+  static setServerSessionToken(token: string): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(this.SERVER_SESSION_TOKEN_KEY, token);
+  }
+
+  /**
+   * Récupère la session serveur d'un utilisateur local (null si absente).
+   */
+  static getServerSessionToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(this.SERVER_SESSION_TOKEN_KEY);
+  }
+
+  /**
+   * Supprime la session serveur d'un utilisateur local.
+   */
+  static clearServerSessionToken(): void {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(this.SERVER_SESSION_TOKEN_KEY);
+  }
+
+  /**
+   * Token à joindre aux appels vers le serveur Popcornn : token cloud (compte principal / membres
+   * cloud) ou, à défaut, session serveur d'un utilisateur local invité.
+   * Ne jamais l'envoyer à popcorn-web (utiliser getCloudAccessToken pour le cloud).
+   */
+  static getServerAuthToken(): string | null {
+    return this.getCloudAccessToken() || this.getServerSessionToken();
   }
 
   /**
@@ -306,6 +341,7 @@ export class TokenManager {
     localStorage.removeItem(this.CLOUD_ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.CLOUD_REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.JWT_SECRET_KEY);
+    localStorage.removeItem(this.SERVER_SESSION_TOKEN_KEY);
   }
 
   /**
