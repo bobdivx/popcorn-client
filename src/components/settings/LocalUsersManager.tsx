@@ -69,7 +69,11 @@ export default function LocalUsersManager() {
       // Seul l'email est demandé : l'invité choisit lui-même son nom de profil à l'acceptation.
       const result = await inviteLocalUser(email.trim());
 
-      if (result.success) {
+      if (result.success && result.emailSent === false) {
+        setError(t('settingsMenu.localUsers.inviteEmailNotSent'));
+        setEmail('');
+        await loadUsers();
+      } else if (result.success) {
         setSuccess(t('settingsMenu.localUsers.inviteSuccess'));
         setEmail('');
         await loadUsers();
