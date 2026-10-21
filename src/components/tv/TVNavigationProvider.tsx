@@ -2036,7 +2036,7 @@ export default function TVNavigationProvider() {
         border-radius: inherit !important;
         pointer-events: none !important;
         z-index: 8 !important;
-        box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(124, 58, 237, 0.95) !important;
+        box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(242, 84, 91, 0.95) !important;
       }
       html[data-tv-platform="true"] [data-torrent-card]:focus-visible,
       html[data-tv-platform="true"] [data-torrent-card]:focus-within,
@@ -2118,7 +2118,7 @@ export default function TVNavigationProvider() {
       html[data-tv-platform="true"] .tv-element-focused {
         outline: 3px solid #fff !important;
         outline-offset: -3px !important;
-        box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(124, 58, 237, 0.9) !important;
+        box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(242, 84, 91, 0.9) !important;
       }
       
       html:not([data-tv-platform="true"]) [data-torrent-card].tv-card-focused,
