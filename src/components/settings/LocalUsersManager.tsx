@@ -70,7 +70,10 @@ export default function LocalUsersManager() {
       const result = await inviteLocalUser(email.trim());
 
       if (result.success && result.emailSent === false) {
-        setError(t('settingsMenu.localUsers.inviteEmailNotSent'));
+        setError(
+          t('settingsMenu.localUsers.inviteEmailNotSent') +
+            (result.emailError ? ` (${result.emailError})` : '')
+        );
         setEmail('');
         await loadUsers();
       } else if (result.success) {
@@ -122,7 +125,12 @@ export default function LocalUsersManager() {
 
       const result = await resendLocalUserInvitation(userId);
 
-      if (result.success) {
+      if (result.success && result.emailSent === false) {
+        setError(
+          t('settingsMenu.localUsers.inviteEmailNotSent') +
+            (result.emailError ? ` (${result.emailError})` : '')
+        );
+      } else if (result.success) {
         setSuccess(t('settingsMenu.localUsers.resendSuccess'));
       } else {
         setError(result.message || t('settingsMenu.localUsers.resendError'));
