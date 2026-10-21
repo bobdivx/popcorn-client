@@ -14,6 +14,7 @@ import { getUserConfig } from '../lib/api/popcorn-web.js';
 import { TokenManager } from '../lib/client/storage.js';
 import { FullScreenLoadingOverlay } from './ui/design-system';
 import { useI18n } from '../lib/i18n/useI18n';
+import { holdPageLoader, releasePageLoader } from '../lib/boot/pageLoader';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -22,6 +23,15 @@ const DIAG_PATH = '/settings/diagnostics';
 const AUDIT_PATH = '/settings/audit';
 const SERVER_SETTINGS_PATH = '/settings/server';
 const HEALTH_CHECK_CACHE_DURATION = 10000; // Cache de 10 secondes pour éviter les checks répétés
+/** Hold de l'écran de chargement unique pendant la 1re vérification (pas d'overlay dédié). */
+const SERVER_CHECK_HOLD = 'server-check';
+
+/** « / » (et /demo, index.html sous file://) : le routage de démarrage appartient à IndexRedirect. */
+function isIndexBootPath(pathname: string): boolean {
+  if (/\/index\.html?$/i.test(pathname)) return true;
+  const p = normalizePath(pathname || '/');
+  return p === '/' || p === '/demo' || p.startsWith('/demo/');
+}
 
 // Cache global pour éviter les checks répétés lors de la navigation
 let lastHealthCheck: { timestamp: number; success: boolean } | null = null;
@@ -117,6 +127,14 @@ export default function ServerConnectionCheck() {
         return;
       }
 
+      // Démarrage sur « / » : IndexRedirect fait déjà les vérifs (serveur, auth, setup) en
+      // parallèle de l'intro, avec l'écran de chargement unique. Ne pas doubler par un 2e écran
+      // ni par une redirection concurrente (qui coupait l'intro).
+      if (isIndexBootPath(currentPath)) {
+        setIsVisible(false);
+        return;
+      }
+
       // Premier lancement / aucune URL configurée: forcer l'assistant de configuration
       // (sinon l'app reste bloquée sur "En attente du serveur..." avec l'URL par défaut)
       // Ne pas renvoyer vers /setup si l'utilisateur est déjà authentifié (cloud ou session) —
@@ -158,6 +176,7 @@ export default function ServerConnectionCheck() {
 
     return () => {
       cancelled = true;
+      releasePageLoader(SERVER_CHECK_HOLD);
       if (retryIntervalRef.current !== null) {
         clearTimeout(retryIntervalRef.current);
       }
@@ -235,7 +254,10 @@ export default function ServerConnectionCheck() {
     }
     
     checkStartTimeRef.current = Date.now();
-    
+    // Pendant la vérification : l'écran de chargement unique (pas d'overlay « Connexion au
+    // serveur… » qui clignotait entre deux autres écrans de chargement).
+    holdPageLoader(SERVER_CHECK_HOLD, 10000);
+
     try {
       const response = await serverApi.checkServerHealth();
       
@@ -246,17 +268,15 @@ export default function ServerConnectionCheck() {
       };
       
       if (response.success) {
-        // Si le serveur répond rapidement (moins de 500ms), ne pas afficher l'animation
-        const elapsed = Date.now() - (checkStartTimeRef.current || 0);
-        if (elapsed < 500) {
-          setIsVisible(false);
-          handleConnectionSuccess(response);
-          return;
-        }
+        releasePageLoader(SERVER_CHECK_HOLD);
+        setIsVisible(false);
+        handleConnectionSuccess(response);
+        return;
       }
       
-      // Si le serveur ne répond pas rapidement ou en cas d'erreur, afficher l'animation
+      // Serveur injoignable : overlay (même rendu que l'écran unique) + réessais + actions
       setIsVisible(true);
+      releasePageLoader(SERVER_CHECK_HOLD);
       checkConnection();
     } catch (err) {
       // Mettre à jour le cache avec l'échec
@@ -267,12 +287,14 @@ export default function ServerConnectionCheck() {
       
       // Si l'utilisateur est authentifié, ne pas bloquer même en cas d'erreur
       if (serverApi.isAuthenticated()) {
+        releasePageLoader(SERVER_CHECK_HOLD);
         setIsVisible(false);
         return;
       }
       
-      // En cas d'erreur, afficher l'animation et réessayer
+      // En cas d'erreur, afficher l'overlay et réessayer
       setIsVisible(true);
+      releasePageLoader(SERVER_CHECK_HOLD);
       checkConnection();
     }
   };
