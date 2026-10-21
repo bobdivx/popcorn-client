@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import type { ComponentType } from 'preact';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { TokenManager } from '../lib/client/storage.js';
 import {
@@ -21,7 +22,6 @@ import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideo from './IntroVideo';
 import { initNativeSsoListener } from '../lib/auth/native-sso';
-import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
 import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
 import { isTVPlatform, isWebOSTV } from '../lib/utils/device-detection';
 import {
@@ -29,6 +29,14 @@ import {
   STORAGE_INTRO_SKIPPED,
   shouldShowBootIntro,
 } from '../lib/utils/boot-intro';
+import {
+  HOME_DATA_HOLD,
+  HOME_READY_EVENT,
+  holdPageLoader,
+  isHomeReady,
+  releasePageLoader,
+  setPageLoaderMessage,
+} from '../lib/boot/pageLoader';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 /** Résultat du démarrage automatique du backend (pour affichage sur /setup). */
@@ -47,11 +55,108 @@ function saveBackendStartResult(result: BackendStartResult) {
   }
 }
 
+/** Hold Layout.astro posé sur « / » jusqu'à ce que l'intro ou la destination soit prête. */
+const INDEX_BOOT_HOLD = 'index-boot';
+
+function computeShowIntro(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Android TV / webOS : comportement Netflix — sting marque à chaque ouverture (session).
+  const tvBoot = isTVPlatform() || isWebOSTV();
+  let sessionSeen = false;
+  let foreverSkipped = false;
+  try {
+    sessionSeen = sessionStorage.getItem(STORAGE_INTRO_SESSION) === '1';
+    foreverSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
+  } catch {
+    // ignore
+  }
+  return shouldShowBootIntro({ isTvBoot: tvBoot, sessionSeen, foreverSkipped });
+}
+
+/**
+ * L'accueil peut-il être monté ici même (sous l'intro), URL réécrite en /dashboard ?
+ * Non sous file:// (build webOS packagé : routes = fichiers .html) → redirection classique.
+ */
+function canRenderHomeInPlace(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.location.protocol === 'file:') return false;
+  if (typeof window.history?.replaceState !== 'function') return false;
+  const p = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+  return p === '/';
+}
+
 export default function IndexRedirect() {
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('Chargement...');
+  // Démarrage unifié : un seul écran de chargement (#popcorn-loading-fallback, Layout.astro) ;
+  // les vérifs (auth / setup / serveur) et le pré-rendu de l'accueil tournent PENDANT l'intro.
+  const [, setLoading] = useState(true);
+  const setMessage = (msg: string) => setPageLoaderMessage(msg);
   const attemptRef = useRef(0);
-  const [showIntro, setShowIntro] = useState(false);
+  const [showIntro, setShowIntro] = useState<boolean>(computeShowIntro);
+  const introDoneRef = useRef(!showIntro);
+  /** Destination décidée pendant l'intro (appliquée à la fin de l'intro). */
+  const pendingPathRef = useRef<string | null>(null);
+  const [HomeComponent, setHomeComponent] = useState<ComponentType | null>(null);
+  const homeInPlaceRef = useRef(false);
+
+  /** Accueil monté sous l'intro : URL → /dashboard (comme dashboard.astro, même Layout). */
+  const mountHomeInPlace = useCallback(() => {
+    if (homeInPlaceRef.current) return;
+    homeInPlaceRef.current = true;
+    try {
+      // Conserver history.state (géré par le ClientRouter Astro) pour que Retour reste cohérent.
+      window.history.replaceState(window.history.state, '', '/dashboard');
+      document.title = 'Tableau de bord - Popcornn';
+      window.dispatchEvent(new Event('popcorn-route-changed'));
+    } catch {
+      // ignore
+    }
+    // Intro déjà finie (ou absente) : l'écran unique reste jusqu'aux premières données.
+    if (introDoneRef.current && !isHomeReady()) holdPageLoader(HOME_DATA_HOLD, 15000);
+    releasePageLoader(INDEX_BOOT_HOLD);
+    import('./dashboard/Dashboard')
+      .then((mod) => setHomeComponent(() => mod.default as ComponentType))
+      .catch((err) => {
+        console.error('[IndexRedirect] Chargement accueil impossible, redirection:', err);
+        homeInPlaceRef.current = false;
+        releasePageLoader(HOME_DATA_HOLD);
+        holdPageLoader(INDEX_BOOT_HOLD, 15000);
+        window.location.href = `${window.location.origin}/dashboard`;
+      });
+  }, []);
+
+  /** Navigation finale : différée tant que l'intro joue ; l'accueil est pré-rendu dessous. */
+  const goTo = useCallback(
+    (path: string) => {
+      if (path === '/dashboard' && homeInPlaceRef.current) return;
+      if (path === '/dashboard' && canRenderHomeInPlace()) {
+        mountHomeInPlace();
+        return;
+      }
+      if (!introDoneRef.current) {
+        pendingPathRef.current = path;
+        return;
+      }
+      // Rechargement de page : l'écran unique reste affiché jusqu'à la page suivante.
+      holdPageLoader(INDEX_BOOT_HOLD, 20000);
+      redirectTo(path);
+    },
+    [mountHomeInPlace],
+  );
+
+  /** Destination sans montage sur place (mode démo : DemoExitBar etc. lisent le mode au montage). */
+  const goToClassic = useCallback((path: string) => {
+    if (!introDoneRef.current) {
+      pendingPathRef.current = path;
+      return;
+    }
+    holdPageLoader(INDEX_BOOT_HOLD, 20000);
+    redirectTo(path);
+  }, []);
+
+  const handleIntroStarted = useCallback(() => {
+    // L'intro (noire, plein écran) prend le relais de l'écran de chargement.
+    releasePageLoader(INDEX_BOOT_HOLD);
+  }, []);
 
   const handleIntroEnded = () => {
     try {
@@ -60,9 +165,28 @@ export default function IndexRedirect() {
     } catch {
       // ignore
     }
+    introDoneRef.current = true;
+    if (homeInPlaceRef.current) {
+      // Accueil pré-rendu sous l'intro : s'il n'a pas encore ses données, écran unique jusque-là.
+      if (!isHomeReady()) holdPageLoader(HOME_DATA_HOLD, 15000);
+      releasePageLoader(INDEX_BOOT_HOLD);
+    } else if (pendingPathRef.current) {
+      const dest = pendingPathRef.current;
+      pendingPathRef.current = null;
+      goTo(dest);
+    } else {
+      // Vérifications encore en cours : l'écran unique reprend (pas de loader spécifique).
+      holdPageLoader(INDEX_BOOT_HOLD, 60000);
+    }
     setShowIntro(false);
-    checkAndRedirect();
   };
+
+  // Accueil prêt → libérer l'écran unique (au cas où le hold a été posé après markHomeReady).
+  useEffect(() => {
+    const onReady = () => releasePageLoader(HOME_DATA_HOLD);
+    window.addEventListener(HOME_READY_EVENT, onReady);
+    return () => window.removeEventListener(HOME_READY_EVENT, onReady);
+  }, []);
 
   // Signaler que l'app a rendu du contenu (masquer l'écran de chargement initial, évite écran noir webOS)
   useEffect(() => {
@@ -80,22 +204,13 @@ export default function IndexRedirect() {
   }, []);
 
   useEffect(() => {
-    // Android TV / webOS : comportement Netflix — sting marque à chaque ouverture (session).
-    // IntroVideo résout le MP4 d'intro versionné (boot-intro.ts) + fallback GIF.
-    const tvBoot = isTVPlatform() || isWebOSTV();
-    let sessionSeen = false;
-    let foreverSkipped = false;
-    try {
-      sessionSeen = sessionStorage.getItem(STORAGE_INTRO_SESSION) === '1';
-      foreverSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
-    } catch {
-      // ignore
+    // Vérifications lancées tout de suite, EN PARALLÈLE de l'intro (plus après).
+    // Pré-chargement du code de l'accueil pendant ce temps (http/https uniquement).
+    if (canRenderHomeInPlace()) {
+      void import('./dashboard/Dashboard').catch(() => {});
     }
-    if (shouldShowBootIntro({ isTvBoot: tvBoot, sessionSeen, foreverSkipped })) {
-      setShowIntro(true);
-      return;
-    }
-    checkAndRedirect();
+    return checkAndRedirect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkAndRedirect = () => {
@@ -135,6 +250,7 @@ export default function IndexRedirect() {
           const slug = idFromPath ?? idFromQuery;
           if (slug) {
             redirectTo('/torrents?slug=' + encodeURIComponent(slug));
+            releasePageLoader(INDEX_BOOT_HOLD);
             return;
           }
         }
@@ -143,6 +259,7 @@ export default function IndexRedirect() {
         // En déploiement SPA, ce composant peut être monté sur /dashboard, /torrents/xxx, etc. : ne pas rediriger dans ce cas.
         if (pathname !== '/' && pathname !== '/demo' && !pathname.startsWith('/demo/')) {
           setLoading(false);
+          releasePageLoader(INDEX_BOOT_HOLD);
           return;
         }
 
@@ -194,12 +311,12 @@ export default function IndexRedirect() {
           const path = window.location.pathname || '';
           if (path === '/demo' || path.startsWith('/demo/')) {
             setDemoMode(true);
-            redirectTo('/dashboard');
+            goToClassic('/dashboard');
             setLoading(false);
             return;
           }
           if (isDemoMode()) {
-            redirectTo('/dashboard');
+            goToClassic('/dashboard');
             setLoading(false);
             return;
           }
@@ -211,7 +328,7 @@ export default function IndexRedirect() {
         try {
           const shouldDiag = localStorage.getItem(STORAGE_DIAG_ON_BOOT) === '1';
           if (shouldDiag) {
-            redirectTo('/settings/diagnostics');
+            goTo('/settings/diagnostics');
             setLoading(false);
             return;
           }
@@ -232,7 +349,7 @@ export default function IndexRedirect() {
                 if (isDemoLibraryBackendUrl(url)) {
                   // Compte de démonstration (ex. revue Google Play) : bibliothèque de démo intégrée.
                   setBackendUrl(url);
-                  redirectTo('/dashboard');
+                  goToClassic('/dashboard');
                   setLoading(false);
                   return;
                 }
@@ -298,7 +415,7 @@ export default function IndexRedirect() {
             }
             // Après 10 tentatives, basculer vers le setup:
             // c'est l'écran qui permet notamment de configurer l'URL du backend.
-            redirectTo('/setup');
+            goTo('/setup');
             setLoading(false);
             return;
           }
@@ -314,7 +431,7 @@ export default function IndexRedirect() {
                 devices?.filter((d) => !d.revokedAt && d.lastSeenAt && d.lastSeenAt > 0).length ?? 0;
               if (activeDeviceCount === 0) {
                 console.log('[IndexRedirect] DB vide et aucun appareil cloud → redirection vers /setup');
-                redirectTo('/setup');
+                goTo('/setup');
                 setLoading(false);
                 return;
               }
@@ -322,7 +439,7 @@ export default function IndexRedirect() {
             } catch (e) {
               console.warn('[IndexRedirect] Impossible de récupérer les appareils cloud, fallback /setup', e);
               console.log('[IndexRedirect] DB vide, redirection vers /setup (fallback)');
-              redirectTo('/setup');
+              goTo('/setup');
               setLoading(false);
               return;
             }
@@ -333,7 +450,7 @@ export default function IndexRedirect() {
         // Ne vérifier l'authentification que si on a un token
         if (!serverApi.isAuthenticated()) {
           setMessage('Vérification de l\'authentification...');
-          redirectTo('/login');
+          goTo('/login');
           setLoading(false);
           return;
         }
@@ -350,19 +467,19 @@ export default function IndexRedirect() {
           if (setupResponse2.success && setupResponse2.data) {
             if (setupResponse2.data.backendReachable !== false && setupResponse2.data.needsSetup) {
               const hasCloudAuth = typeof TokenManager?.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
-              if (!hasCloudAuth) redirectTo('/setup');
-              else redirectTo('/dashboard');
+              if (!hasCloudAuth) goTo('/setup');
+              else goTo('/dashboard');
             } else {
-              redirectTo('/dashboard');
+              goTo('/dashboard');
             }
           } else {
             // En cas d'erreur, rediriger vers le dashboard (ne pas bloquer l'utilisateur)
-            redirectTo('/dashboard');
+            goTo('/dashboard');
           }
         } else {
           // Utilisateur non connecté (token invalide ou expiré)
           setMessage('Redirection vers la connexion...');
-          redirectTo('/login');
+          goTo('/login');
         }
       } catch (error) {
         // Logger l'erreur de manière visible (console.error apparaît dans logcat WebView)
@@ -389,7 +506,7 @@ export default function IndexRedirect() {
         setLoading(false);
         if (mounted) {
           console.log('[IndexRedirect] Redirecting to /setup due to error');
-          redirectTo('/setup');
+          goTo('/setup');
         }
         return;
       } finally {
@@ -408,7 +525,7 @@ export default function IndexRedirect() {
       setLoading(false);
       // Rediriger vers /setup en cas d'erreur fatale au niveau du useEffect
       try {
-        redirectTo('/setup');
+        goTo('/setup');
       } catch {
         console.error('[IndexRedirect] Cannot redirect to /setup - redirectTo failed');
       }
@@ -419,27 +536,23 @@ export default function IndexRedirect() {
     };
   };
 
-  if (showIntro) {
-    return <IntroVideo onEnded={handleIntroEnded} variant="brand" />;
-  }
+  // Accueil pré-rendu (sous l'intro tant qu'elle joue) : inerte + masqué à la navigation TV.
+  const home = HomeComponent ? (
+    <div
+      data-boot-home
+      aria-hidden={showIntro ? 'true' : undefined}
+      {...(showIntro ? ({ inert: true } as Record<string, unknown>) : {})}
+    >
+      <HomeComponent />
+    </div>
+  ) : null;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-[var(--ed-bg,#0c0d10)]">
-        <div className="text-center max-w-lg mx-4">
-          <HLSLoadingSpinner size="lg" text={message} />
-          {message.includes('réessai') && (
-            <div className="mt-6 w-full max-w-xs mx-auto bg-white/10 rounded-full h-px overflow-hidden">
-              <div
-                className="h-px bg-[var(--ed-accent,#f2545b)] transition-all duration-300"
-                style={{ width: `${Math.min(100, attemptRef.current * 10)}%` }}
-              ></div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <>
+      {home}
+      {showIntro ? (
+        <IntroVideo onEnded={handleIntroEnded} onStarted={handleIntroStarted} variant="brand" />
+      ) : null}
+    </>
+  );
 }
