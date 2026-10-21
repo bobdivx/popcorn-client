@@ -2003,7 +2003,9 @@
       "mainAccountOnly": "This page is reserved for the main account. Please sign in with your cloud account.",
       "linkTitle": "Manage local users",
       "linkDescription": "Invite and manage local accounts with limited permissions",
-      "inviteEmailNotSent": "The invitation was created but the email could not be sent. Retry with “Resend invitation”."
+      "inviteEmailNotSent": "The invitation was created but the email could not be sent. Retry with “Resend invitation”.",
+      "lastEmailSent": "Invitation email sent on {date} (check Spam / Promotions)",
+      "lastEmailFailed": "Email failed on {date}: {error}"
     },
     "documentation": {
       "title": "Documentation",
