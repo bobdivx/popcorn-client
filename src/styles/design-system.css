@@ -2820,3 +2820,18 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   }
 }
 
+/* ── Compat daisyUI sans oklch (webOS / anciens WebView Android TV) ──
+   daisyUI v4 injecte des couleurs de repli codées en dur (--fallback-p #491eff / #7582ff,
+   --fallback-s #ff41c7…) quand le navigateur ne supporte pas oklch() : btn-primary,
+   text-primary, toggle, progress… redevenaient indigo/violet sur TV. On les aligne sur
+   l’accent corail éditorial. Sans effet sur les navigateurs récents. */
+@supports not (color: oklch(0% 0 0)) {
+  html:root {
+    --fallback-p: var(--raw-color-brand-500);
+    --fallback-pc: var(--raw-color-white);
+    --fallback-s: var(--ed-ink, #f4f1ec);
+    --fallback-sc: var(--ed-bg, #0c0d10);
+    --fallback-a: var(--raw-color-brand-500);
+    --fallback-ac: var(--raw-color-white);
+  }
+}
