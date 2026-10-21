@@ -220,7 +220,18 @@ export default {
           '--btn-focus-scale': '0.98',
         },
       },
-      'light',
+      {
+        // Thème clair : même accent corail (le 'light' daisyUI par défaut est indigo/violet #491eff).
+        light: {
+          ...require('daisyui/src/theming/themes')['light'],
+          primary: '#e03a42',
+          'primary-content': '#ffffff',
+          secondary: '#18181b',
+          'secondary-content': '#ffffff',
+          accent: '#e03a42',
+          'accent-content': '#ffffff',
+        },
+      },
     ],
     darkTheme: 'dark',
   },
