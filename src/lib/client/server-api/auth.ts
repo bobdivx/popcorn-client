@@ -173,7 +173,7 @@ export const authMethods = {
         applyServerSession(backendRes.data.access_token);
         const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
         this.saveTokens(accessToken, refreshToken);
-        this.saveUser({ id: userId, email: user.email || email, username });
+        this.saveUser({ id: userId, email: user.email || email, username, role: user.role });
         console.log('[server-api] Connexion backend (compte local) réussie');
         return {
           success: true,
