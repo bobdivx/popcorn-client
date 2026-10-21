@@ -2039,7 +2039,9 @@
       "tokenExpired": "Votre session cloud a expiré. Veuillez vous reconnecter.",
       "mainAccountOnly": "Cette page est réservée au compte principal. Veuillez vous connecter avec votre compte cloud.",
       "linkTitle": "Gérer les utilisateurs locaux",
-      "linkDescription": "Invitez et gérez les comptes locaux avec permissions limitées"
+      "linkDescription": "Invitez et gérez les comptes locaux avec permissions limitées",
+      "shareDefaultNone": "Par défaut, un invité ne voit aucun média (partage « Aucun »). Choisissez ce qu'il peut voir dans",
+      "manageSharing": "Paramètres › Amis (partage)"
     },
     "documentation": {
       "title": "Documentation",
@@ -2901,7 +2903,25 @@
     "noActivity": "Aucune activité.",
     "selectMediaToShare": "Sélectionner les médias à partager",
     "noMediaSelectable": "Aucun média sélectionnable (assurez-vous que la bibliothèque est enrichie).",
-    "apply": "Appliquer"
+    "apply": "Appliquer",
+    "localGuestsTitle": "Invités (utilisateurs locaux)",
+    "localGuestsDescription": "Les invités que vous avez créés dans « Utilisateurs locaux ». Par défaut, un invité ne voit rien (partage « Aucun ») : choisissez ici « Tout » ou une sélection de médias.",
+    "noLocalGuests": "Aucun invité actif. Invitez-en un depuis « Utilisateurs locaux »."
+  },
+  "quickConnectAuthorize": {
+    "title": "Connexion rapide",
+    "description": "Autorisez un nouvel appareil à se connecter en entrant le code de connexion rapide affiché sur cet appareil.",
+    "codeLabel": "Code de connexion rapide",
+    "codeHint": "Entrez le code à 6 caractères affiché sur le nouvel appareil",
+    "codeLengthError": "Veuillez entrer un code à 6 caractères",
+    "accountLabel": "Compte à connecter",
+    "myAccount": "Mon compte",
+    "guestOption": "Invité : {name}",
+    "guestHint": "Un invité n'accède qu'aux médias que vous partagez avec lui (rien par défaut).",
+    "authorizing": "Autorisation...",
+    "submit": "Autoriser la connexion",
+    "success": "Code autorisé avec succès ! L'appareil peut maintenant se connecter.",
+    "authorizeError": "Erreur lors de l'autorisation"
   },
   "torrentSyncManager": {
     "status": "Statut",
