@@ -23,10 +23,10 @@ export const CLASSIC_PACK: UiPack = {
   id: 'classic',
   name: { fr: 'Popcornn', en: 'Popcornn' },
   description: {
-    fr: 'Ancien thème : sombre, violet, cartes.',
-    en: 'Previous theme: dark, violet, cards.',
+    fr: 'Thème sombre éditorial, accent corail.',
+    en: 'Dark editorial theme, coral accent.',
   },
-  swatch: { bg: '#121212', accent: '#a855f7', text: '#ffffff' },
+  swatch: { bg: '#0c0d10', accent: '#f2545b', text: '#f4f1ec' },
 };
 
 /** Pack Tesla — accent bleu, clair et sombre. */
