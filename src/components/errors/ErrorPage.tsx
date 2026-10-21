@@ -69,7 +69,7 @@ export default function ErrorPage({
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center relative overflow-hidden">
       {/* Animation de fond */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className={`absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)] animate-pulse`}></div>
+        <div className={`absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(242,84,91,0.1),transparent_50%)] animate-pulse`}></div>
         <div className={`absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r ${colors.circles} rounded-full blur-3xl animate-pulse`} style={{ animationDelay: '0s', animationDuration: '3s' }}></div>
         <div className={`absolute bottom-1/4 right-1/4 w-96 h-96 bg-gradient-to-r ${colors.circles} rounded-full blur-3xl animate-pulse`} style={{ animationDelay: '1.5s', animationDuration: '3s' }}></div>
       </div>
@@ -125,7 +125,7 @@ export default function ErrorPage({
           {showHomeButton && (
             <a
               href="/dashboard"
-              className="px-8 py-4 tv:px-12 tv:py-5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold text-lg tv:text-2xl rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 focus:scale-105 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
+              className="px-8 py-4 tv:px-12 tv:py-5 bg-[#f2545b] hover:bg-[#ff6a70] text-white font-bold text-lg tv:text-2xl rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 focus:scale-105 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
               tabIndex={0}
               data-focusable
             >
