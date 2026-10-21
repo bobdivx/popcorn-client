@@ -341,11 +341,12 @@ export class ServerApiClientBase {
       } catch { /* ignore */ }
     }
 
-    // Authentification serveur : joindre le token d'acces cloud / Pocket ID. Le serveur resout
-    // le membre a partir de ce token ; le JWT local auto-signe n'est pas verifiable cote serveur.
+    // Authentification serveur : joindre le token d'acces cloud / Pocket ID, ou a defaut la
+    // session serveur d'un utilisateur local invite (pls1.). Le JWT local auto-signe n'est pas
+    // verifiable cote serveur.
     if (typeof window !== 'undefined' && !(headers as Record<string, string>).Authorization) {
-      const cloudToken = TokenManager.getCloudAccessToken();
-      if (cloudToken) (headers as Record<string, string>).Authorization = `Bearer ${cloudToken}`;
+      const serverToken = TokenManager.getServerAuthToken();
+      if (serverToken) (headers as Record<string, string>).Authorization = `Bearer ${serverToken}`;
     }
 
     // Identite client (version + plateforme) pour le gate min-client-version serveur.
@@ -376,6 +377,17 @@ export class ServerApiClientBase {
             }
           }
         } catch { /* ignore - gestion standard ci-dessous */ }
+      }
+      // Session d'utilisateur local (invite) expiree ou revoquee : forcer une reconnexion.
+      if (
+        response.status === 401 &&
+        !isAuthBootstrap &&
+        typeof window !== 'undefined' &&
+        !TokenManager.getCloudAccessToken() &&
+        TokenManager.getServerSessionToken()
+      ) {
+        TokenManager.clearServerSessionToken();
+        window.dispatchEvent(new CustomEvent('popcorn:session-expired'));
       }
       // Client trop ancien pour le gate min-version : afficher l'ecran "Mets a jour Popcornn".
       if (response.status === 426 && typeof window !== 'undefined') {
@@ -470,7 +482,7 @@ export class ServerApiClientBase {
     const mixedContentError = this.getMixedContentError(url);
     if (mixedContentError) return { success: false, error: 'MixedContent', message: mixedContentError };
     const headers: HeadersInit = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-    const blobCloudToken = typeof window !== 'undefined' ? TokenManager.getCloudAccessToken() : null;
+    const blobCloudToken = typeof window !== 'undefined' ? TokenManager.getServerAuthToken() : null;
     if (blobCloudToken) (headers as Record<string, string>).Authorization = `Bearer ${blobCloudToken}`;
     else if (this.accessToken) (headers as Record<string, string>).Authorization = `Bearer ${this.accessToken}`;
     try {
@@ -603,6 +615,7 @@ export class ServerApiClientBase {
     if (typeof window === 'undefined') return;
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    TokenManager.clearServerSessionToken();
     this.accessToken = null;
     this.refreshToken = null;
   }
@@ -698,5 +711,3 @@ export class ServerApiClientBase {
     return this.accessToken;
   }
 }
-
-
