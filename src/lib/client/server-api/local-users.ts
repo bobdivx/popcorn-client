@@ -23,6 +23,8 @@ export interface LocalUser {
 }
 
 export interface CreateLocalUserRequest {
+  /** Id popcorn-web (Turso) de l'utilisateur local, réutilisé côté serveur. */
+  id?: string;
   cloud_account_id: string;
   email: string;
   password_hash: string;
