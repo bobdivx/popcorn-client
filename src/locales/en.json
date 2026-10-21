@@ -2000,7 +2000,9 @@
       "loadError": "Error while loading local users",
       "noToken": "You must be signed in with your cloud account to manage local users.",
       "tokenExpired": "Your cloud session has expired. Please sign in again.",
-      "mainAccountOnly": "This page is reserved for the main account. Please sign in with your cloud account."
+      "mainAccountOnly": "This page is reserved for the main account. Please sign in with your cloud account.",
+      "linkTitle": "Manage local users",
+      "linkDescription": "Invite and manage local accounts with limited permissions"
     },
     "documentation": {
       "title": "Documentation",
