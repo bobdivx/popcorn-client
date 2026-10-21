@@ -49,7 +49,8 @@ function configuredBackend(): string {
 
 function hasCloudSession(): boolean {
   try {
-    return Boolean(TokenManager.getCloudAccessToken());
+    // Token cloud ou session serveur d'un utilisateur local invite.
+    return Boolean(TokenManager.getServerAuthToken());
   } catch {
     return false;
   }
@@ -100,7 +101,7 @@ export function getMediaTokenSync(): string | null {
 }
 
 async function requestToken(backend: string): Promise<Response | null> {
-  const t = TokenManager.getCloudAccessToken();
+  const t = TokenManager.getServerAuthToken();
   if (!t) return null;
   return fetch(`${backend}/api/local/media-token`, {
     headers: { Authorization: `Bearer ${t}`, ...clientIdentityHeaders() },
