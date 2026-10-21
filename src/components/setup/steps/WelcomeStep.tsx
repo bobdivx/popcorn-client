@@ -35,7 +35,7 @@ function ConfigItem({
 }) {
   return (
     <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;margin-bottom:8px;">
-      <div style={`width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;${present ? 'background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.2);' : 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);'}`}>
+      <div style={`width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;${present ? 'background:rgba(242,84,91,0.12);border:1px solid rgba(242,84,91,0.2);' : 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);'}`}>
         {icon}
       </div>
       <div style="flex:1;min-width:0;">
@@ -50,7 +50,7 @@ function ConfigItem({
             <button
               type="button"
               onClick={onEdit}
-              style="margin-left:6px;padding:4px 10px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.2);border-radius:6px;color:#c4b5fd;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s;"
+              style="margin-left:6px;padding:4px 10px;background:rgba(242,84,91,0.1);border:1px solid rgba(242,84,91,0.2);border-radius:6px;color:#ffa1a6;font-size:11.5px;font-weight:600;cursor:pointer;transition:all 0.15s;"
             >
               Modifier
             </button>
@@ -122,7 +122,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       key: 'indexers',
       label: t('wizard.welcome.importLabelIndexers'),
       icon: (
-        <svg style="width:15px;height:15px;color:rgba(167,139,250,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style="width:15px;height:15px;color:rgba(251,122,128,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       ),
@@ -134,7 +134,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       key: 'tmdb',
       label: t('wizard.welcome.importLabelTmdb'),
       icon: (
-        <svg style="width:15px;height:15px;color:rgba(167,139,250,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style="width:15px;height:15px;color:rgba(251,122,128,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
         </svg>
       ),
@@ -146,7 +146,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       key: 'downloadLocation',
       label: t('wizard.welcome.importLabelDownloadLocation'),
       icon: (
-        <svg style="width:15px;height:15px;color:rgba(167,139,250,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style="width:15px;height:15px;color:rgba(251,122,128,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
       ),
@@ -158,7 +158,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       key: 'syncSettings',
       label: t('wizard.welcome.importLabelSyncSettings'),
       icon: (
-        <svg style="width:15px;height:15px;color:rgba(167,139,250,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style="width:15px;height:15px;color:rgba(251,122,128,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       ),
@@ -170,7 +170,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       key: 'categories',
       label: t('wizard.welcome.importLabelCategories'),
       icon: (
-        <svg style="width:15px;height:15px;color:rgba(167,139,250,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg style="width:15px;height:15px;color:rgba(251,122,128,0.8);" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
       ),
@@ -185,12 +185,12 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
       <style>{`
         .disclaimer-scroll::-webkit-scrollbar { width: 4px; }
         .disclaimer-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
-        .disclaimer-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 4px; }
+        .disclaimer-scroll::-webkit-scrollbar-thumb { background: rgba(242,84,91,0.3); border-radius: 4px; }
         .disclaimer-section { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .disclaimer-section:last-child { border-bottom: none; padding-bottom: 0; }
-        .disclaimer-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.25); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #a78bfa; flex-shrink: 0; margin-top: 1px; }
+        .disclaimer-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(242,84,91,0.15); border: 1px solid rgba(242,84,91,0.25); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fb7a80; flex-shrink: 0; margin-top: 1px; }
         .checkbox-custom { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
-        .checkbox-custom.checked { background: #7c3aed; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.2); }
+        .checkbox-custom.checked { background: #f2545b; border-color: #f2545b; box-shadow: 0 0 0 3px rgba(242,84,91,0.2); }
       `}</style>
 
       <div style="margin-bottom:24px;">
@@ -227,8 +227,8 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
             ))}
           </div>
           {!disclaimerScrolledToBottom && (
-            <div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(to top, rgba(7,7,14,0.9), transparent);border-radius:0 0 12px 12px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;">
-              <span style="font-size:10px;color:rgba(167,139,250,0.6);">Défiler pour lire</span>
+            <div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(to top, rgba(12,13,16,0.9), transparent);border-radius:0 0 12px 12px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;">
+              <span style="font-size:10px;color:rgba(251,122,128,0.6);">Défiler pour lire</span>
             </div>
           )}
         </div>
@@ -245,7 +245,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
           </div>
           <span style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.5;user-select:none;">J'ai lu et j'accepte les termes ci-dessus. Je suis entièrement responsable de mon utilisation.</span>
         </label>
-        <a href="/disclaimer" target="_blank" style="font-size:11px;color:rgba(167,139,250,0.6);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px;" onClick={(e) => e.stopPropagation()}>
+        <a href="/disclaimer" target="_blank" style="font-size:11px;color:rgba(251,122,128,0.6);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px;" onClick={(e) => e.stopPropagation()}>
           Lire la version complète
           <svg style="width:10px;height:10px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
         </a>
@@ -274,16 +274,16 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
 
       {/* Import en cours */}
       {isImportRunning && (
-        <div style="background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.15);border-radius:12px;padding:16px 18px;margin-bottom:20px;">
+        <div style="background:rgba(242,84,91,0.06);border:1px solid rgba(242,84,91,0.15);border-radius:12px;padding:16px 18px;margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:#a78bfa;animation:wizard-pulse 1s ease-in-out infinite;" />
-            <span style="font-size:13.5px;font-weight:600;color:#c4b5fd;">{t('wizard.welcome.importTitle')}</span>
+            <div style="width:8px;height:8px;border-radius:50%;background:#fb7a80;animation:wizard-pulse 1s ease-in-out infinite;" />
+            <span style="font-size:13.5px;font-weight:600;color:#ffa1a6;">{t('wizard.welcome.importTitle')}</span>
           </div>
           <p style="font-size:12.5px;color:rgba(255,255,255,0.45);margin:0 0 10px;">{importStatus.message}</p>
           {importStatus.total > 0 && (
             <div>
               <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:9999px;overflow:hidden;">
-                <div style={`height:100%;border-radius:9999px;background:linear-gradient(90deg,#7c3aed,#a78bfa);transition:width 0.3s ease;width:${importProgress}%`} />
+                <div style={`height:100%;border-radius:9999px;background:linear-gradient(90deg,#f2545b,#fb7a80);transition:width 0.3s ease;width:${importProgress}%`} />
               </div>
               <div style="font-size:11.5px;color:rgba(255,255,255,0.3);margin-top:4px;">{importStatus.done} / {importStatus.total}</div>
             </div>
