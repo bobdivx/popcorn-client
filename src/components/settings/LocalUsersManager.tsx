@@ -4,6 +4,7 @@ import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { syncLocalUsersToBackend, removeLocalUserFromBackend } from '../../lib/client/local-users-sync';
 
 export default function LocalUsersManager() {
   const { t } = useI18n();
@@ -34,6 +35,8 @@ export default function LocalUsersManager() {
       const localUsers = await getLocalUsers();
       if (localUsers) {
         setUsers(localUsers);
+        // Les invités activés doivent exister sur le serveur pour pouvoir s'y connecter.
+        void syncLocalUsersToBackend();
       } else {
         const token = TokenManager.getCloudAccessToken();
         const refreshToken = TokenManager.getCloudRefreshToken();
@@ -98,6 +101,7 @@ export default function LocalUsersManager() {
       const result = await deleteLocalUser(userId);
 
       if (result.success) {
+        await removeLocalUserFromBackend(userId);
         setSuccess(t('settingsMenu.localUsers.deleteSuccess'));
         await loadUsers();
       } else {
