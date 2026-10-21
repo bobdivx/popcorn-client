@@ -107,6 +107,8 @@ export default function Navbar() {
     // passive: true améliore la fluidité du scroll (ne bloque pas le main thread)
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('popstate', updatePath);
+    // URL réécrite sans navigation (accueil pré-rendu sous l'intro : « / » → « /dashboard »).
+    window.addEventListener('popcorn-route-changed', updatePath);
 
     loadUser();
 
@@ -124,6 +126,7 @@ export default function Navbar() {
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('popstate', updatePath);
+      window.removeEventListener('popcorn-route-changed', updatePath);
       window.removeEventListener('popcorn-auth-changed', handleAuthChanged);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
