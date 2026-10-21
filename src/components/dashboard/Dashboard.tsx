@@ -1,4 +1,4 @@
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
@@ -26,6 +26,7 @@ import {
 } from './utils/browsePriority';
 import { IS_STORE_BUILD } from '../../lib/distribution';
 import StoreLibraryHome from './StoreLibraryHome';
+import { markHomeReady } from '../../lib/boot/pageLoader';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
   const seen = new Set<string>();
@@ -57,6 +58,34 @@ function FullDashboard() {
   const loading = dataLoading && downloadsLoading;
   const highlights = useTmdbHighlights(['now_playing', 'trending_movie', 'trending_tv', 'on_the_air']);
   const titles = useMemo(() => highlightTitles(language), [language]);
+
+  // Écran de chargement unique : l'accueil se révèle quand ses premières données sont là et que
+  // l'image du hero est décodée (au plus ~1,2 s d'attente), au lieu d'un skeleton intermédiaire.
+  // Monté sous l'intro au démarrage (IndexRedirect) : tout ceci se fait pendant l'intro.
+  useEffect(() => {
+    if (dataLoading) return undefined;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = Date.now();
+    const tick = () => {
+      if (cancelled) return;
+      const elapsed = Date.now() - startedAt;
+      const heroImg = document.querySelector<HTMLImageElement>(
+        '[data-page="dashboard"] .hero-dashboard img, [data-page="dashboard"] [data-editorial-hero] img',
+      );
+      if ((heroImg && heroImg.complete) || (!heroImg && elapsed > 300) || elapsed > 1200) {
+        markHomeReady();
+        return;
+      }
+      timer = setTimeout(tick, 80);
+    };
+    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb: () => void) => setTimeout(cb, 16);
+    raf(() => raf(tick));
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [dataLoading]);
 
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
@@ -275,5 +304,9 @@ function FullDashboard() {
 
 /** Version store (PUBLIC_DISTRIBUTION=play) : bibliothèque du serveur uniquement, sans catalogue torrent. */
 export default function Dashboard() {
+  useEffect(() => {
+    // Version store : StoreLibraryHome gère son propre chargement → ne pas retenir l'écran unique.
+    if (IS_STORE_BUILD) markHomeReady();
+  }, []);
   return IS_STORE_BUILD ? <StoreLibraryHome filter="all" /> : <FullDashboard />;
 }
