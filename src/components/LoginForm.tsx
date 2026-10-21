@@ -9,6 +9,26 @@ import { isTVPlatform } from '../lib/utils/device-detection';
 import PocketIdButton from './PocketIdButton';
 import { initNativeSsoListener, takeSsoReturn } from '../lib/auth/native-sso';
 import { hasBackendUrl, hasDeploymentBackend } from '../lib/backend-config.js';
+import GuestMagicLink from './auth/GuestMagicLink';
+
+/**
+ * Lien de connexion d'un profil invité (assistant d'accueil, email « lien de connexion ») :
+ * https://client.popcornn.app/login#qc=<secret à usage unique>. Le secret est lu puis retiré
+ * de l'URL immédiatement.
+ */
+function takeGuestHandoffSecret(): string | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash || '';
+  if (!hash.startsWith('#')) return null;
+  const secret = new URLSearchParams(hash.slice(1)).get('qc');
+  if (!secret) return null;
+  try {
+    window.history.replaceState(window.history.state ?? {}, '', window.location.pathname + window.location.search);
+  } catch {
+    // ignore
+  }
+  return secret;
+}
 
 export default function LoginForm() {
   const { t } = useI18n();
@@ -21,6 +41,8 @@ export default function LoginForm() {
   const [checkingUsers, setCheckingUsers] = useState(true);
   const [ssoRequired, setSsoRequired] = useState(false);
   const [ssoCompleting, setSsoCompleting] = useState(false);
+  const [guestHandoff] = useState<string | null>(() => takeGuestHandoffSecret());
+  const [guestConnecting, setGuestConnecting] = useState<boolean>(() => guestHandoff !== null);
 
   // Détection TV pour adapter la taille de la carte de login
   const isTV = typeof window !== 'undefined' ? isTVPlatform() : false;
@@ -72,9 +94,40 @@ export default function LoginForm() {
     }
   }, []);
 
+  // Profil invité : connexion automatique avec le lien reçu (sans mot de passe).
+  useEffect(() => {
+    if (!guestHandoff) return;
+    let cancelled = false;
+    serverApi
+      .connectQuickConnect(guestHandoff)
+      .then((response) => {
+        if (cancelled) return;
+        if (response.success) {
+          void registerDeviceIfPossible();
+          redirectTo('/dashboard');
+          return;
+        }
+        setGuestConnecting(false);
+        setError(response.message || t('loginForm.guestLink.failed'));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGuestConnecting(false);
+        setError(t('loginForm.guestLink.failed'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Vérifier si la DB est vide (pas d'utilisateurs) et rediriger vers setup
   useEffect(() => {
     const checkUsers = async () => {
+      // Connexion d'un invité en cours : pas de redirection vers l'assistant d'installation.
+      if (guestHandoff) {
+        setCheckingUsers(false);
+        return;
+      }
       try {
         const setupResponse = await serverApi.getSetupStatus();
         if (setupResponse.success && setupResponse.data) {
@@ -158,6 +211,17 @@ export default function LoginForm() {
   const cardClasses = `w-full ${isTV ? 'max-w-xl md:max-w-2xl p-8 lg:p-12' : 'max-w-md p-4 sm:p-6 md:p-8'} bg-black/80 backdrop-blur-sm border border-white/20 rounded-xl shadow-2xl mx-3 sm:mx-4`;
 
   // Afficher un loader pendant la vérification
+  if (guestConnecting) {
+    return (
+      <div className={cardClasses}>
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg text-primary-500"></span>
+          <p className="mt-4 text-white">{t('loginForm.guestLink.connecting')}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (checkingUsers) {
     return (
       <div className={cardClasses}>
@@ -303,6 +367,9 @@ export default function LoginForm() {
           )}
         </form>
       )}
+
+      {/* Profils invités : lien de connexion par email (sans mot de passe) */}
+      {activeTab === 'login' && <GuestMagicLink initialEmail={email} />}
 
       {/* Quick Connect */}
       {activeTab === 'quick-connect' && (
