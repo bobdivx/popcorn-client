@@ -578,6 +578,113 @@ function pathLooksLikeFile(p: string | null | undefined): boolean {
   return /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(lower) || /\.[a-z0-9]{2,4}$/.test(lower);
 }
 
+/** Entrée bibliothèque (GET /library) rattachée à une série TV. */
+function isLibrarySeriesItem(item: any): boolean {
+  const typ = String(item?.tmdb_type ?? item?.tmdbType ?? '').toLowerCase();
+  const cat = String(item?.category ?? '').toUpperCase();
+  return typ === 'tv' || typ === 'series' || cat === 'SERIES';
+}
+
+/** Saison / épisode depuis le nom de fichier d'une entrée bibliothèque (S01E02, 1x02…). */
+function parseSeasonEpisodeFromLibraryItem(item: any): { season: number; episode: number } | null {
+  const rawPath = String(item?.download_path ?? item?.downloadPath ?? '').replace(/\\/g, '/');
+  const base = rawPath.split('/').filter(Boolean).pop() ?? '';
+  const candidates = [base, String(item?.file_name ?? ''), String(item?.name ?? ''), rawPath];
+  for (const text of candidates) {
+    if (!text) continue;
+    const m =
+      text.match(/s(\d{1,2})[\s._-]*e(\d{1,3})/i) ||
+      text.match(/(?:^|[^a-z0-9])(\d{1,2})x(\d{2,3})(?:[^0-9]|$)/i);
+    if (m) {
+      const season = parseInt(m[1], 10);
+      const episode = parseInt(m[2], 10);
+      if (!Number.isNaN(season) && !Number.isNaN(episode)) return { season, episode };
+    }
+  }
+  return null;
+}
+
+/**
+ * Construit une grille saisons/épisodes uniquement depuis la bibliothèque locale (GET /library).
+ * Utilisé quand les endpoints `/api/torrents/series/...` ne sont pas disponibles (build store)
+ * ou en complément de la grille TMDB pour que chaque carte pointe vers le bon fichier local.
+ */
+function buildSeriesEpisodesFromLibraryItems(
+  items: any[],
+  tmdbTvId: number | null,
+  mainTitle: string,
+): SeriesEpisodesResponse | null {
+  const byKey = new Map<string, { item: any; season: number; episode: number }>();
+  for (const item of items) {
+    const se = parseSeasonEpisodeFromLibraryItem(item);
+    if (!se || se.episode <= 0) continue;
+    const key = `${se.season}:${se.episode}`;
+    const prev = byKey.get(key);
+    // Préférer une entrée fichier (pas un dossier) quand plusieurs entrées visent le même épisode.
+    if (
+      !prev ||
+      (!pathLooksLikeFile(prev.item?.download_path) && pathLooksLikeFile(item?.download_path))
+    ) {
+      byKey.set(key, { item, season: se.season, episode: se.episode });
+    }
+  }
+  if (!byKey.size) return null;
+  const seasonsMap = new Map<number, SeriesEpisodeInfo[]>();
+  byKey.forEach(({ item, season, episode }) => {
+    const variant = libraryItemToTorrent(item);
+    const list = seasonsMap.get(season) ?? [];
+    list.push({
+      season,
+      episode,
+      name: `Épisode ${episode}`,
+      id: variant.id || `library_s${season}_e${episode}`,
+      info_hash: item?.info_hash || null,
+      quality: item?.quality ?? null,
+      language: item?.language ?? null,
+      format: item?.source_format ?? null,
+      codec: item?.video_codec ?? null,
+      file_size: Number(item?.file_size) || 0,
+      seed_count: 0,
+      leech_count: 0,
+      file_path: item?.download_path || null,
+      is_from_multi_torrent: false,
+    });
+    seasonsMap.set(season, list);
+  });
+  const seasons: SeriesSeasonInfo[] = [...seasonsMap.keys()]
+    .sort(compareSeasonNumbers)
+    .map((season) => ({
+      season,
+      episodes: (seasonsMap.get(season) ?? []).sort((a, b) => a.episode - b.episode),
+    }));
+  return {
+    slug: tmdbTvId ? `tmdb_${tmdbTvId}` : 'library',
+    main_title: mainTitle || 'Série',
+    seasons,
+  };
+}
+
+/** Choisit l'épisode « de départ » d'une série en bibliothèque : le plus petit SxxEyy (fichier de préférence). */
+function pickFirstLibraryEpisodeItem(items: any[]): any | undefined {
+  let best: { item: any; season: number; episode: number; isFile: boolean } | undefined;
+  for (const item of items) {
+    const se = parseSeasonEpisodeFromLibraryItem(item);
+    if (!se) continue;
+    // Les spéciaux (S00) passent après les saisons régulières.
+    const season = se.season === 0 ? Number.MAX_SAFE_INTEGER : se.season;
+    const isFile = pathLooksLikeFile(item?.download_path);
+    if (
+      !best ||
+      season < best.season ||
+      (season === best.season && se.episode < best.episode) ||
+      (season === best.season && se.episode === best.episode && isFile && !best.isFile)
+    ) {
+      best = { item, season, episode: se.episode, isFile };
+    }
+  }
+  return best?.item;
+}
+
 /** Retourne true si le variant correspond au titre demandé (ex. nom de fichier bibliothèque). */
 function variantMatchesTitle(variant: any, titleHint: string): boolean {
   if (!titleHint || titleHint.trim().length === 0) return false;
@@ -1212,14 +1319,21 @@ export default function MediaDetailRoute() {
           console.log('[MediaDetailRoute] Détection d\'un média local, récupération depuis la bibliothèque:', contentId);
           const libraryResponse = await serverApi.getLibrary();
           if (libraryResponse.success && libraryResponse.data) {
-            const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
+            const libraryItems: any[] = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
             // Trouver le média correspondant au slug
+            const exactLocalMedia = libraryItems.find((item: any) =>
+              !!contentId && (item.info_hash === contentId || item.slug === contentId)
+            );
+            const sameTmdbItems =
+              tmdbId != null
+                ? libraryItems.filter((item: any) => Number(item.tmdb_id) === tmdbId)
+                : [];
             const localMedia =
-              libraryItems.find((item: any) =>
-                !!contentId && (item.info_hash === contentId || item.slug === contentId)
-              ) ||
+              exactLocalMedia ||
               (IS_STORE_BUILD && tmdbId != null
-                ? libraryItems.find((item: any) => Number(item.tmdb_id) === tmdbId)
+                ? (sameTmdbItems.some(isLibrarySeriesItem)
+                    ? pickFirstLibraryEpisodeItem(sameTmdbItems.filter(isLibrarySeriesItem))
+                    : undefined) ?? sameTmdbItems[0]
                 : undefined);
             
             if (localMedia && !cancelled) {
@@ -1283,7 +1397,77 @@ export default function MediaDetailRoute() {
               } as Torrent;
               
               setTorrent(t);
-              setLoading(false);
+
+              // Série : charger toutes les entrées bibliothèque de la même série + la grille
+              // saisons/épisodes. Sans ça la fiche n'a ni carrousels d'épisodes ni épisode
+              // suivant/précédent dans le lecteur (build store Android : PUBLIC_DISTRIBUTION=play).
+              const localTmdbIdRaw = Number(localMedia.tmdb_id ?? tmdbId);
+              const localTmdbId =
+                Number.isFinite(localTmdbIdRaw) && localTmdbIdRaw > 0 ? Math.floor(localTmdbIdRaw) : null;
+              const typeHint = new URLSearchParams(
+                typeof window !== 'undefined' ? window.location.search : '',
+              ).get('type');
+              const looksLikeSeries =
+                isLibrarySeriesItem(localMedia) ||
+                typeHint === 'tv' ||
+                torrentNameLooksLikeSeriesEpisode(String(localMedia.name ?? '')) ||
+                torrentNameLooksLikeSeriesEpisode(String(localMedia.download_path ?? ''));
+              if (looksLikeSeries) {
+                try {
+                  const seriesItems = (
+                    localTmdbId != null
+                      ? libraryItems.filter(
+                          (item: any) =>
+                            Number(item.tmdb_id) === localTmdbId &&
+                            (isLibrarySeriesItem(item) || item === localMedia),
+                        )
+                      : [localMedia]
+                  ).filter((item: any) => item === localMedia || item.exists !== false);
+                  if (seriesItems.length > 0 && !cancelled) {
+                    const variants = seriesItems.map((item: any) => libraryItemToTorrent(item));
+                    // La variante courante garde l'objet construit ci-dessus (infoHash local_*, démo…).
+                    setInitialVariants([
+                      t,
+                      ...variants.filter((v) => v.id !== t.id),
+                    ]);
+                  }
+                  const showTitle = String(
+                    localMedia.tmdb_title || titleFromQuery || localMedia.name || '',
+                  ).trim();
+                  const libraryPayload = buildSeriesEpisodesFromLibraryItems(
+                    seriesItems,
+                    localTmdbId,
+                    showTitle,
+                  );
+                  let payload: SeriesEpisodesResponse | null = null;
+                  if (localTmdbId != null) {
+                    // Hors store : même pipeline que la fiche web (backend + TMDB).
+                    // Store : les endpoints /api/torrents/series/* sont bloqués → grille TMDB (/api/discover).
+                    const base = !IS_STORE_BUILD
+                      ? await resolveSeriesEpisodesPayload(false, {
+                          contentId,
+                          tmdbId: localTmdbId,
+                          tmdbTitleSearchHint: showTitle || null,
+                          groupSlug: localMedia.slug || null,
+                        })
+                      : await buildSeriesEpisodesFromTmdbDiscover(
+                          false,
+                          localTmdbId,
+                          localMedia.slug || `tmdb_${localTmdbId}`,
+                        );
+                    if (cancelled) return;
+                    if (base?.seasons?.length) {
+                      payload = mergeLibraryEpisodesIntoTmdbPayload(base, libraryPayload);
+                    }
+                  }
+                  if (!payload && libraryPayload?.seasons?.length) payload = libraryPayload;
+                  if (payload?.seasons?.length && !cancelled) setSeriesEpisodes(payload);
+                } catch (seriesErr) {
+                  console.warn('[MediaDetailRoute] Épisodes série (bibliothèque) indisponibles:', seriesErr);
+                }
+              }
+
+              if (!cancelled) setLoading(false);
               return;
             } else {
               console.warn('[MediaDetailRoute] Média local non trouvé dans la bibliothèque:', contentId);
