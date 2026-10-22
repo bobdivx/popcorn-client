@@ -29,8 +29,8 @@ Pour utiliser la signature native dans GitHub Actions, vous devez configurer les
    | Nom du secret | Description | Exemple |
    |--------------|-------------|---------|
    | `ANDROID_KEYSTORE_BASE64` | Keystore encodé en base64 | Contenu du fichier `keystore_base64.txt` |
-   | `ANDROID_KEYSTORE_PASSWORD` | Mot de passe du keystore | `***REMOVED***` |
-   | `ANDROID_KEY_PASSWORD` | Mot de passe de la clé (peut être identique) | `***REMOVED***` |
+   | `ANDROID_KEYSTORE_PASSWORD` | Mot de passe du keystore | `<REDACTED>` |
+   | `ANDROID_KEY_PASSWORD` | Mot de passe de la clé (peut être identique) | `<REDACTED>` |
 
 ### Option 2 : Créer un nouveau keystore (pour CI uniquement)
 
