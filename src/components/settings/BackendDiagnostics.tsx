@@ -319,20 +319,19 @@ export default function BackendDiagnostics() {
           const apiUrl = getPopcornWebApiUrl();
           const fullUrl = `${apiUrl}/auth/login`;
           
-          // Tester juste la connectivité (sans credentials valides)
-          // On s'attend à une erreur 400/401, mais ça confirme que l'API est accessible
+          // Tester juste la connectivité, sans envoyer d'identifiants (corps vide).
+          // On s'attend à une erreur 4xx, mais ça confirme que l'API est accessible
           try {
             const testRes = await fetch(fullUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: 'test@test.com', password: 'test' }),
+              body: JSON.stringify({}),
             });
             
             // Si on arrive ici, pas d'erreur CORS → l'API est accessible
-            const data = await testRes.json().catch(() => ({}));
-            // 400/401 sont attendus (credentials invalides), mais ça confirme que l'API répond
-            if (testRes.status === 400 || testRes.status === 401) {
-              return { success: true, message: `API accessible (erreur ${testRes.status} attendue pour credentials de test)` };
+            // Une 4xx est attendue (requête sans identifiants), mais ça confirme que l'API répond
+            if (testRes.status >= 400 && testRes.status < 500) {
+              return { success: true, message: `API accessible (erreur ${testRes.status} attendue sans identifiants)` };
             }
             return { 
               success: testRes.ok,
