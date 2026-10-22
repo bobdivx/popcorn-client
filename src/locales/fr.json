@@ -210,6 +210,30 @@
     "en": "English"
   },
   "wizard": {
+    "shell": {
+      "setup": "Configuration",
+      "stepsTitle": "Étapes",
+      "step": "Étape",
+      "of": "sur",
+      "diagnostics": "Diagnostics",
+      "configured": "Configuré",
+      "skippedHint": "Étape passée automatiquement — cliquez pour modifier",
+      "errorKicker": "Connexion",
+      "backendUnreachableTitle": "Backend inaccessible",
+      "backendUnreachableMessage": "Impossible de charger le statut du setup. Vérifiez que le backend est démarré.",
+      "openDiagnostics": "Ouvrir les diagnostics",
+      "steps": {
+        "auth": "Connexion",
+        "serverUrl": "Serveur",
+        "language": "Langue",
+        "welcome": "Bienvenue",
+        "indexers": "Indexers",
+        "tmdb": "TMDB",
+        "downloadLocation": "Téléchargement",
+        "sync": "Sync",
+        "complete": "Terminé"
+      }
+    },
     "language": {
       "title": "Choisissez votre langue",
       "description": "Sélectionnez la langue de l'interface. Vous pourrez la modifier à tout moment dans les paramètres.",
