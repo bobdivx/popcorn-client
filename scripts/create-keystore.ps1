@@ -79,7 +79,7 @@ Write-Host ""
 
 # Creer le keystore
 $keystorePath = "popcorn-release.jks"
-$password = "***REMOVED***"
+$password = $env:ANDROID_KEYSTORE_PASSWORD
 $alias = "popcorn-key"
 
 Write-Host "Creation du keystore: $keystorePath"
