@@ -5,6 +5,7 @@ import { getUserConfig, getPopcornWebBaseUrl } from '../../../lib/api/popcorn-we
 import { CloudImportManager } from '../../../lib/client/cloud-import';
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { generateQRCode } from '../../../lib/utils/qrcode';
+import { StepHeader, Alert, Spinner } from '../wizardUi';
 
 interface QuickConnectStepProps {
   focusedButtonIndex: number;
@@ -202,130 +203,148 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
     await connectQuickConnect(secret);
   };
 
-  const spacing = tvMode ? 'space-y-4' : compact ? 'space-y-3' : 'space-y-6';
   // En TV mode, le QR doit tenir dans la hauteur disponible (viewport 720p - chrome)
   const qrSize = tvMode ? 200 : compact ? 136 : 224;
   const qrPadding = tvMode ? 12 : compact ? 8 : 16;
+  const mode = tvMode ? 'qc--tv' : compact ? 'qc--compact' : 'qc--full';
 
   return (
-    <div className={`quick-connect-step ${tvMode ? 'quick-connect-step--tv' : ''} ${spacing}`}>
+    <div class={`quick-connect-step qc ${mode}`}>
+      <style>{`
+        .qc { width: 100%; }
+        .qc__hint { margin: 0 0 22px; font-size: 0.92rem; line-height: 1.6; color: var(--wz-ink-dim); }
+        .qc--tv .qc__hint { font-size: 1.05rem; }
+        .qc__loading { display: flex; align-items: center; justify-content: center; min-height: 180px; }
+        .qc--tv .qc__loading { min-height: 320px; }
+        .qc--full .qc__loading { min-height: 360px; }
+        .qc__grid { display: flex; align-items: center; }
+        .qc__grid > .qc__qr { flex-shrink: 0; margin-right: 28px; }
+        .qc__grid > .qc__code { flex: 1; min-width: 0; }
+        .qc--compact .qc__grid { flex-direction: column; }
+        .qc--compact .qc__grid > .qc__qr { margin: 0 0 18px; }
+        @media (max-width: 639px) {
+          .qc__grid { flex-direction: column; }
+          .qc__grid > .qc__qr { margin: 0 0 20px; }
+        }
+        .qc__qr { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+        .qc__qr-box { background: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; max-width: 90vw; }
+        .qc__qr-box img { width: 100%; height: 100%; object-fit: contain; }
+        .qc__qr-caption { margin-top: 10px; font-size: 0.75rem; color: var(--wz-ink-faint); text-align: center; }
+        .qc__code { text-align: left; }
+        .qc--compact .qc__code { text-align: center; }
+        @media (max-width: 639px) { .qc__code { text-align: center; } }
+        .qc__code-label { display: block; margin-bottom: 10px; font-family: var(--wz-display); font-size: 0.62rem; letter-spacing: 0.32em; text-transform: uppercase; color: var(--wz-ink-faint); }
+        .qc__code-value { font-family: var(--wz-mono); font-weight: 600; color: var(--wz-ink); letter-spacing: 0.3em; line-height: 1.1; word-break: break-all; }
+        .qc--full .qc__code-value { font-size: 2.25rem; }
+        .qc--compact .qc__code-value { font-size: 1.5rem; }
+        .qc--tv .qc__code-value { font-size: 2.6rem; letter-spacing: 0.35em; }
+        .qc__code-help { margin: 10px 0 0; font-size: 0.8rem; line-height: 1.55; color: var(--wz-ink-dim); }
+        .qc__expiry { margin-top: 12px; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--wz-ink-faint); }
+        .qc--tv .qc__expiry { font-size: 0.95rem; }
+        .qc__authorized { margin-top: 12px; display: flex; align-items: center; color: var(--wz-ok); font-size: 0.85rem; }
+        .qc--compact .qc__authorized { justify-content: center; }
+        .qc--tv .qc__authorized { font-size: 1.1rem; }
+        .qc__authorized::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--wz-ok); margin-right: 10px; flex-shrink: 0; }
+        .qc__actions { display: flex; flex-wrap: wrap; align-items: center; margin-top: 24px; }
+        .qc__actions > .wz-btn + .wz-btn { margin-left: 12px; }
+        .qc--compact .qc__actions { flex-direction: column; align-items: stretch; margin-top: 18px; }
+        .qc--compact .qc__actions > .wz-btn + .wz-btn { margin-left: 0; margin-top: 10px; }
+        @media (max-width: 639px) {
+          .qc__actions { flex-direction: column; align-items: stretch; }
+          .qc__actions > .wz-btn + .wz-btn { margin-left: 0; margin-top: 10px; }
+        }
+      `}</style>
+
       {!compact && !tvMode && (
-        <>
-          <h3 className="text-2xl font-bold text-white">Connexion rapide</h3>
-          <p className="text-gray-400">
-            Scannez le QR code avec un autre appareil déjà connecté, ou entrez le code manuellement.
-          </p>
-        </>
+        <StepHeader
+          kicker="Appareil connecté"
+          title="Connexion rapide"
+          lead="Scannez le QR code avec un autre appareil déjà connecté, ou entrez le code manuellement."
+        />
       )}
 
       {tvMode && (
-        <p className="text-center text-gray-300 text-lg" style={{ marginBottom: 4 }}>
+        <p class="qc__hint">
           Scannez le QR code avec votre téléphone ou entrez le code sur popcorn-web
         </p>
       )}
 
       {error && (
-        <div className={`bg-primary-900/30 border border-primary-700 rounded-xl text-primary-300 ${tvMode ? 'p-4 text-base' : 'p-3 text-sm'}`}>
-          <span>{error}</span>
-        </div>
+        <Alert tone="error" style="margin-bottom:18px;">{error}</Alert>
       )}
 
       {loading && !code && (
-        <div className={`flex justify-center items-center ${tvMode ? 'min-h-[320px]' : compact ? 'min-h-[180px]' : 'min-h-[400px]'}`}>
-          <span className={`loading loading-spinner text-white ${tvMode ? 'loading-lg' : 'loading-lg'}`}></span>
+        <div class="qc__loading">
+          <span class="ed-spinner ed-spinner--sm" aria-hidden="true" />
         </div>
       )}
 
       {code && (
-        <div className={spacing}>
-          {/* QR Code — TV: grand pour lecture à distance, compact: petit, défaut: moyen */}
-          {qrCodeUrl && (
-            <div className="flex flex-col items-center" style={{ maxWidth: '100%' }}>
-              <div
-                className="bg-white rounded-xl flex items-center justify-center shadow-2xl flex-shrink-0"
-                style={{
-                  padding: qrPadding,
-                  width: qrSize + qrPadding * 2,
-                  height: qrSize + qrPadding * 2,
-                  maxWidth: '90vw',
-                  maxHeight: tvMode ? '30vh' : undefined,
-                  boxSizing: 'border-box',
-                }}
-              >
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code de connexion rapide"
-                  className="object-contain"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    maxWidth: qrSize,
-                    maxHeight: qrSize,
-                  }}
-                />
-              </div>
-              {!compact && !tvMode && (
-                <p className="text-gray-400 text-sm text-center mt-2">
-                  Scannez ce QR code avec un appareil déjà connecté
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Code à 6 caractères — TV: très gros pour lisibilité à distance */}
-          <div className={`bg-gray-900 border-2 border-gray-600 rounded-xl ${tvMode ? 'p-6' : compact ? 'p-3' : 'p-6'}`}>
-            <div className={`text-center ${tvMode ? 'space-y-4' : compact ? 'space-y-2' : 'space-y-4'}`}>
-              <div>
-                <label className={`block font-semibold text-gray-400 mb-2 ${tvMode ? 'text-lg' : 'text-sm'}`}>
-                  Code à 6 caractères
-                </label>
+        <div>
+          <div class="qc__grid">
+            {/* QR Code — TV: grand pour lecture à distance, compact: petit, défaut: moyen */}
+            {qrCodeUrl && (
+              <div class="qc__qr">
                 <div
-                  className="font-mono font-bold text-white tracking-widest"
+                  class="qc__qr-box"
                   style={{
-                    fontSize: tvMode ? '2.5rem' : compact ? '1.5rem' : '2.25rem',
-                    letterSpacing: tvMode ? '0.35em' : undefined,
+                    padding: qrPadding,
+                    width: qrSize + qrPadding * 2,
+                    height: qrSize + qrPadding * 2,
+                    maxHeight: tvMode ? '30vh' : undefined,
                   }}
                 >
-                  {code}
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR Code de connexion rapide"
+                    style={{ maxWidth: qrSize, maxHeight: qrSize }}
+                  />
                 </div>
                 {!compact && !tvMode && (
-                  <p className="text-gray-400 text-sm mt-2">
-                    Entrez ce code sur un appareil déjà connecté pour autoriser cette connexion
+                  <p class="qc__qr-caption">
+                    Scannez ce QR code avec un appareil déjà connecté
                   </p>
                 )}
               </div>
+            )}
+
+            {/* Code à 6 caractères — TV: très gros pour lisibilité à distance */}
+            <div class="qc__code">
+              <span class="qc__code-label">Code à 6 caractères</span>
+              <div class="qc__code-value">{code}</div>
+              {!compact && !tvMode && (
+                <p class="qc__code-help">
+                  Entrez ce code sur un appareil déjà connecté pour autoriser cette connexion
+                </p>
+              )}
 
               {expiresAt && remainingSeconds !== null && (
-                <div className={tvMode ? 'text-gray-400 text-base' : 'text-gray-500 text-xs'}>
+                <div class="qc__expiry">
                   Expire dans {remainingSeconds} secondes
                 </div>
               )}
 
               {status === 'authorized' && (
-                <div className={tvMode ? 'text-green-400 text-xl font-semibold' : 'text-green-400 text-sm'}>
-                  ✓ Code autorisé, connexion en cours...
+                <div class="qc__authorized">
+                  Code autorisé, connexion en cours...
                 </div>
               )}
             </div>
           </div>
 
-          {/* Bouton de connexion manuelle — TV: grande zone focus */}
-          <div className="flex justify-center">
+          <div class="qc__actions">
+            {/* Bouton de connexion manuelle — TV: grande zone focus */}
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
+              type="button"
               data-focusable
               onClick={handleManualConnect}
               disabled={loading || status !== 'authorized'}
-              className={`
-                bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors
-                disabled:opacity-50 disabled:cursor-not-allowed
-                focus:outline-none focus:ring-4 focus:ring-primary-500/50
-                ${tvMode ? 'px-8 py-4 text-lg min-h-[56px]' : compact ? 'px-4 py-2 text-sm' : 'px-6 py-3'}
-              `}
+              class={`wz-btn ${status === 'authorized' ? 'wz-btn--primary' : 'wz-btn--ghost'} ${compact ? 'wz-btn--sm' : ''}`}
             >
               {loading ? (
                 <>
-                  <span className="loading loading-spinner loading-sm"></span>
+                  <Spinner />
                   Connexion...
                 </>
               ) : status === 'authorized' ? (
@@ -334,11 +353,10 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
                 'En attente d\'autorisation...'
               )}
             </button>
-          </div>
 
-          {/* Bouton pour générer un nouveau code — TV: visible et focusable */}
-          <div className="flex justify-center">
+            {/* Bouton pour générer un nouveau code — TV: visible et focusable */}
             <button
+              type="button"
               data-focusable
               onClick={() => {
                 if (pollingIntervalRef.current !== null) {
@@ -352,12 +370,7 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
                 initQuickConnect();
               }}
               disabled={loading}
-              className={`
-                rounded-xl transition-colors focus:outline-none focus:ring-4 focus:ring-primary-500/50
-                bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white
-                disabled:opacity-50 disabled:cursor-not-allowed
-                ${tvMode ? 'px-6 py-3 text-base min-h-[48px]' : 'px-4 py-2 text-sm'}
-              `}
+              class={`wz-btn wz-btn--quiet ${compact ? 'wz-btn--sm' : ''}`}
             >
               Générer un nouveau code
             </button>
