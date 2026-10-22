@@ -10,6 +10,7 @@ import {
 } from '../../../lib/utils/indexer-definitions-filter';
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { Info } from 'lucide-preact';
+import { StepHeader, StepLoading, Alert, Spinner, CheckButton, IconArrowLeft, IconArrowRight } from '../wizardUi';
 
 const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
 function getStoredUseJackett(): boolean {
@@ -403,51 +404,112 @@ export function IndexersStep({
     setError(null);
   };
 
+  const header = (
+    <StepHeader
+      kicker="Sources"
+      title="Configuration des indexers"
+      lead="Les indexers sont les sources dans lesquelles Popcornn recherche films et séries. Ajoutez-en au moins un pour continuer."
+    />
+  );
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div>
+        {header}
+        <StepLoading />
       </div>
     );
   }
 
   const hasIndexers = indexers.length > 0;
 
+  const openManualForm = () => {
+    setShowDefinitionSelector(false);
+    setSelectedDefinition(null);
+    setShowForm(true);
+    setFormData({
+      name: '',
+      baseUrl: '',
+      apiKey: '',
+      jackettIndexerName: '',
+      isEnabled: true,
+      isDefault: false,
+      priority: 0,
+      indexerTypeId: null,
+      extraConfig: {},
+      useFlareSolverr: false,
+    });
+  };
+
+  const required = <span class="wz-accent" style="margin-left:4px;">*</span>;
+
   return (
-    <div className="space-y-6">
+    <div class="ix-step">
+      <style>{`
+        .ix-filters { display: flex; flex-wrap: wrap; margin: 0 -6px; }
+        .ix-filters > * { margin: 0 6px 12px; }
+        .ix-filters > .ix-filters__search { flex: 1 1 240px; min-width: 0; }
+        .ix-filters > select { flex: 0 1 180px; }
+        @media (max-width: 639px) { .ix-filters > select { flex: 1 1 140px; } }
+        .ix-def { display: flex; align-items: flex-start; width: 100%; text-align: left; }
+        .ix-def .wz-option__end { margin-left: 16px; align-self: center; }
+        .ix-def + .ix-def { margin-top: 10px; }
+        .ix-tags { display: flex; flex-wrap: wrap; margin-top: 10px; }
+        .ix-tags > .wz-badge { margin: 0 6px 6px 0; }
+        .ix-item { display: flex; align-items: flex-start; padding: 18px 0; border-bottom: 1px solid var(--wz-line); }
+        .ix-item:first-child { border-top: 1px solid var(--wz-line); }
+        .ix-item__body { flex: 1; min-width: 0; }
+        .ix-item__name { display: flex; flex-wrap: wrap; align-items: center; }
+        .ix-item__name > .wz-badge { margin-left: 10px; }
+        .ix-item__meta { margin-top: 6px; font-size: 0.78rem; color: var(--wz-ink-faint); font-family: var(--wz-mono); word-break: break-all; }
+        .ix-item__actions { display: flex; flex-shrink: 0; margin-left: 16px; }
+        .ix-item__actions > * + * { margin-left: 8px; }
+        @media (max-width: 639px) {
+          .ix-item { flex-direction: column; }
+          .ix-item__actions { margin: 14px 0 0; width: 100%; }
+          .ix-item__actions > .wz-btn { flex: 1; }
+        }
+        .ix-tools { display: flex; flex-wrap: wrap; align-items: center; margin-top: 24px; }
+        .ix-tools > * { margin: 0 12px 12px 0; }
+        @media (max-width: 639px) { .ix-tools { flex-direction: column; align-items: stretch; } .ix-tools > * { margin-right: 0; } }
+        .ix-drop { margin-top: 10px; padding: 18px; border: 1px dashed var(--wz-line-strong); text-align: center; font-size: 0.82rem; color: var(--wz-ink-dim); cursor: pointer; transition: border-color 0.2s, background-color 0.2s; }
+        .ix-drop:hover, .ix-drop.is-over { border-color: var(--wz-accent); background: var(--wz-accent-soft); }
+        .ix-field-head { display: flex; align-items: center; justify-content: space-between; }
+        .ix-field-head > .wz-label { margin-bottom: 0; }
+        .ix-field-head + .wz-input { margin-top: 10px; }
+        .ix-checks > .wz-check + .wz-check { margin-top: 10px; }
+        .ix-form-actions { display: flex; justify-content: flex-end; margin-top: 28px; }
+        .ix-form-actions > * + * { margin-left: 12px; }
+        @media (max-width: 639px) { .ix-form-actions { flex-direction: column-reverse; } .ix-form-actions > * + * { margin-left: 0; margin-bottom: 10px; } }
+      `}</style>
       {confirmDialog}
       <CookieWizardModal isOpen={showCookieWizard} onClose={() => setShowCookieWizard(false)} />
       <IndexerDefinitionDocsModal isOpen={showDocs} onClose={() => setShowDocs(false)} />
-      <h3 className="text-2xl font-bold text-white">Configuration des indexers</h3>
-      
+      {header}
+
+      <div class="wz-stack">
       {hasIndexers ? (
-        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300">
-          <span>Au moins un indexer est configuré</span>
-        </div>
+        <Alert tone="success">Au moins un indexer est configuré</Alert>
       ) : (
-        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-300">
-          <span>
-            Aucun indexer configuré. Veuillez en ajouter au moins un.
-            {' '}
-            <span className="text-yellow-200/80">(si tu viens de te connecter, l'import automatique peut prendre quelques secondes)</span>
-          </span>
-        </div>
+        <Alert tone="warning">
+          Aucun indexer configuré. Veuillez en ajouter au moins un.
+          {' '}
+          <span class="wz-muted">(si tu viens de te connecter, l'import automatique peut prendre quelques secondes)</span>
+        </Alert>
       )}
 
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {showDefinitionSelector ? (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-white">{t('setupIndexersStep.selectDefinitionTitle')}</h3>
+        <div>
+          <div class="wz-between" style="margin-bottom:12px;">
+            <div class="wz-inline">
+              <h3 class="wz-h3" style="margin:0;">{t('setupIndexersStep.selectDefinitionTitle')}</h3>
               <button
                 type="button"
-                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white/90 transition-colors"
+                class="wz-icon-btn"
+                data-focusable
+                style="margin-left:10px;"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -461,7 +523,8 @@ export function IndexersStep({
             </div>
             <button
               type="button"
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg"
+              class="wz-btn wz-btn--ghost wz-btn--sm"
+              data-focusable
               onClick={() => {
                 setShowDefinitionSelector(false);
                 setDefinitions([]);
@@ -470,37 +533,31 @@ export function IndexersStep({
               {t('common.cancel')}
             </button>
           </div>
-          <p className="text-gray-300 text-sm">
+          <p class="wz-text-sm" style="margin:0 0 20px;">
             {t('setupIndexersStep.manualHint')}
           </p>
           {definitions.length > 0 && (
-            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-1 rounded border-gray-600 bg-gray-800 text-primary-500 focus:ring-primary-500"
-                  checked={useJackett}
-                  onChange={(e) => toggleUseJackett((e.target as HTMLInputElement).checked)}
-                  aria-describedby="setup-use-jackett-desc"
-                />
-                <div>
-                  <span className="font-medium text-white">{t('indexersManager.useJackettLabel')}</span>
-                  <p id="setup-use-jackett-desc" className="text-sm text-gray-400 mt-1">{t('indexersManager.useJackettDescription')}</p>
-                </div>
-              </label>
-            </div>
+            <CheckButton
+              checked={useJackett}
+              onToggle={(next) => toggleUseJackett(next)}
+              desc={t('indexersManager.useJackettDescription')}
+              descId="setup-use-jackett-desc"
+              style="margin-bottom:20px;"
+            >
+              <span style="color:var(--wz-ink);">{t('indexersManager.useJackettLabel')}</span>
+            </CheckButton>
           )}
           {definitions.length > 0 && (
-            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+            <div class="ix-filters" style="margin-bottom:8px;">
               <input
                 type="search"
-                className="flex-1 min-w-[200px] px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600"
+                class="wz-input ix-filters__search"
                 placeholder={t('setupIndexersStep.searchPlaceholder')}
                 value={definitionSearchQuery}
                 onInput={(e) => setDefinitionSearchQuery((e.target as HTMLInputElement).value)}
               />
               <select
-                className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-600"
+                class="wz-input"
                 value={definitionFilterLanguage}
                 onChange={(e) => setDefinitionFilterLanguage((e.target as HTMLSelectElement).value)}
                 aria-label={t('setupIndexersStep.filterByLanguage')}
@@ -513,7 +570,7 @@ export function IndexersStep({
                 ))}
               </select>
               <select
-                className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-600"
+                class="wz-input"
                 value={definitionFilterCountry}
                 onChange={(e) => setDefinitionFilterCountry((e.target as HTMLSelectElement).value)}
                 aria-label={t('setupIndexersStep.filterByCountry')}
@@ -528,97 +585,64 @@ export function IndexersStep({
             </div>
           )}
           {definitions.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-gray-400">{t('setupIndexersStep.noDefinitions')}</p>
+            <div class="wz-panel wz-panel--quiet">
+              <p class="wz-text" style="margin:0 0 16px;">{t('setupIndexersStep.noDefinitions')}</p>
               <button
                 type="button"
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg"
-                onClick={() => {
-                  setShowDefinitionSelector(false);
-                  setSelectedDefinition(null);
-                  setShowForm(true);
-                  setFormData({
-                    name: '',
-                    baseUrl: '',
-                    apiKey: '',
-                    jackettIndexerName: '',
-                    isEnabled: true,
-                    isDefault: false,
-                    priority: 0,
-                    indexerTypeId: null,
-                    extraConfig: {},
-                    useFlareSolverr: false,
-                  });
-                }}
+                class="wz-btn wz-btn--ghost"
+                data-focusable
+                onClick={openManualForm}
               >
                 {t('setupIndexersStep.configureManually')}
               </button>
             </div>
           ) : displayedDefinitions.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-gray-400">{t('setupIndexersStep.noResultsForSearch')}</p>
-              <p className="text-sm text-gray-500">
+            <div class="wz-panel wz-panel--quiet">
+              <p class="wz-text" style="margin:0 0 6px;">{t('setupIndexersStep.noResultsForSearch')}</p>
+              <p class="wz-help" style="margin:0;">
                 {t('setupIndexersStep.manualHint')}
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {displayedDefinitions.map((def) => (
-                <div
+                <button
                   key={def.id}
-                  role="button"
-                  tabIndex={0}
-                  className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-primary-500 cursor-pointer transition-colors"
+                  type="button"
+                  data-focusable
+                  class="wz-option ix-def"
                   onClick={() => handleSelectDefinition(def)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSelectDefinition(def)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-semibold text-white mb-1">{def.name}</h4>
-                      {def.description && (
-                        <p className="text-sm text-gray-400 mb-2">{def.description}</p>
+                  <span class="wz-option__body">
+                    <span class="wz-option__title">{def.name}</span>
+                    {def.description && (
+                      <span class="wz-option__desc">{def.description}</span>
+                    )}
+                    <span class="ix-tags">
+                      <span class="wz-badge">{def.protocol}</span>
+                      {def.language && (
+                        <span class="wz-badge">{def.language}</span>
                       )}
-                      <div className="flex gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded">{def.protocol}</span>
-                        {def.language && (
-                          <span className="px-2 py-0.5 bg-gray-700/80 text-gray-400 text-xs rounded">{def.language}</span>
-                        )}
-                        {def.country && (
-                          <span className="px-2 py-0.5 bg-gray-700/80 text-gray-400 text-xs rounded">{def.country}</span>
-                        )}
-                        {def.requiresApiKey && (
-                          <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-300 text-xs rounded">{t('setupIndexersStep.apiKeyRequired')}</span>
-                        )}
-                        {def.requiresAuth && (
-                          <span className="px-2 py-0.5 bg-blue-900/50 text-blue-300 text-xs rounded">{t('indexersManager.authRequired')}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-primary-400 text-sm font-medium">{t('setupIndexersStep.select')}</span>
-                  </div>
-                </div>
+                      {def.country && (
+                        <span class="wz-badge">{def.country}</span>
+                      )}
+                      {def.requiresApiKey && (
+                        <span class="wz-badge wz-badge--warn">{t('setupIndexersStep.apiKeyRequired')}</span>
+                      )}
+                      {def.requiresAuth && (
+                        <span class="wz-badge wz-badge--accent">{t('indexersManager.authRequired')}</span>
+                      )}
+                    </span>
+                  </span>
+                  <span class="wz-option__end wz-link wz-link--accent">{t('setupIndexersStep.select')}</span>
+                </button>
               ))}
-              <div className="pt-2">
+              <div style="margin-top:20px;">
                 <button
                   type="button"
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg"
-                  onClick={() => {
-                    setShowDefinitionSelector(false);
-                    setSelectedDefinition(null);
-                    setShowForm(true);
-                    setFormData({
-                      name: '',
-                      baseUrl: '',
-                      apiKey: '',
-                      jackettIndexerName: '',
-                      isEnabled: true,
-                      isDefault: false,
-                      priority: 0,
-                      indexerTypeId: null,
-                      extraConfig: {},
-                      useFlareSolverr: false,
-                    });
-                  }}
+                  class="wz-btn wz-btn--ghost"
+                  data-focusable
+                  onClick={openManualForm}
                 >
                   {t('setupIndexersStep.configureManually')}
                 </button>
@@ -627,67 +651,69 @@ export function IndexersStep({
           )}
         </div>
       ) : !showForm ? (
-        <>
-          <div className="space-y-4">
-            {indexers.length > 0 ? (
-              <div className="space-y-2">
-                {indexers.map((indexer) => (
-                  <div key={indexer.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="text-lg font-semibold text-white">{indexer.name}</h4>
-                          {indexer.isDefault && (
-                            <span className="px-2 py-1 bg-primary-600 text-white text-xs font-semibold rounded">Par défaut</span>
-                          )}
-                          {!indexer.isEnabled && (
-                            <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs font-semibold rounded">Désactivé</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-400 mb-1">{indexer.baseUrl}</p>
-                        {indexer.jackettIndexerName && (
-                          <p className="text-xs text-gray-500">Indexer: {indexer.jackettIndexerName}</p>
-                        )}
-                        <p className="text-xs text-gray-500">Priorité: {indexer.priority}</p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <button
-                          className="w-full sm:w-auto px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                          onClick={() => handleEdit(indexer)}
-                        >
-                          Éditer
-                        </button>
-                        <button
-                          className="w-full sm:w-auto px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
-                          onClick={() => handleDelete(indexer.id)}
-                          disabled={deleting === indexer.id}
-                        >
-                          {deleting === indexer.id ? (
-                            <span className="loading loading-spinner loading-sm"></span>
-                          ) : (
-                            'Supprimer'
-                          )}
-                        </button>
-                      </div>
+        <div>
+          {indexers.length > 0 ? (
+            <div>
+              <span class="wz-section-label">Indexers configurés</span>
+              {indexers.map((indexer) => (
+                <div key={indexer.id} class="ix-item">
+                  <div class="ix-item__body">
+                    <div class="ix-item__name">
+                      <span class="wz-option__title">{indexer.name}</span>
+                      {indexer.isDefault && (
+                        <span class="wz-badge wz-badge--accent">Par défaut</span>
+                      )}
+                      {!indexer.isEnabled && (
+                        <span class="wz-badge">Désactivé</span>
+                      )}
                     </div>
+                    <div class="ix-item__meta">{indexer.baseUrl}</div>
+                    {indexer.jackettIndexerName && (
+                      <div class="ix-item__meta">Indexer: {indexer.jackettIndexerName}</div>
+                    )}
+                    <div class="ix-item__meta">Priorité: {indexer.priority}</div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-400">Aucun indexer configuré</p>
-            )}
-          </div>
+                  <div class="ix-item__actions">
+                    <button
+                      type="button"
+                      class="wz-btn wz-btn--ghost wz-btn--sm"
+                      data-focusable
+                      onClick={() => handleEdit(indexer)}
+                    >
+                      Éditer
+                    </button>
+                    <button
+                      type="button"
+                      class="wz-btn wz-btn--danger wz-btn--sm"
+                      data-focusable
+                      onClick={() => handleDelete(indexer.id)}
+                      disabled={deleting === indexer.id}
+                    >
+                      {deleting === indexer.id ? (
+                        <span class="ed-spinner ed-spinner--xs" aria-hidden="true" />
+                      ) : (
+                        'Supprimer'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p class="wz-muted" style="margin:0;">Aucun indexer configuré</p>
+          )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div class="ix-tools">
             <button
               type="button"
-              className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+              class="wz-btn wz-btn--primary"
+              data-focusable
               onClick={handleAddIndexer}
               disabled={loadingDefinitions}
             >
               {loadingDefinitions ? (
                 <>
-                  <span className="loading loading-spinner loading-sm"></span>
+                  <Spinner />
                   {t('common.loading')}
                 </>
               ) : (
@@ -696,7 +722,8 @@ export function IndexersStep({
             </button>
             <button
               type="button"
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-center flex items-center justify-center gap-2"
+              class="wz-btn wz-btn--ghost"
+              data-focusable
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -704,7 +731,7 @@ export function IndexersStep({
               }}
               title={t('indexerDefinitionDocs.open')}
             >
-              <Info className="w-4 h-4" />
+              <Info className="w-4 h-4 is-lead" />
               <span>{t('indexerDefinitionDocs.open')}</span>
             </button>
             {hasCloudToken && (
@@ -712,39 +739,37 @@ export function IndexersStep({
                 href="/settings/indexer-definitions"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-center"
+                class="wz-btn wz-btn--quiet"
               >
-                {t('setupIndexersStep.addDefinition')}
+                {t('setupIndexersStep.addDefinition')} ↗
               </a>
             )}
           </div>
-        </>
+        </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} class="wz-panel">
           {editingIndexer && (
-            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 text-blue-300">
-              <span>Édition de l'indexer: {editingIndexer.name}</span>
-            </div>
+            <Alert tone="info" style="margin-bottom:20px;">Édition de l'indexer: {editingIndexer.name}</Alert>
           )}
           {selectedDefinition && !editingIndexer && (
-            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-gray-300 text-sm">
+            <p class="wz-text-sm" style="margin:0 0 20px;">
               {t('setupIndexersStep.basedOnDefinition')}{' '}
-              <strong className="text-white">{selectedDefinition.name}</strong>
-            </div>
+              <strong style="color:var(--wz-ink);font-weight:500;">{selectedDefinition.name}</strong>
+            </p>
           )}
 
           {(() => {
             const effectiveDef = selectedDefinition || (editingIndexer?.indexerTypeId && definitions.find((d) => d.id === editingIndexer?.indexerTypeId)) || null;
             const uiFields = Array.isArray(effectiveDef?.ui?.fields) ? effectiveDef!.ui!.fields : [];
             const fieldLabel = (field: { name?: string; label?: string }) => field?.label || (field?.name ? t(`indexersManager.form.${field.name}` as any) : '') || field?.name || '';
-            const inputClass = 'w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent';
+            const inputClass = 'wz-input';
             return (
               <>
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.name')}</label>
+          <div class="wz-field">
+            <label class="wz-label">{t('indexersManager.form.name')}</label>
             <input
               type="text"
-              className={inputClass}
+              class={inputClass}
               value={formData.name}
               onInput={(e) => setFormData({ ...formData, name: (e.target as HTMLInputElement).value })}
               required
@@ -755,29 +780,30 @@ export function IndexersStep({
             if (!name) return null;
             if (name === 'baseUrl') {
               return (
-                <div key={name} className="space-y-2">
-                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}</label>
-                  <input type="url" className={inputClass} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required placeholder={field.placeholder} />
+                <div key={name} class="wz-field">
+                  <label class="wz-label">{fieldLabel(field)}</label>
+                  <input type="url" class={`${inputClass} wz-input--mono`} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required placeholder={field.placeholder} />
                 </div>
               );
             }
             if (name === 'apiKey') {
               return (
-                <div key={name} className="space-y-2">
-                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{effectiveDef?.requiresApiKey && <span className="text-red-400 ml-1">*</span>}</label>
-                  <input type="password" autoComplete="new-password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} required={effectiveDef?.requiresApiKey ?? false} placeholder={field.placeholder} />
+                <div key={name} class="wz-field">
+                  <label class="wz-label">{fieldLabel(field)}{effectiveDef?.requiresApiKey && required}</label>
+                  <input type="password" autoComplete="new-password" class={`${inputClass} wz-input--mono`} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} required={effectiveDef?.requiresApiKey ?? false} placeholder={field.placeholder} />
                 </div>
               );
             }
             const isPassword = name !== 'cookie' && (field.type || '').toLowerCase() === 'password';
             return (
-              <div key={name} className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{field.required && <span className="text-red-400 ml-1">*</span>}</label>
+              <div key={name} class="wz-field">
+                <div class="ix-field-head">
+                  <label class="wz-label">{fieldLabel(field)}{field.required && required}</label>
                   {name === 'cookie' && (
                     <button
                       type="button"
-                      className="text-sm font-medium px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10"
+                      class="wz-btn wz-btn--ghost wz-btn--sm"
+                      data-focusable
                       onClick={() => setShowCookieWizard(true)}
                     >
                       {t('indexersManager.form.cookieWizardOpen')}
@@ -786,7 +812,7 @@ export function IndexersStep({
                 </div>
                 <input
                   type={isPassword ? 'password' : 'text'}
-                  className={inputClass}
+                  class={inputClass}
                   value={formData.extraConfig?.[name] ?? ''}
                   onInput={(e) => {
                     const v = (e.target as HTMLInputElement).value;
@@ -799,16 +825,16 @@ export function IndexersStep({
                 {name === 'cookie' && (
                   <>
                     <div
-                      className="mt-2 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 p-4 text-center text-sm text-gray-400 hover:border-primary-500/50 hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      class="ix-drop"
                       tabIndex={0}
                       role="button"
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('!border-primary-500', '!bg-primary-500/10'); }}
-                      onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('!border-primary-500', '!bg-primary-500/10'); }}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('is-over'); }}
+                      onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('is-over'); }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         const el = e.currentTarget as HTMLElement;
-                        el.classList.remove('!border-primary-500', '!bg-primary-500/10');
+                        el.classList.remove('is-over');
                         const text = e.dataTransfer?.getData?.('text/plain')?.trim();
                         if (text) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } });
                       }}
@@ -821,7 +847,9 @@ export function IndexersStep({
                     </div>
                     <button
                       type="button"
-                      className="mt-2 text-sm px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:bg-primary-500/10"
+                      class="wz-btn wz-btn--ghost wz-btn--sm"
+                      data-focusable
+                      style="margin-top:10px;"
                       onClick={async () => {
                         try {
                           const text = await navigator.clipboard.readText();
@@ -831,95 +859,89 @@ export function IndexersStep({
                     >
                       {t('indexersManager.form.cookiePasteButton')}
                     </button>
-                    <p className="text-sm text-gray-400">{t('indexersManager.form.cookieHelp')}</p>
+                    <p class="wz-help">{t('indexersManager.form.cookieHelp')}</p>
                   </>
                 )}
               </div>
             );
           }) : (
             <>
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.baseUrl')}</label>
-            <input type="url" className={inputClass} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required />
+          <div class="wz-field">
+            <label class="wz-label">{t('indexersManager.form.baseUrl')}</label>
+            <input type="url" class={`${inputClass} wz-input--mono`} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required />
           </div>
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.apiKey')}</label>
-            <input type="password" autoComplete="new-password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} placeholder={t('indexersManager.optional')} />
+          <div class="wz-field">
+            <label class="wz-label">{t('indexersManager.form.apiKey')}</label>
+            <input type="password" autoComplete="new-password" class={`${inputClass} wz-input--mono`} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} placeholder={t('indexersManager.optional')} />
           </div>
             </>
           )}
           {(effectiveDef?.protocol === 'torznab' || formData.jackettIndexerName !== undefined) && (
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.jackettName')}</label>
-            <input type="text" className={inputClass} value={formData.jackettIndexerName} onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })} />
+          <div class="wz-field">
+            <label class="wz-label">{t('indexersManager.form.jackettName')}</label>
+            <input type="text" class={inputClass} value={formData.jackettIndexerName} onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })} />
           </div>
           )}
           {effectiveDef?.protocol === 'custom' && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
-                  checked={formData.useFlareSolverr ?? false}
-                  onChange={(e) => setFormData({ ...formData, useFlareSolverr: (e.target as HTMLInputElement).checked })}
-                />
-                <span className="text-white">{t('indexersManager.form.useFlareSolverr')}</span>
-              </label>
-              <p className="text-sm text-gray-400 ml-6">{t('indexersManager.form.useFlareSolverrHelp')}</p>
+            <div class="wz-field">
+              <CheckButton
+                checked={formData.useFlareSolverr ?? false}
+                onToggle={(next) => setFormData({ ...formData, useFlareSolverr: next })}
+                desc={t('indexersManager.form.useFlareSolverrHelp')}
+              >
+                <span style="color:var(--wz-ink);">{t('indexersManager.form.useFlareSolverr')}</span>
+              </CheckButton>
             </div>
           )}
               </>
             );
           })()}
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">Priorité</label>
+          <div class="wz-field">
+            <label class="wz-label">Priorité</label>
             <input
               type="number"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              class="wz-input"
+              style="max-width:160px;"
               value={formData.priority}
               onInput={(e) => setFormData({ ...formData, priority: parseInt((e.target as HTMLInputElement).value) || 0 })}
               min="0"
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
-                checked={formData.isEnabled}
-                onChange={(e) => setFormData({ ...formData, isEnabled: (e.target as HTMLInputElement).checked })}
-              />
-              <span className="text-white">Activer</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
-                checked={formData.isDefault}
-                onChange={(e) => setFormData({ ...formData, isDefault: (e.target as HTMLInputElement).checked })}
-              />
-              <span className="text-white">Par défaut</span>
-            </label>
+          <div class="wz-field ix-checks">
+            <CheckButton
+              checked={formData.isEnabled}
+              onToggle={(next) => setFormData({ ...formData, isEnabled: next })}
+            >
+              Activer
+            </CheckButton>
+            <CheckButton
+              checked={formData.isDefault}
+              onToggle={(next) => setFormData({ ...formData, isDefault: next })}
+            >
+              Par défaut
+            </CheckButton>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div class="ix-form-actions">
             <button
               type="button"
-              className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+              class="wz-btn wz-btn--ghost"
+              data-focusable
               onClick={handleCancel}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="wz-btn wz-btn--primary"
+              data-focusable
               disabled={saving}
             >
               {saving ? (
                 <>
-                  <span className="loading loading-spinner loading-sm"></span>
+                  <Spinner />
                   Sauvegarde...
                 </>
               ) : (
@@ -929,22 +951,29 @@ export function IndexersStep({
           </div>
         </form>
       )}
+      </div>
 
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-4 mt-8">
+      <div class="wz-actions">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+          type="button"
+          class="wz-btn wz-btn--ghost"
+          data-focusable
           onClick={onPrevious}
         >
-          ← Précédent
+          <IconArrowLeft />
+          Précédent
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          type="button"
+          class="wz-btn wz-btn--primary"
+          data-focusable
           onClick={onNext}
           disabled={!hasIndexers}
         >
-          Suivant →
+          Suivant
+          <IconArrowRight />
         </button>
       </div>
     </div>
