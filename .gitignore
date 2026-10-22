@@ -58,3 +58,7 @@ src-tauri/gen/
 /playwright/.auth/
 .env*.local
 *.ipk
+
+# Signing secrets (never commit)
+keystore-base64.txt
+keystore_base64.txt
