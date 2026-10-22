@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { SyncProgress } from '../components/SyncProgress';
 import { useI18n } from '../../../lib/i18n';
+import { StepHeader, Alert, Spinner, IconArrowLeft, IconArrowRight, IconCheck } from '../wizardUi';
 
 /** Même forme que la réponse /api/sync/status (pour SyncProgress externalStatus) */
 interface SyncStatusData {
@@ -186,117 +187,103 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
   };
 
   return (
-    <div className="space-y-6">
+    <div>
       {!syncStarted ? (
         <>
-          <div className="text-center">
-            <h3 className="text-3xl font-bold text-white mb-2">Synchronisation des torrents</h3>
-            <p className="text-lg text-gray-400 mb-6">
-              Lancez la première synchronisation pour récupérer les torrents depuis vos indexers configurés.
-            </p>
-          </div>
+          <StepHeader
+            kicker="Bibliothèque"
+            title="Synchronisation des torrents"
+            lead="Lancez la première synchronisation pour récupérer les torrents depuis vos indexers configurés."
+          />
 
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-            <p className="text-white mb-4">
-              La synchronisation va interroger vos indexers activés pour récupérer les torrents disponibles.
-              Cette opération peut prendre plusieurs minutes selon le nombre d'indexers et de torrents.
-            </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2">
-              <li>Les torrents seront organisés par catégorie (films, séries)</li>
-              <li>Les métadonnées TMDB seront ajoutées automatiquement si configurées</li>
-              <li>Vous pourrez relancer une synchronisation depuis les paramètres plus tard</li>
-            </ul>
-          </div>
-
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
-              <span className="text-red-300 text-sm">{error}</span>
+          <div class="wz-stack">
+            <div class="wz-panel">
+              <p class="wz-text" style="color:var(--wz-ink);margin-bottom:18px;">
+                La synchronisation va interroger vos indexers activés pour récupérer les torrents disponibles.
+                Cette opération peut prendre plusieurs minutes selon le nombre d'indexers et de torrents.
+              </p>
+              <ol class="wz-list wz-list--lines" style="border-top:1px solid var(--wz-line);">
+                <li style="align-items:center;"><span class="wz-num">01</span><span>Les torrents seront organisés par catégorie (films, séries)</span></li>
+                <li style="align-items:center;"><span class="wz-num">02</span><span>Les métadonnées TMDB seront ajoutées automatiquement si configurées</span></li>
+                <li style="align-items:center;border-bottom:0;"><span class="wz-num">03</span><span>Vous pourrez relancer une synchronisation depuis les paramètres plus tard</span></li>
+              </ol>
             </div>
-          )}
 
-          <div className="flex flex-col sm:flex-row gap-4">
+            {error && <Alert tone="error">{error}</Alert>}
+          </div>
+
+          <div class="wz-actions">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+              type="button"
+              class="wz-btn wz-btn--ghost"
+              data-focusable
               onClick={onPrevious}
             >
+              <IconArrowLeft />
               {t('syncStep.previous')}
             </button>
             <button
               ref={(el) => { buttonRefs.current[1] = el; }}
-              className="w-full sm:flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+              type="button"
+              class="wz-btn wz-btn--primary"
+              data-focusable
               onClick={handleStartSync}
               disabled={syncing}
             >
+              {syncing ? <Spinner /> : null}
               {syncing ? t('syncStep.starting') : t('syncStep.launchSync')}
             </button>
           </div>
         </>
       ) : syncing ? (
         <>
-          <div className="text-center">
-            <h3 className="text-3xl font-bold text-white mb-2">{t('syncStep.inProgress')}</h3>
-            <p className="text-lg text-gray-400">
-              {t('syncStep.fromIndexers')}
-            </p>
-          </div>
+          <StepHeader
+            kicker="Bibliothèque"
+            title={t('syncStep.inProgress')}
+            lead={t('syncStep.fromIndexers')}
+          />
 
-          {/* Mêmes stats que la page Sync torrent : progression, indexer/catégorie en cours, compteurs films/séries/autres, total */}
-          <SyncProgress compact={false} externalStatus={syncStatus} />
+          <div class="wz-stack">
+            {/* Mêmes stats que la page Sync torrent : progression, indexer/catégorie en cours, compteurs films/séries/autres, total */}
+            <SyncProgress compact={false} externalStatus={syncStatus} />
 
-          <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
-            <p className="text-blue-300 text-sm text-center">
-              {t('syncStep.pleaseWait')}
-            </p>
+            <Alert tone="info">{t('syncStep.pleaseWait')}</Alert>
           </div>
         </>
       ) : syncComplete ? (
         <>
-          <div className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="w-24 h-24 rounded-full bg-green-600 flex items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-12 w-12 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
+          <div class="wz-center">
+            <div class="wz-seal wz-seal--ok">
+              <IconCheck />
             </div>
+          </div>
+          <StepHeader
+            center
+            kicker="Bibliothèque"
+            title={t('syncStep.completed')}
+            lead={t('syncStep.syncedSuccess')}
+          />
 
-            <h3 className="text-3xl font-bold text-white mb-2">{t('syncStep.completed')}</h3>
-            
-            <p className="text-lg text-gray-400 mb-6">
-              {t('syncStep.syncedSuccess')}
-            </p>
-
+          <div class="wz-stack">
             {/* Afficher les mêmes stats que la page Sync torrent (films, séries, autres, total) */}
             {syncStatus && (syncStatus.stats && Object.keys(syncStatus.stats).length > 0) && (
-              <div className="mb-6">
-                <SyncProgress compact={false} externalStatus={syncStatus} />
-              </div>
+              <SyncProgress compact={false} externalStatus={syncStatus} />
             )}
 
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-              <p className="text-white">
-                {t('syncStep.continueToFinal')}
-              </p>
-            </div>
+            <p class="wz-text wz-center">{t('syncStep.continueToFinal')}</p>
+          </div>
 
+          <div class="wz-actions wz-actions--end">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
+              type="button"
+              class="wz-btn wz-btn--primary"
+              data-focusable
               onClick={handleNext}
             >
               {t('syncStep.continue')}
+              <IconArrowRight />
             </button>
           </div>
         </>
