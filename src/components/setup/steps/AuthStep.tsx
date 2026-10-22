@@ -16,6 +16,7 @@ import { isTVPlatform, isTablet } from '../../../lib/utils/device-detection';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
 import { dbgLog } from '../../../lib/debug/debug-store';
+import { StepHeader, Alert, Spinner, IconArrowLeft, IconArrowRight } from '../wizardUi';
 
 interface AuthStepProps {
   focusedButtonIndex: number;
@@ -328,8 +329,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   // Layout TV : Connexion rapide (QR + code) en premier, puis option "Connexion avec email"
   const renderTVLayout = () => (
     <div class="auth-step-tv">
-      <h2 class="auth-step-tv__title">{t('wizard.auth.title')}</h2>
-      <p class="auth-step-tv__subtitle">{t('wizard.auth.description')}</p>
+      <StepHeader kicker="Compte Popcornn" title={t('wizard.auth.title')} lead={t('wizard.auth.description')} />
 
       {!showEmailFormExpanded ? (
         <>
@@ -342,14 +342,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               tvMode
             />
           </div>
-          <div class="auth-step-tv__divider">Ou</div>
-          <div style="margin-bottom:16px;">
+          <div class="wz-divider">Ou</div>
+          <div class="auth-step-tv__alt">
             <PocketIdButton emphasize />
           </div>
-          <div class="auth-step-tv__divider">Ou</div>
+          <div class="wz-divider">Ou</div>
           <button
             type="button"
-            class="auth-step-tv__email-cta"
+            class="wz-btn wz-btn--ghost wz-btn--block auth-step-tv__email-cta"
             data-focusable
             onClick={() => setShowEmailFormExpanded(true)}
           >
@@ -358,26 +358,32 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         </>
       ) : (
         <div class="auth-step-tv__form-block">
-          <button
-            type="button"
-            class="auth-step-tv__back"
-            data-focusable
-            onClick={() => setShowEmailFormExpanded(false)}
-          >
-            ← Retour au QR code
-          </button>
-          {/* Réutiliser les vues login/register avec styles TV */}
-          <div class="auth-tab-bar auth-step-tv__tabs">
+          <div class="auth-step-tv__back">
             <button
               type="button"
-              class={`auth-tab ${view === 'login' ? 'active' : ''} auth-step-tv__tab`}
+              class="wz-link"
+              data-focusable
+              onClick={() => setShowEmailFormExpanded(false)}
+            >
+              ← Retour au QR code
+            </button>
+          </div>
+          {/* Réutiliser les vues login/register avec styles TV */}
+          <div class="auth-tab-bar">
+            <button
+              type="button"
+              class={`auth-tab ${view === 'login' ? 'active' : ''}`}
+              data-focusable
+              aria-pressed={view === 'login'}
               onClick={() => { setView('login'); setError(null); }}
             >
               {t('wizard.auth.loginTab')}
             </button>
             <button
               type="button"
-              class={`auth-tab ${view === 'register' ? 'active' : ''} auth-step-tv__tab`}
+              class={`auth-tab ${view === 'register' ? 'active' : ''}`}
+              data-focusable
+              aria-pressed={view === 'register'}
               onClick={() => { setView('register'); setError(null); }}
             >
               {t('wizard.auth.registerTab')}
@@ -387,22 +393,18 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             <div class="auth-step-tv__form">
               <div class="auth-section-label">Connexion avec email</div>
               {ssoRequired ? (
-                <div style="margin-bottom:16px;"><PocketIdButton emphasize /></div>
+                <div style="margin-bottom:20px;"><PocketIdButton emphasize /></div>
               ) : (
-                <div style="margin-bottom:16px;">
+                <div style="margin-bottom:20px;">
                   <PocketIdButton />
-                  <div class="flex items-center gap-3 my-4">
-                    <div class="flex-1 h-px bg-white/20" />
-                    <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
-                    <div class="flex-1 h-px bg-white/20" />
-                  </div>
+                  <div class="wz-divider">{t('loginForm.sso.or')}</div>
                 </div>
               )}
               <form onSubmit={handleLogin}>
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">{t('wizard.auth.email')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.email')}</label>
                   <input
-                    class="wizard-input auth-step-tv__input"
+                    class="wz-input"
                     type="email"
                     placeholder={t('wizard.auth.emailPlaceholder')}
                     value={loginEmail}
@@ -413,10 +415,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   />
                 </div>
                 {!ssoRequired && (
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">{t('wizard.auth.password')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.password')}</label>
                   <input
-                    class="wizard-input auth-step-tv__input"
+                    class="wz-input"
                     type="password"
                     placeholder={t('wizard.auth.passwordPlaceholder')}
                     value={loginPassword}
@@ -431,38 +433,38 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 <button
                   ref={(el) => { buttonRefs.current[0] = el; }}
                   type="submit"
-                  class="wizard-btn-primary auth-step-tv__submit"
+                  class="wz-btn wz-btn--primary wz-btn--block auth-step-tv__submit"
+                  data-focusable
                   disabled={loading || !loginEmail || !loginPassword}
                 >
                   {loading ? 'Connexion...' : 'Se connecter'}
                 </button>
                 )}
               </form>
-              <button
-                type="button"
-                class="auth-step-tv__link"
-                onClick={() => { setView('register'); setError(null); }}
-              >
-                Pas encore de compte ? S'inscrire
-              </button>
+              <div class="auth-switch">
+                <button
+                  type="button"
+                  class="wz-link wz-link--accent"
+                  data-focusable
+                  onClick={() => { setView('register'); setError(null); }}
+                >
+                  Pas encore de compte ? S'inscrire
+                </button>
+              </div>
             </div>
           )}
           {view === 'register' && (
             <div class="auth-step-tv__form">
               <div class="auth-section-label">Créer un compte</div>
-              <div style="margin-bottom:16px;">
+              <div style="margin-bottom:20px;">
                 <PocketIdButton />
-                <div class="flex items-center gap-3 my-4">
-                  <div class="flex-1 h-px bg-white/20" />
-                  <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
-                  <div class="flex-1 h-px bg-white/20" />
-                </div>
+                <div class="wz-divider">{t('loginForm.sso.or')}</div>
               </div>
               <form onSubmit={handleRegister}>
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">{t('wizard.auth.email')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.email')}</label>
                   <input
-                    class="wizard-input auth-step-tv__input"
+                    class="wz-input"
                     type="email"
                     placeholder={t('wizard.auth.emailPlaceholder')}
                     value={registerEmail}
@@ -472,10 +474,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     autocomplete="email"
                   />
                 </div>
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">{t('wizard.auth.password')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.password')}</label>
                   <input
-                    class="wizard-input auth-step-tv__input"
+                    class="wz-input"
                     type="password"
                     placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
@@ -485,10 +487,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     autocomplete="new-password"
                   />
                 </div>
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">{t('wizard.auth.confirmPassword')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.confirmPassword')}</label>
                   <input
-                    class="wizard-input auth-step-tv__input"
+                    class="wz-input"
                     type="password"
                     placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
@@ -501,19 +503,23 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 <button
                   ref={(el) => { buttonRefs.current[0] = el; }}
                   type="submit"
-                  class="wizard-btn-primary auth-step-tv__submit"
+                  class="wz-btn wz-btn--primary wz-btn--block auth-step-tv__submit"
+                  data-focusable
                   disabled={loading || !registerEmail || !registerPassword}
                 >
                   {loading ? "Inscription..." : "S'inscrire"}
                 </button>
               </form>
-              <button
-                type="button"
-                class="auth-step-tv__link"
-                onClick={() => { setView('login'); setError(null); }}
-              >
-                Déjà un compte ? Se connecter
-              </button>
+              <div class="auth-switch">
+                <button
+                  type="button"
+                  class="wz-link wz-link--accent"
+                  data-focusable
+                  onClick={() => { setView('login'); setError(null); }}
+                >
+                  Déjà un compte ? Se connecter
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -527,187 +533,110 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         .auth-two-col {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 24px;
+          grid-gap: 28px;
+          gap: 28px;
           align-items: start;
         }
         @media (max-width: 640px) {
           .auth-two-col { grid-template-columns: 1fr; }
         }
-        /* Desktop : layout compact pour que le QR reste visible sans scroll (mobile/tablette inchangé) */
-        @media (min-width: 1024px) {
-          .auth-step-desktop-compact > div:first-of-type { margin-bottom: 16px !important; }
-          .auth-step-desktop-compact .auth-tab-bar { margin-bottom: 16px; }
-          .auth-step-desktop-compact .auth-two-col { gap: 16px; align-items: center; }
-          .auth-step-desktop-compact .auth-qr-side { padding: 14px; }
-          .auth-step-desktop-compact .auth-section-label { margin-bottom: 8px; }
-        }
+        /* Onglets éditoriaux : trait fin, actif souligné corail */
         .auth-tab-bar {
           display: flex;
-          gap: 4px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px;
-          padding: 4px;
-          margin-bottom: 24px;
+          border-bottom: 1px solid var(--wz-line);
+          margin-bottom: 28px;
         }
         .auth-tab {
-          flex: 1; padding: 8px 12px;
-          font-size: 13px; font-weight: 600;
-          border-radius: 7px; border: none; cursor: pointer;
-          transition: all 0.15s;
-          color: rgba(255,255,255,0.45);
+          flex: 1;
+          min-height: 48px;
+          padding: 12px 8px;
+          margin: 0 0 -1px;
           background: transparent;
+          border: 0;
+          border-bottom: 2px solid transparent;
+          border-radius: 0;
+          color: var(--wz-ink-faint);
+          font-family: var(--wz-display);
+          font-size: 0.68rem;
+          font-weight: 400;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
           text-align: center;
+          cursor: pointer;
+          transition: color 0.2s, border-color 0.2s;
         }
-        .auth-tab.active {
-          background: rgba(242,84,91,0.2);
-          color: #ffa1a6;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        }
-        .auth-tab:hover:not(.active) { color: rgba(255,255,255,0.7); }
+        .auth-tab:hover { color: var(--wz-ink-dim); }
+        .auth-tab.active { color: var(--wz-ink); border-bottom-color: var(--wz-accent); }
         .auth-section-label {
-          font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
-          color: rgba(255,255,255,0.3); text-transform: uppercase;
-          margin-bottom: 12px;
+          display: block;
+          margin: 0 0 16px;
+          font-family: var(--wz-display);
+          font-size: 0.62rem;
+          font-weight: 400;
+          letter-spacing: 0.32em;
+          text-transform: uppercase;
+          color: var(--wz-ink-faint);
         }
+        .auth-field { margin-bottom: 18px; }
         .auth-qr-side {
-          background: rgba(242,84,91,0.06);
-          border: 1px solid rgba(242,84,91,0.15);
-          border-radius: 12px;
-          padding: 20px;
+          border: 1px solid var(--wz-line);
+          background: var(--wz-surface);
+          padding: 24px 20px;
           display: flex;
           flex-direction: column;
           align-items: center;
           text-align: center;
         }
-        .auth-qr-icon {
-          width: 40px; height: 40px;
-          background: rgba(242,84,91,0.15);
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          margin-bottom: 10px;
-        }
-        .auth-2fa-box {
-          background: rgba(242,84,91,0.06);
-          border: 1px solid rgba(242,84,91,0.2);
-          border-radius: 12px;
-          padding: 20px;
-          margin-bottom: 20px;
-        }
-        .auth-code-input {
-          width: 100%;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 10px;
-          padding: 14px;
-          color: #fff;
-          font-size: 24px; font-weight: 700;
-          text-align: center; letter-spacing: 8px;
-          outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .auth-code-input:focus {
-          border-color: rgba(242,84,91,0.6);
-          box-shadow: 0 0 0 3px rgba(242,84,91,0.12);
-        }
-        .auth-restore-banner {
-          background: rgba(59,130,246,0.07);
-          border: 1px solid rgba(59,130,246,0.2);
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 20px;
-        }
-        /* ─── Layout TV : lisibilité à distance, zones de focus larges ─── */
-        .auth-step-tv { max-width: 720px; margin: 0 auto; text-align: center; }
-        .auth-step-tv__title { font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 700; color: #fff; margin: 0 0 8px; }
-        .auth-step-tv__subtitle { font-size: clamp(0.9rem, 2vw, 1rem); color: rgba(255,255,255,0.5); margin: 0 0 24px; line-height: 1.5; }
-        .auth-step-tv__qr-block { margin-bottom: 24px; }
-        .auth-step-tv__divider {
-          display: flex; align-items: center; gap: 16px; margin: 28px 0;
-          color: rgba(255,255,255,0.35); font-size: 1rem; font-weight: 600;
-        }
-        .auth-step-tv__divider::before, .auth-step-tv__divider::after {
-          content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12);
-        }
-        .auth-step-tv__email-cta {
-          display: inline-flex; align-items: center; justify-content: center;
-          min-height: 56px; padding: 14px 32px;
-          font-size: 1.125rem; font-weight: 600;
-          background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15);
-          color: #fff; border-radius: 14px; cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, transform 0.1s;
-        }
-        .auth-step-tv__email-cta:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); }
-        .auth-step-tv__email-cta:focus { outline: none; box-shadow: 0 0 0 4px rgba(242,84,91,0.4); }
-        .auth-step-tv__form-block { text-align: left; margin-top: 16px; }
-        .auth-step-tv__back {
-          margin-bottom: 20px; padding: 10px 0;
-          background: none; border: none; color: rgba(251,122,128,0.9);
-          font-size: 1rem; font-weight: 600; cursor: pointer;
-          min-height: 48px; border-radius: 10px;
-          transition: color 0.2s, background 0.2s;
-        }
-        .auth-step-tv__back:hover { color: #ffa1a6; background: rgba(242,84,91,0.1); }
-        .auth-step-tv__back:focus { outline: none; box-shadow: 0 0 0 3px rgba(242,84,91,0.3); }
-        .auth-step-tv__tabs { margin-bottom: 20px; }
-        .auth-step-tv__tab { font-size: 1rem !important; padding: 12px 16px !important; min-height: 48px; }
-        .auth-step-tv__form { max-width: 420px; }
-        .auth-step-tv__field { margin-bottom: 18px; }
-        .auth-step-tv__input {
-          font-size: 1.125rem !important; padding: 14px 18px !important;
-          min-height: 52px; border-radius: 12px;
-        }
-        .auth-step-tv__submit {
-          width: 100%; min-height: 52px; font-size: 1.125rem !important;
-          margin-top: 8px; margin-bottom: 16px;
-        }
-        .auth-step-tv__link {
-          background: none; border: none; color: rgba(251,122,128,0.85);
-          font-size: 1rem; text-decoration: underline; cursor: pointer;
-          padding: 8px 0; display: block; width: 100%;
-        }
-        .auth-step-tv__link:hover { color: #ffa1a6; }
+        .auth-qr-side__title { display: block; margin-bottom: 6px; font-family: var(--wz-display); font-size: 0.74rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--wz-ink); }
+        .auth-qr-side__desc { margin: 0 0 18px; font-size: 0.8rem; line-height: 1.55; color: var(--wz-ink-dim); }
+        .auth-2fa-box { margin-bottom: 24px; }
+        .auth-restore-banner { margin-bottom: 24px; }
+        .auth-switch { margin-top: 22px; text-align: center; }
+
+        /* ─── Layout unifié (TV, tablette, grand écran) ─── */
+        .auth-step-tv { max-width: 640px; }
+        .auth-step-tv__qr-block { border: 1px solid var(--wz-line); background: var(--wz-surface); padding: 28px 24px; }
+        .auth-step-tv__alt { margin-top: 4px; }
+        .auth-step-tv__form-block { margin-top: 4px; }
+        .auth-step-tv__back { margin-bottom: 28px; }
+        .auth-step-tv__form { max-width: 460px; }
+        .auth-step-tv__submit { margin-top: 8px; }
+        .auth-step-tv .auth-switch { text-align: left; max-width: 460px; }
+        .wz-root.is-tv .auth-tab { min-height: 60px; font-size: 0.8rem; }
+        .wz-root.is-tv .auth-step-tv__form, .wz-root.is-tv .auth-step-tv .auth-switch { max-width: 560px; }
       `}</style>
 
       {/* En-tête (sur TV, affiché seulement pour 2FA / config sauvegardée ; sinon le layout TV a le sien) */}
       {(!useUnifiedAuthLayout || hasSavedConfig || view === '2fa') && (
-        <div style="margin-bottom:28px;">
-          <h2 style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
-            {t('wizard.auth.title')}
-          </h2>
-          <p style="font-size:14px;color:rgba(255,255,255,0.45);margin:0;line-height:1.5;">
-            {t('wizard.auth.description')}
-          </p>
-        </div>
+        <StepHeader kicker="Compte Popcornn" title={t('wizard.auth.title')} lead={t('wizard.auth.description')} />
       )}
 
       {/* Bannière config sauvegardée */}
       {hasSavedConfig && (
-        <div class="auth-restore-banner">
-          <div style="font-weight:600;color:#93c5fd;margin-bottom:6px;font-size:13.5px;">
-            Configuration sauvegardée détectée
-          </div>
-          <p style="color:rgba(255,255,255,0.55);font-size:13px;margin:0 0 12px;">
+        <div class="auth-restore-banner wz-panel wz-panel--accent">
+          <span class="wz-kicker" style="margin-bottom:10px;">Configuration sauvegardée détectée</span>
+          <p class="wz-text" style="margin-bottom:20px;">
             Une configuration précédente a été trouvée dans votre compte.
           </p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div class="wz-actions__group">
             <button
               type="button"
-              class="wizard-btn-primary"
-              onClick={handleRestoreConfig}
+              class="wz-btn wz-btn--ghost"
+              data-focusable
+              onClick={() => { setHasSavedConfig(false); onNext(); }}
               disabled={restoringConfig}
-              style="font-size:13px;padding:9px 18px;"
             >
-              {restoringConfig ? 'Restauration...' : 'Restaurer la configuration'}
+              Passer
             </button>
             <button
               type="button"
-              class="wizard-btn-secondary"
-              onClick={() => { setHasSavedConfig(false); onNext(); }}
+              class="wz-btn wz-btn--primary"
+              data-focusable
+              onClick={handleRestoreConfig}
               disabled={restoringConfig}
-              style="font-size:13px;padding:9px 18px;"
             >
-              Passer
+              {restoringConfig ? <Spinner /> : null}
+              {restoringConfig ? 'Restauration...' : 'Restaurer la configuration'}
             </button>
           </div>
         </div>
@@ -715,30 +644,22 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
 
       {/* Erreur */}
       {error && (
-        <div class="wizard-error" style="margin-bottom:20px;">
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <svg style="width:15px;height:15px;flex-shrink:0;margin-top:1px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            {error}
-          </div>
-        </div>
+        <Alert tone="error" style="margin-bottom:24px;">{error}</Alert>
       )}
 
       {/* Vue 2FA */}
       {view === '2fa' && (
         <div>
           <div class="auth-2fa-box">
-            <div style="font-weight:600;color:#ffa1a6;margin-bottom:6px;font-size:13.5px;">Code de vérification requis</div>
-            <p style="color:rgba(255,255,255,0.5);font-size:13px;margin:0;">
-              Un code à 6 chiffres a été envoyé à <strong style="color:rgba(255,255,255,0.75);">{loginEmail}</strong>.
-            </p>
+            <Alert tone="info" title="Code de vérification requis">
+              Un code à 6 chiffres a été envoyé à <strong>{loginEmail}</strong>.
+            </Alert>
           </div>
           <form onSubmit={handleLogin}>
-            <div style="margin-bottom:20px;">
-              <label class="wizard-label">{t('wizard.auth.verificationCode')}</label>
+            <div style="margin-bottom:8px;max-width:420px;">
+              <label class="wz-label">{t('wizard.auth.verificationCode')}</label>
               <input
-                class="auth-code-input"
+                class="wz-input wz-input--code"
                 type="text"
                 placeholder={t('wizard.auth.verificationCodePlaceholder')}
                 value={twoFactorCode}
@@ -749,26 +670,30 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 maxLength={6}
                 autoFocus
               />
-              <p style="font-size:12px;color:rgba(255,255,255,0.3);margin-top:6px;">
+              <p class="wz-help">
                 Entrez le code à 6 chiffres reçu par email
               </p>
             </div>
-            <div style="display:flex;gap:8px;">
-              <button
-                ref={(el) => { buttonRefs.current[0] = el; }}
-                type="submit"
-                class="wizard-btn-primary"
-                disabled={loading || twoFactorCode.length !== 6}
-              >
-                {loading ? 'Vérification...' : 'Vérifier'}
-              </button>
+            <div class="wz-actions">
               <button
                 type="button"
-                class="wizard-btn-secondary"
+                class="wz-btn wz-btn--ghost"
+                data-focusable
                 onClick={() => { setView('login'); setRequires2FA(false); setTempToken(null); setTwoFactorCode(''); setError(null); }}
                 disabled={loading}
               >
+                <IconArrowLeft />
                 Retour
+              </button>
+              <button
+                ref={(el) => { buttonRefs.current[0] = el; }}
+                type="submit"
+                class="wz-btn wz-btn--primary"
+                data-focusable
+                disabled={loading || twoFactorCode.length !== 6}
+              >
+                {loading ? <Spinner /> : null}
+                {loading ? 'Vérification...' : 'Vérifier'}
               </button>
             </div>
           </form>
@@ -786,6 +711,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             <button
               type="button"
               class={`auth-tab ${view === 'login' ? 'active' : ''}`}
+              aria-pressed={view === 'login'}
               onClick={() => { setView('login'); setError(null); }}
             >
               {t('wizard.auth.loginTab')}
@@ -793,6 +719,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             <button
               type="button"
               class={`auth-tab ${view === 'register' ? 'active' : ''}`}
+              aria-pressed={view === 'register'}
               onClick={() => { setView('register'); setError(null); }}
             >
               {t('wizard.auth.registerTab')}
@@ -806,22 +733,18 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               <div>
                 <div class="auth-section-label">Connexion avec email</div>
                 {ssoRequired ? (
-                  <div style="margin-bottom:16px;"><PocketIdButton emphasize /></div>
+                  <div style="margin-bottom:20px;"><PocketIdButton emphasize /></div>
                 ) : (
-                  <div style="margin-bottom:16px;">
+                  <div style="margin-bottom:20px;">
                     <PocketIdButton />
-                    <div class="flex items-center gap-3 my-4">
-                      <div class="flex-1 h-px bg-white/20" />
-                      <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
-                      <div class="flex-1 h-px bg-white/20" />
-                    </div>
+                    <div class="wz-divider">{t('loginForm.sso.or')}</div>
                   </div>
                 )}
                 <form onSubmit={handleLogin}>
-                  <div style="margin-bottom:14px;">
-                    <label class="wizard-label">{t('wizard.auth.email')}</label>
+                  <div class="auth-field">
+                    <label class="wz-label">{t('wizard.auth.email')}</label>
                     <input
-                      class="wizard-input"
+                      class="wz-input"
                       type="email"
                       placeholder={t('wizard.auth.emailPlaceholder')}
                       value={loginEmail}
@@ -832,10 +755,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     />
                   </div>
                   {!ssoRequired && (
-                  <div style="margin-bottom:20px;">
-                    <label class="wizard-label">{t('wizard.auth.password')}</label>
+                  <div class="auth-field">
+                    <label class="wz-label">{t('wizard.auth.password')}</label>
                     <input
-                      class="wizard-input"
+                      class="wz-input"
                       type="password"
                       placeholder={t('wizard.auth.passwordPlaceholder')}
                       value={loginPassword}
@@ -850,31 +773,29 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <button
                     ref={(el) => { buttonRefs.current[0] = el; }}
                     type="submit"
-                    class="wizard-btn-primary"
-                    style="width:100%;"
+                    class="wz-btn wz-btn--primary wz-btn--block"
+                    data-focusable
                     disabled={loading || !loginEmail || !loginPassword}
                   >
                     {loading ? (
                       <>
-                        <span style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:wizard-pulse 0.6s linear infinite;" />
+                        <Spinner />
                         Connexion...
                       </>
                     ) : (
                       <>
                         Se connecter
-                        <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
+                        <IconArrowRight />
                       </>
                     )}
                   </button>
                 )}
                 </form>
 
-                <div style="margin-top:16px;text-align:center;">
+                <div class="auth-switch">
                   <button
                     type="button"
-                    style="background:none;border:none;cursor:pointer;font-size:12.5px;color:rgba(251,122,128,0.7);text-decoration:underline;text-underline-offset:2px;"
+                    class="wz-link wz-link--accent"
                     onClick={() => { setView('register'); setError(null); }}
                   >
                     Pas encore de compte ? S'inscrire
@@ -884,13 +805,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
 
               {/* Colonne droite : QR code */}
               <div class="auth-qr-side">
-                <div class="auth-qr-icon">
-                  <svg style="width:20px;height:20px;color:#fb7a80;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                  </svg>
-                </div>
-                <div style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.75);margin-bottom:4px;">Connexion rapide</div>
-                <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0 0 14px;line-height:1.5;">
+                <span class="auth-qr-side__title">Connexion rapide</span>
+                <p class="auth-qr-side__desc">
                   Scannez le QR code depuis l'app Popcorn ou popcorn-web
                 </p>
                 <QuickConnectStep
@@ -908,19 +824,15 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           {view === 'register' && (
             <div>
               <div class="auth-section-label">Créer un compte</div>
-              <div style="margin-bottom:16px;">
+              <div style="margin-bottom:20px;">
                 <PocketIdButton />
-                <div class="flex items-center gap-3 my-4">
-                  <div class="flex-1 h-px bg-white/20" />
-                  <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
-                  <div class="flex-1 h-px bg-white/20" />
-                </div>
+                <div class="wz-divider">{t('loginForm.sso.or')}</div>
               </div>
               <form onSubmit={handleRegister}>
-                <div style="margin-bottom:14px;">
-                  <label class="wizard-label">{t('wizard.auth.email')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.email')}</label>
                   <input
-                    class="wizard-input"
+                    class="wz-input"
                     type="email"
                     placeholder={t('wizard.auth.emailPlaceholder')}
                     value={registerEmail}
@@ -931,10 +843,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     autoFocus
                   />
                 </div>
-                <div style="margin-bottom:14px;">
-                  <label class="wizard-label">{t('wizard.auth.password')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.password')}</label>
                   <input
-                    class="wizard-input"
+                    class="wz-input"
                     type="password"
                     placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
@@ -944,10 +856,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     autocomplete="new-password"
                   />
                 </div>
-                <div style="margin-bottom:20px;">
-                  <label class="wizard-label">{t('wizard.auth.confirmPassword')}</label>
+                <div class="auth-field">
+                  <label class="wz-label">{t('wizard.auth.confirmPassword')}</label>
                   <input
-                    class="wizard-input"
+                    class="wz-input"
                     type="password"
                     placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
@@ -957,23 +869,26 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     autocomplete="new-password"
                   />
                 </div>
-                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <div class="wz-actions">
                   <button
                     type="button"
-                    class="wizard-btn-secondary"
+                    class="wz-btn wz-btn--ghost"
                     onClick={() => { setView('login'); setError(null); }}
                     disabled={loading}
-                    style="font-size:13px;padding:9px 16px;"
                   >
+                    <IconArrowLeft />
                     Retour
                   </button>
                   <button
                     ref={(el) => { buttonRefs.current[0] = el; }}
                     type="submit"
-                    class="wizard-btn-primary"
+                    class="wz-btn wz-btn--primary"
+                    data-focusable
                     disabled={loading || !registerEmail || !registerPassword}
                   >
-                    {loading ? "Inscription..." : "S'inscrire →"}
+                    {loading ? <Spinner /> : null}
+                    {loading ? "Inscription..." : "S'inscrire"}
+                    {!loading ? <IconArrowRight /> : null}
                   </button>
                 </div>
               </form>
@@ -984,4 +899,3 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     </div>
   );
 }
-
