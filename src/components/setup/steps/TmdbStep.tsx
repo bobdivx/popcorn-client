@@ -4,6 +4,7 @@ import { getUserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 import { useI18n } from '../../../lib/i18n';
+import { StepHeader, StepLoading, Alert, Spinner, IconArrowLeft, IconArrowRight } from '../wizardUi';
 
 interface TmdbStepProps {
   setupStatus: SetupStatus | null;
@@ -228,8 +229,9 @@ export function TmdbStep({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div>
+        <StepHeader kicker="Métadonnées" title="Configuration de la clé API TMDB" />
+        <StepLoading />
       </div>
     );
   }
@@ -237,68 +239,47 @@ export function TmdbStep({
   const hasExistingKey = setupStatus?.hasTmdbKey || (tmdbKey && (tmdbKey.includes('*') || tmdbKey.includes('...')));
 
   return (
-    <div className="space-y-6">
-      <h3 className="text-2xl font-bold text-white">Configuration de la clé API TMDB</h3>
-      
+    <div>
+      <StepHeader
+        kicker="Métadonnées"
+        title="Configuration de la clé API TMDB"
+        lead="Le token TMDB permet d'enrichir automatiquement les torrents avec des métadonnées (synopsis, date de sortie, genres, note, etc.)."
+      />
+
+      <div class="wz-stack">
       {hasExistingKey ? (
-        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300 flex items-center gap-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Clé API TMDB configurée</span>
-        </div>
+        <Alert tone="success">Clé API TMDB configurée</Alert>
       ) : (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 flex items-center gap-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <span>Clé API TMDB obligatoire — configurez-en une pour continuer.</span>
-        </div>
+        <Alert tone="warning">Clé API TMDB obligatoire — configurez-en une pour continuer.</Alert>
       )}
 
-      <p className="text-gray-400">
-        Le token TMDB permet d'enrichir automatiquement les torrents avec des métadonnées
-        (synopsis, date de sortie, genres, note, etc.).
-      </p>
-
-      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+      <div>
         <a
           href="https://www.themoviedb.org/settings/api"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary-600 hover:text-primary-500 transition-colors"
+          class="wz-link wz-link--accent"
         >
-          Obtenir une clé API TMDB gratuite →
+          Obtenir une clé API TMDB gratuite ↗
         </a>
       </div>
 
-      {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
-      {success && (
-        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300">
-          <span>{success}</span>
-        </div>
-      )}
+      {success && <Alert tone="success">{success}</Alert>}
 
-      {cloudKeyWarning && (
-        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-300">
-          <span>⚠️ {cloudKeyWarning}</span>
-        </div>
-      )}
+      {cloudKeyWarning && <Alert tone="warning">{cloudKeyWarning}</Alert>}
 
-      <div className="space-y-2">
-        <label className="block text-sm font-semibold text-white">
+      <div class="wz-panel">
+        <label class="wz-label" for="wz-tmdb-key">
           Clé API TMDB
         </label>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div class="wz-input-row">
           <input
+            id="wz-tmdb-key"
             type="password"
             autoComplete="new-password"
-            className="w-full sm:flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+            class="wz-input wz-input--mono"
             placeholder={hasExistingKey ? "Entrez une nouvelle clé pour remplacer" : "Entrez votre clé API TMDB"}
             value={tmdbKey}
             onInput={(e) => {
@@ -333,13 +314,15 @@ export function TmdbStep({
           />
           <button
             ref={(el) => { buttonRefs.current[0] = el; }}
-            className="w-full sm:w-auto whitespace-nowrap px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            class="wz-btn wz-btn--ghost"
+            data-focusable
             onClick={handleSave}
             disabled={saving || !tmdbKey.trim() || tmdbKey.includes('*') || tmdbKey.includes('...')}
           >
             {saving ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
+                <Spinner />
                 Sauvegarde...
               </>
             ) : (
@@ -348,30 +331,39 @@ export function TmdbStep({
           </button>
         </div>
         {hasExistingKey && (
-          <p className="text-sm text-gray-500">
+          <p class="wz-help">
             Une clé est déjà configurée. Entrez une nouvelle clé complète pour la remplacer.
           </p>
         )}
       </div>
+      </div>
 
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-4 mt-8">
+      <div class="wz-actions">
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+          type="button"
+          class="wz-btn wz-btn--ghost"
+          data-focusable
           onClick={onPrevious}
         >
-          ← Précédent
+          <IconArrowLeft />
+          Précédent
         </button>
         <button
           ref={(el) => { buttonRefs.current[2] = el; }}
-          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          type="button"
+          class="wz-btn wz-btn--primary"
+          data-focusable
           onClick={onNext}
           disabled={!hasExistingKey}
           title={!hasExistingKey ? 'Configurez une clé TMDB pour continuer' : undefined}
         >
-          Suivant →
+          Suivant
+          <IconArrowRight />
         </button>
       </div>
     </div>
   );
 }
+
+
