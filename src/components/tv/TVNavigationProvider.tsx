@@ -344,8 +344,10 @@ export default function TVNavigationProvider() {
       if (tv && !scope && !document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) {
         const detail = document.querySelector('[data-tv-media-detail]');
         if (detail) {
+          // Tout contenu focusable de la fiche reste candidat (sections ajoutées hors zones incluses) :
+          // seuls les éléments hors fiche et hors header (barres flottantes…) sont écartés.
           return filtered.filter((el) =>
-            !!el.closest('[data-tv-site-header], [data-tv-zone], [data-tv-episode-row], [role="menu"]')
+            !!el.closest('[data-tv-site-header], [data-tv-zone], [data-tv-episode-row], [role="menu"], [data-tv-media-detail]')
           );
         }
       }
@@ -1112,12 +1114,36 @@ export default function TVNavigationProvider() {
       return bestAction ? pageActionFocusable(bestAction) : null;
     };
 
+    /** Cibles déjà essayées sans succès pendant l’appui en cours (focus() refusé). */
+    let navAttemptExclude: Set<HTMLElement> | null = null;
+
+    /**
+     * Cible réellement focusable et visible : un élément listé mais masqué (display:none, taille 0),
+     * désactivé ou sans tabIndex (div data-focusable) fait échouer focus() en silence — la flèche
+     * était alors « consommée » et le focus restait bloqué (ex. fiche média TV : bloqué sur « Plus »).
+     */
+    const isNavigableTarget = (el: HTMLElement | null | undefined): el is HTMLElement => {
+      if (!el || !el.isConnected) return false;
+      if (navAttemptExclude?.has(el)) return false;
+      if ((el as HTMLButtonElement).disabled) return false;
+      if (el.getAttribute('tabindex') === '-1' || el.tabIndex < 0) return false;
+      if (el.closest('[aria-hidden="true"], [data-tv-nav-skip], [inert]')) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      if (!isWebOSCheck()) {
+        const style = window.getComputedStyle(el);
+        if (style.visibility === 'hidden' || style.display === 'none') return false;
+      }
+      return true;
+    };
+
     const zoneFocusables = (root: HTMLElement): HTMLElement[] =>
       Array.from(root.querySelectorAll<HTMLElement>('[data-focusable], a[href], button:not([disabled])')).filter(
         (el) =>
           el.getAttribute('tabindex') !== '-1' &&
           !el.closest('[aria-hidden="true"]') &&
-          !el.closest('[data-tv-nav-skip]')
+          !el.closest('[data-tv-nav-skip]') &&
+          isNavigableTarget(el)
       );
 
     const closestHeaderFocusable = (current: HTMLElement): HTMLElement | null => {
@@ -1140,6 +1166,12 @@ export default function TVNavigationProvider() {
       return best;
     };
 
+    const firstNavigableCard = (scroller: HTMLElement): HTMLElement | null => {
+      const cards = scroller.querySelectorAll<HTMLElement>('[data-episode-card]');
+      for (let i = 0; i < cards.length; i++) if (isNavigableTarget(cards[i])) return cards[i];
+      return zoneFocusables(scroller)[0] ?? null;
+    };
+
     const collectMediaDetailStops = (detail: HTMLElement): HTMLElement[] => {
       const stops: HTMLElement[] = [];
       const play = detail.querySelector<HTMLElement>('[data-tv-zone="play"]');
@@ -1148,16 +1180,36 @@ export default function TVNavigationProvider() {
       if (meta && zoneFocusables(meta).length > 0) stops.push(meta);
       detail.querySelectorAll<HTMLElement>('[data-tv-episode-row]').forEach((row) => {
         const select = row.querySelector<HTMLElement>('select:not([disabled])');
-        if (select) stops.push(select);
+        if (select && isNavigableTarget(select)) stops.push(select);
         const scroller = row.querySelector<HTMLElement>('[data-tv-episode-scroller]');
-        if (scroller && scroller.querySelector('[data-episode-card], [data-focusable], button')) stops.push(scroller);
+        if (scroller && firstNavigableCard(scroller)) stops.push(scroller);
       });
-      return stops;
+
+      // Tout autre contenu focusable de la fiche (boutons de section, carrousels ajoutés hors zones…) devient
+      // un arrêt, dans l'ordre du document : rien sous la rangée d'actions ne peut rester inaccessible.
+      const content = detail.querySelector<HTMLElement>('[data-tv-back-handler]') ?? detail;
+      const covered = (el: HTMLElement) => stops.some((st) => st === el || st.contains(el));
+      const extras: HTMLElement[] = [];
+      const raw = content.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      for (let i = 0; i < raw.length; i++) {
+        const el = raw[i];
+        if (covered(el)) continue;
+        if (el.closest('[role="dialog"], [role="menu"], [data-tv-site-header]')) continue;
+        const group = el.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+        const stop = group && content.contains(group) ? group : el;
+        if (extras.includes(stop) || covered(stop)) continue;
+        if (stop === el ? !isNavigableTarget(el) : !firstNavigableCard(stop)) continue;
+        extras.push(stop);
+      }
+      if (extras.length === 0) return stops;
+      return stops
+        .concat(extras)
+        .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
     };
 
     const focusMediaDetailStop = (stop: HTMLElement, from: HTMLElement): HTMLElement | null => {
-      if (stop.matches('[data-tv-episode-scroller]')) {
-        const cards = Array.from(stop.querySelectorAll<HTMLElement>('[data-episode-card]'));
+      if (stop.matches('[data-tv-episode-scroller], [data-carousel]')) {
+        const cards = Array.from(stop.querySelectorAll<HTMLElement>('[data-episode-card]')).filter(isNavigableTarget);
         if (cards.length === 0) return zoneFocusables(stop)[0] ?? null;
         const fromCard = from.closest('[data-episode-card]') as HTMLElement | null;
         const fromScroller = fromCard?.closest('[data-tv-episode-scroller]');
@@ -1168,9 +1220,9 @@ export default function TVNavigationProvider() {
         }
         return cards[0];
       }
-      if (stop.matches('select')) return stop;
+      if (!stop.hasAttribute('data-tv-zone')) return isNavigableTarget(stop) ? stop : null;
       const primary = stop.querySelector<HTMLElement>('[data-media-detail-primary-action]:not([disabled])');
-      if (primary) return primary;
+      if (isNavigableTarget(primary)) return primary;
       return zoneFocusables(stop)[0] ?? null;
     };
 
@@ -1184,8 +1236,11 @@ export default function TVNavigationProvider() {
       const inHeader = !!current.closest(SITE_HEADER_SELECTOR);
       if (inHeader) {
         if (direction !== 'down') return { kind: 'skip' };
-        const el = focusMediaDetailStop(stops[0], current);
-        return el ? { kind: 'target', el } : { kind: 'skip' };
+        for (let i = 0; i < stops.length; i++) {
+          const el = focusMediaDetailStop(stops[i], current);
+          if (el) return { kind: 'target', el };
+        }
+        return { kind: 'skip' };
       }
       if (!detail.contains(current)) return { kind: 'skip' };
 
@@ -1196,18 +1251,30 @@ export default function TVNavigationProvider() {
           break;
         }
       }
-      if (idx < 0) {
-        if (direction === 'down') {
-          const el = focusMediaDetailStop(stops[0], current);
-          return el ? { kind: 'target', el } : { kind: 'header' };
+      const step = direction === 'up' ? -1 : 1;
+      let from: number;
+      if (idx >= 0) {
+        from = idx + step;
+      } else if (direction === 'down') {
+        // Hors arrêt : premier arrêt situé après l'élément courant dans le document.
+        from = stops.findIndex((st) => !!(current.compareDocumentPosition(st) & Node.DOCUMENT_POSITION_FOLLOWING));
+        if (from < 0) return { kind: 'stop' };
+      } else {
+        from = -1;
+        for (let i = stops.length - 1; i >= 0; i--) {
+          if (current.compareDocumentPosition(stops[i]) & Node.DOCUMENT_POSITION_PRECEDING) {
+            from = i;
+            break;
+          }
         }
-        return { kind: 'header' };
+        if (from < 0) return { kind: 'header' };
       }
-      const nextIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (nextIdx < 0) return { kind: 'header' };
-      if (nextIdx >= stops.length) return { kind: 'stop' };
-      const el = focusMediaDetailStop(stops[nextIdx], current);
-      return el ? { kind: 'target', el } : { kind: 'stop' };
+      // Sauter les arrêts sans cible focusable au lieu de consommer la touche sans bouger.
+      for (let i = from; i >= 0 && i < stops.length; i += step) {
+        const el = focusMediaDetailStop(stops[i], current);
+        if (el && el !== current) return { kind: 'target', el };
+      }
+      return direction === 'up' ? { kind: 'header' } : { kind: 'stop' };
     };
 
     const resolveTvBrowseVertical = (current: HTMLElement, direction: 'up' | 'down'): BrowseStep => {
@@ -1426,9 +1493,31 @@ export default function TVNavigationProvider() {
         activeElement !== document.body &&
         (direction === 'up' || direction === 'down')
       ) {
-        const step = resolveTvBrowseVertical(activeElement, direction);
+        let step = resolveTvBrowseVertical(activeElement, direction);
         if (step.kind === 'target') {
-          focusElement(step.el);
+          // focus() peut échouer en silence : vérifier et passer à la cible suivante plutôt que rester bloqué.
+          const tried = new Set<HTMLElement>();
+          navAttemptExclude = tried;
+          try {
+            for (let attempt = 0; attempt < 6 && step.kind === 'target'; attempt++) {
+              const el: HTMLElement = step.el;
+              focusElement(el);
+              const now = document.activeElement as HTMLElement | null;
+              if (now && now !== activeElement && (now === el || el.contains(now))) return true;
+              tried.add(el);
+              step = resolveTvBrowseVertical(activeElement, direction);
+            }
+          } finally {
+            navAttemptExclude = null;
+          }
+          if (step.kind === 'target') return true;
+        }
+        if (step.kind === 'stop' && direction === 'down' && activeElement.closest('[data-tv-media-detail]')) {
+          // Bas de fiche sans autre cible : faire défiler pour révéler le contenu restant (synopsis…).
+          const maxY = document.documentElement.scrollHeight - window.innerHeight;
+          if (window.scrollY < maxY - 4) {
+            window.scrollBy({ top: Math.round(window.innerHeight * 0.45), behavior: scrollBehavior });
+          }
           return true;
         }
         if (step.kind === 'header') {
