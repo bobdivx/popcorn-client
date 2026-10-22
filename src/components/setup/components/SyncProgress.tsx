@@ -149,22 +149,22 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
   if (!effectiveStatus) {
     if (compact) {
       return (
-        <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-2">
-          <DsLoader size="xs" className="text-blue-400 shrink-0" />
-          <span className="text-blue-400 text-sm">{t('syncProgress.starting')}</span>
+        <div className="sp-compact sticky top-0 z-[100] px-4 py-3 flex items-center gap-2">
+          <style>{SYNC_PROGRESS_CSS}</style>
+          <DsLoader size="xs" className="shrink-0" />
+          <span className="sp-compact__label">{t('syncProgress.starting')}</span>
         </div>
       );
     }
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <DsLoader size="xs" className="text-blue-400 shrink-0" />
-            <h3 className="text-lg font-semibold text-white">{t('syncProgress.starting')}</h3>
+      <div className="sp-root">
+        <style>{SYNC_PROGRESS_CSS}</style>
+        <div className="sp-panel sp-panel--center">
+          <div className="sp-head sp-head--center">
+            <DsLoader size="xs" className="shrink-0" />
+            <h3 className="sp-title">{t('syncProgress.starting')}</h3>
           </div>
-          <p className="text-gray-400 text-sm text-center">
-            {t('syncProgress.backendConnecting')}
-          </p>
+          <p className="sp-muted">{t('syncProgress.backendConnecting')}</p>
         </div>
       </div>
     );
@@ -200,101 +200,100 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
   // Mode compact : barre en haut avec juste le pourcentage (z-index au-dessus de la hero sur mobile)
   if (compact) {
     return (
-      <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-3">
-        <DsLoader size="xs" className="text-blue-400 shrink-0" />
+      <div className="sp-compact sticky top-0 z-[100] px-4 py-3 flex items-center gap-3">
+        <style>{SYNC_PROGRESS_CSS}</style>
+        <DsLoader size="xs" className="shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-center gap-2 mb-1">
-            <span className="text-blue-400 text-sm truncate">{t('syncProgress.inProgress')}</span>
-            <span className="text-primary-600 font-bold text-sm flex-shrink-0">{progress}%</span>
+            <span className="sp-compact__label truncate">{t('syncProgress.inProgress')}</span>
+            <span className="sp-value sp-value--sm flex-shrink-0">{progress}%</span>
           </div>
-          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-primary-600 to-primary-600/80 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+          <div className="sp-bar">
+            <div className="sp-bar__fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
         {elapsedTime > 0 && (
-          <span className="text-gray-400 text-xs flex-shrink-0">{formatElapsedTime(elapsedTime)}</span>
+          <span className="sp-time flex-shrink-0">{formatElapsedTime(elapsedTime)}</span>
         )}
       </div>
     );
   }
 
+  const categoryCode = (category: string) => (category === 'films' ? 'FILM' : category === 'series' ? 'TV' : '···');
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="sp-root animate-fade-in">
+      <style>{SYNC_PROGRESS_CSS}</style>
       {/* En-tête avec temps écoulé */}
-      <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <DsLoader size="xs" className="text-blue-400 shrink-0" />
-            {isActuallySyncing ? t('syncProgress.inProgress') : t('syncProgress.pending')}
+      <div className="sp-panel">
+        <div className="sp-head">
+          <h3 className="sp-title">
+            <DsLoader size="xs" className="shrink-0" />
+            <span>{isActuallySyncing ? t('syncProgress.inProgress') : t('syncProgress.pending')}</span>
           </h3>
           {elapsedTime > 0 && (
-            <span className="text-blue-400 text-sm font-semibold">
-              {formatElapsedTime(elapsedTime)}
-            </span>
+            <span className="sp-time">{formatElapsedTime(elapsedTime)}</span>
           )}
         </div>
 
         {/* Informations de progression */}
         {effectiveStatus.progress && (
-          <div className="space-y-3">
+          <div className="sp-rows">
             {effectiveStatus.progress.total_to_process === 0 && fetchedTotal > 0 && (
-              <div className="bg-gray-800/50 rounded-lg p-3">
-                <p className="text-gray-400 text-xs">{t('syncProgress.fetching')}</p>
-                <p className="text-white font-semibold text-sm">
-                  {fetchedTotal.toLocaleString()} {t('syncProgress.torrentsFetched')}
-                  {typeof effectiveStatus.progress.fetched_pages === 'number' ? ` • ${effectiveStatus.progress.fetched_pages} ${t('syncProgress.pages')}` : ''}
-                </p>
+              <div className="sp-row">
+                <div className="sp-row__body">
+                  <p className="sp-label">{t('syncProgress.fetching')}</p>
+                  <p className="sp-row__value">
+                    {fetchedTotal.toLocaleString()} {t('syncProgress.torrentsFetched')}
+                    {typeof effectiveStatus.progress.fetched_pages === 'number' ? ` • ${effectiveStatus.progress.fetched_pages} ${t('syncProgress.pages')}` : ''}
+                  </p>
+                </div>
               </div>
             )}
 
             {effectiveStatus.progress.current_indexer && (
-              <div className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                <div className="w-2 h-2 bg-primary-600 rounded-full animate-pulse"></div>
-                <div className="flex-1">
-                  <p className="text-gray-400 text-xs">{t('syncProgress.currentIndexer')}</p>
-                  <p className="text-white font-semibold text-sm">{effectiveStatus.progress.current_indexer}</p>
+              <div className="sp-row">
+                <span className="sp-dot" aria-hidden="true"></span>
+                <div className="sp-row__body">
+                  <p className="sp-label">{t('syncProgress.currentIndexer')}</p>
+                  <p className="sp-row__value">{effectiveStatus.progress.current_indexer}</p>
                 </div>
                 {effectiveStatus.progress.indexer_torrents[effectiveStatus.progress.current_indexer] !== undefined && (
-                  <div className="text-right">
-                    <p className="text-primary-600 font-bold text-lg">{effectiveStatus.progress.indexer_torrents[effectiveStatus.progress.current_indexer]}</p>
-                    <p className="text-gray-400 text-xs">{t('syncProgress.torrents')}</p>
+                  <div className="sp-row__aside">
+                    <p className="sp-value">{effectiveStatus.progress.indexer_torrents[effectiveStatus.progress.current_indexer]}</p>
+                    <p className="sp-label">{t('syncProgress.torrents')}</p>
                   </div>
                 )}
               </div>
             )}
 
             {effectiveStatus.progress.current_category && (
-              <div className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                <div className="text-2xl">
-                  {effectiveStatus.progress.current_category === 'films' ? '🎬' : effectiveStatus.progress.current_category === 'series' ? '📺' : '📦'}
-                </div>
-                <div className="flex-1">
-                  <p className="text-gray-400 text-xs">{t('syncProgress.category')}</p>
-                  <p className="text-white font-semibold text-sm capitalize">{effectiveStatus.progress.current_category}</p>
+              <div className="sp-row">
+                <span className="sp-code" aria-hidden="true">{categoryCode(effectiveStatus.progress.current_category)}</span>
+                <div className="sp-row__body">
+                  <p className="sp-label">{t('syncProgress.category')}</p>
+                  <p className="sp-row__value capitalize">{effectiveStatus.progress.current_category}</p>
                 </div>
                 {effectiveStatus.progress.category_torrents[effectiveStatus.progress.current_category] !== undefined && (
-                  <div className="text-right">
-                    <p className="text-primary-600 font-bold text-lg">{effectiveStatus.progress.category_torrents[effectiveStatus.progress.current_category]}</p>
-                    <p className="text-gray-400 text-xs">{t('syncProgress.torrents')}</p>
+                  <div className="sp-row__aside">
+                    <p className="sp-value">{effectiveStatus.progress.category_torrents[effectiveStatus.progress.current_category]}</p>
+                    <p className="sp-label">{t('syncProgress.torrents')}</p>
                   </div>
                 )}
               </div>
             )}
 
             {effectiveStatus.progress.total_to_process > 0 && (
-              <div className="bg-gray-800/50 rounded-lg p-3">
-                <div className="flex justify-between items-center mb-2">
-                  <p className="text-gray-400 text-xs">{t('syncProgress.processing')}</p>
-                  <p className="text-primary-600 font-bold text-sm">
+              <div className="sp-row sp-row--col">
+                <div className="sp-head" style={{ marginBottom: '10px' }}>
+                  <p className="sp-label">{t('syncProgress.processing')}</p>
+                  <p className="sp-value sp-value--sm">
                     {effectiveStatus.progress.total_processed} / {effectiveStatus.progress.total_to_process}
                   </p>
                 </div>
-                <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-primary-600 to-primary-600/80 rounded-full transition-all duration-300"
+                <div className="sp-bar">
+                  <div
+                    className="sp-bar__fill"
                     style={{ width: `${Math.min(100, (effectiveStatus.progress.total_processed / effectiveStatus.progress.total_to_process) * 100)}%` }}
                   ></div>
                 </div>
@@ -304,81 +303,103 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
         )}
 
         {/* Barre de progression globale */}
-        <div className="mt-4 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-white font-semibold text-sm">{t('syncProgress.globalProgress')}</span>
-            <span className="text-primary-600 font-bold text-lg">{progress}%</span>
+        <div className="sp-global">
+          <div className="sp-head" style={{ marginBottom: '12px' }}>
+            <span className="sp-label sp-label--ink">{t('syncProgress.globalProgress')}</span>
+            <span className="sp-value">{progress}%</span>
           </div>
-          <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-primary-600 via-primary-600/80 to-primary-600 rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2"
-              style={{ width: `${progress}%` }}
-            >
-              {progress > 10 && (
-                <span className="text-xs text-white font-bold">{progress}%</span>
-              )}
-            </div>
+          <div className="sp-bar sp-bar--lg">
+            <div className="sp-bar__fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </div>
 
-      {/* Films, Séries, Autres : même design que Total synchronisé (une ligne par catégorie, pas de cartes séparées) */}
+      {/* Films, Séries, Autres : une ligne par catégorie */}
       {Object.keys(effectiveStatus.stats || {}).length > 0 && (
-        <div className="space-y-3">
+        <div className="sp-list">
           {Object.entries(effectiveStatus.stats || {}).map(([category, count]) => {
             const animatedCount = Math.floor(animatedCounts[category] || 0);
-            const icon = category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦';
             const label = category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others');
             return (
-              <div
-                key={category}
-                className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-4 sm:p-5 border border-primary-600/30 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl" aria-hidden="true">{icon}</span>
-                  <span className="text-white font-semibold">{label}</span>
+              <div key={category} className="sp-stat">
+                <div className="sp-stat__left">
+                  <span className="sp-code" aria-hidden="true">{categoryCode(category)}</span>
+                  <span className="sp-stat__label">{label}</span>
                 </div>
-                <span className="text-primary-600 font-bold text-2xl tabular-nums">
-                  {animatedCount.toLocaleString()}
-                </span>
+                <span className="sp-value tabular-nums">{animatedCount.toLocaleString()}</span>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* TMDB : enrichis (même design que Total) si l’API renvoie tmdb_stats */}
+      {/* TMDB : enrichis si l’API renvoie tmdb_stats */}
       {effectiveStatus.tmdb_stats && (effectiveStatus.tmdb_stats.with_tmdb > 0 || effectiveStatus.tmdb_stats.without_tmdb > 0) && (
-        <div className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-4 sm:p-5 border border-primary-600/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-            </svg>
-            <span className="text-white font-semibold">{t('torrentSyncManager.withTmdb')} / TMDB</span>
+        <div className="sp-stat">
+          <div className="sp-stat__left">
+            <span className="sp-code" aria-hidden="true">TMDB</span>
+            <span className="sp-stat__label">{t('torrentSyncManager.withTmdb')} / TMDB</span>
           </div>
-          <span className="text-primary-600 font-bold text-2xl tabular-nums">
+          <span className="sp-value tabular-nums">
             {effectiveStatus.tmdb_stats.with_tmdb.toLocaleString()}
-            <span className="text-white/70 font-normal text-lg ml-1">/ {(effectiveStatus.tmdb_stats.with_tmdb + effectiveStatus.tmdb_stats.without_tmdb).toLocaleString()}</span>
+            <span className="sp-value__total"> / {(effectiveStatus.tmdb_stats.with_tmdb + effectiveStatus.tmdb_stats.without_tmdb).toLocaleString()}</span>
           </span>
         </div>
       )}
 
       {/* Total synchronisé (récap unique) */}
       {totalTorrents > 0 && (
-        <div className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-6 border border-primary-600/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <span className="text-white font-semibold">{t('syncProgress.totalSynced')}</span>
-            </div>
-            <span className="text-primary-600 font-bold text-3xl tabular-nums">
-              {totalTorrents.toLocaleString()}
-            </span>
+        <div className="sp-stat sp-stat--total">
+          <div className="sp-stat__left">
+            <span className="sp-stat__label">{t('syncProgress.totalSynced')}</span>
           </div>
+          <span className="sp-value sp-value--lg tabular-nums">{totalTorrents.toLocaleString()}</span>
         </div>
       )}
     </div>
   );
 }
+
+/** Style éditorial (corail sur fond sombre), autonome : le composant sert aussi hors de l'assistant. */
+const SYNC_PROGRESS_CSS = `
+.sp-root { font-family: 'Jost', 'Inter', system-ui, sans-serif; font-weight: 300; color: #f4f1ec; }
+.sp-root > * + * { margin-top: 12px; }
+.sp-panel { padding: 22px 24px; border: 1px solid rgba(255,255,255,0.09); background: rgba(255,255,255,0.025); border-radius: 2px; }
+.sp-panel--center { text-align: center; }
+.sp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.sp-head--center { justify-content: center; }
+.sp-head--center > * + * { margin-left: 12px; }
+.sp-title { display: flex; align-items: center; margin: 0; font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-weight: 300; font-size: 0.78rem; letter-spacing: 0.26em; text-transform: uppercase; color: #f4f1ec; }
+.sp-title > * + * { margin-left: 12px; }
+.sp-muted { margin: 0; font-size: 0.85rem; line-height: 1.6; color: rgba(244,241,236,0.62); }
+.sp-time { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.78rem; color: rgba(244,241,236,0.62); }
+.sp-rows { border-top: 1px solid rgba(255,255,255,0.09); }
+.sp-row { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.09); }
+.sp-row > * + * { margin-left: 14px; }
+.sp-row--col { display: block; }
+.sp-row--col > * + * { margin-left: 0; }
+.sp-row__body { flex: 1; min-width: 0; }
+.sp-row__value { margin: 4px 0 0; font-size: 0.9rem; color: #f4f1ec; overflow-wrap: anywhere; }
+.sp-row__aside { text-align: right; flex-shrink: 0; }
+.sp-label { margin: 0; font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-size: 0.6rem; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(244,241,236,0.38); }
+.sp-label--ink { color: rgba(244,241,236,0.62); }
+.sp-value { margin: 0; font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-weight: 300; font-size: 1.25rem; letter-spacing: 0.04em; color: #f2545b; font-variant-numeric: tabular-nums; }
+.sp-value--sm { font-size: 0.85rem; }
+.sp-value--lg { font-size: 1.9rem; font-weight: 200; }
+.sp-value__total { color: rgba(244,241,236,0.62); font-size: 0.85em; }
+.sp-dot { width: 6px; height: 6px; border-radius: 50%; background: #f2545b; flex-shrink: 0; }
+.sp-code { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 26px; padding: 0 8px; border: 1px solid rgba(242,84,91,0.38); color: #f2545b; font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-size: 0.58rem; letter-spacing: 0.18em; flex-shrink: 0; }
+.sp-global { margin-top: 20px; }
+.sp-bar { height: 2px; background: rgba(242,84,91,0.18); overflow: hidden; }
+.sp-bar--lg { height: 3px; }
+.sp-bar__fill { height: 100%; background: #f2545b; transition: width 0.4s cubic-bezier(0.2,0.7,0.2,1); }
+.sp-list { border-top: 1px solid rgba(255,255,255,0.09); }
+.sp-list .sp-stat { border-top: 0; }
+.sp-stat { display: flex; align-items: center; justify-content: space-between; padding: 16px 4px; border-bottom: 1px solid rgba(255,255,255,0.09); }
+.sp-stat__left { display: flex; align-items: center; min-width: 0; }
+.sp-stat__left > * + * { margin-left: 14px; }
+.sp-stat__label { font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: #f4f1ec; }
+.sp-stat--total { padding: 20px 24px; border: 1px solid rgba(242,84,91,0.38); background: rgba(242,84,91,0.06); }
+.sp-compact { background: rgba(12,13,16,0.96); border-bottom: 1px solid rgba(242,84,91,0.38); color: #f4f1ec; }
+.sp-compact__label { font-family: 'Josefin Sans', 'Jost', system-ui, sans-serif; font-size: 0.66rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(244,241,236,0.78); }
+`;
