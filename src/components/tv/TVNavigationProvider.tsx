@@ -1513,11 +1513,12 @@ export default function TVNavigationProvider() {
           if (step.kind === 'target') return true;
         }
         if (step.kind === 'stop' && direction === 'down' && activeElement.closest('[data-tv-media-detail]')) {
-          // Bas de fiche sans autre cible : faire défiler pour révéler le contenu restant (synopsis…).
+          // Bas de fiche sans autre cible : faire défiler pour révéler le contenu restant,
+          // sans jamais sortir l'élément focusé de l'écran.
           const maxY = document.documentElement.scrollHeight - window.innerHeight;
-          if (window.scrollY < maxY - 4) {
-            window.scrollBy({ top: Math.round(window.innerHeight * 0.45), behavior: scrollBehavior });
-          }
+          const room = Math.round(activeElement.getBoundingClientRect().top - window.innerHeight * 0.12);
+          const delta = Math.min(Math.round(window.innerHeight * 0.45), room, Math.round(maxY - window.scrollY));
+          if (delta > 4) window.scrollBy({ top: delta, behavior: scrollBehavior });
           return true;
         }
         if (step.kind === 'header') {
