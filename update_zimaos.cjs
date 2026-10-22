@@ -3,7 +3,7 @@ const ssh = new NodeSSH();
 
 async function run() {
   try {
-    await ssh.connect({ host: '10.1.0.58', username: 'bobdivx', password: '***REMOVED***' });
+    await ssh.connect({ host: '10.1.0.58', username: 'bobdivx', password: process.env.ZIMAOS_SSH_PASSWORD });
     console.log('Pulling dev image...');
     const pull = await ssh.execCommand('docker pull bobdivx/popcorn-frontend:dev');
     console.log(pull.stdout);
