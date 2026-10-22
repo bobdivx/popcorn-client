@@ -4,51 +4,12 @@ import { SyncProgress } from '../components/SyncProgress';
 import { useI18n } from '../../../lib/i18n';
 import { syncLocalUsersToBackend } from '../../../lib/client/local-users-sync';
 import { resolveBootIntroMp4 } from '../../../lib/utils/boot-intro';
+import { StepHeader, Alert, Spinner, IconArrowRight, IconCheck } from '../wizardUi';
 
 interface CompleteStepProps {
   focusedButtonIndex: number;
   buttonRefs: { current: (HTMLButtonElement | null)[] };
   onComplete: () => void;
-}
-
-// Particules de confetti légères (CSS pur)
-function Confetti() {
-  const colors = ['#f2545b', '#fb7a80', '#fb7a80', '#ffa1a6', '#e03a42', '#ffc8cb'];
-  const pieces = Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    color: colors[i % colors.length],
-    left: `${(i * 5.5 + 2) % 98}%`,
-    delay: `${(i * 0.12) % 2}s`,
-    duration: `${2.2 + (i % 3) * 0.4}s`,
-    size: i % 3 === 0 ? 8 : i % 3 === 1 ? 6 : 5,
-  }));
-
-  return (
-    <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;border-radius:16px;">
-      <style>{`
-        @keyframes confetti-fall {
-          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(200px) rotate(360deg); opacity: 0; }
-        }
-      `}</style>
-      {pieces.map((p) => (
-        <div
-          key={p.id}
-          style={{
-            position: 'absolute',
-            top: '-20px',
-            left: p.left,
-            width: `${p.size}px`,
-            height: `${p.size * 0.6}px`,
-            background: p.color,
-            borderRadius: '2px',
-            animation: `confetti-fall ${p.duration} ${p.delay} ease-in forwards`,
-            opacity: 0.8,
-          }}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: CompleteStepProps) {
@@ -142,58 +103,21 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
   const isSyncing = syncStatus?.sync_in_progress || false;
 
   return (
-    <div style={{ position: 'relative', minHeight: '420px', overflow: 'hidden', borderRadius: '16px' }}>
+    <div class="wz-complete" style={{ position: 'relative', minHeight: '440px', overflow: 'hidden' }}>
       <style>{`
-        @keyframes complete-pop {
-          0% { transform: scale(0.5); opacity: 0; }
-          70% { transform: scale(1.1); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes complete-ring {
-          0% { transform: scale(0.8); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes complete-fade-up {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .complete-icon-wrap {
-          animation: complete-ring 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-        .complete-check {
-          animation: complete-pop 0.4s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-        .complete-title {
-          animation: complete-fade-up 0.4s 0.25s ease both;
-        }
-        .complete-sub {
-          animation: complete-fade-up 0.4s 0.35s ease both;
-        }
-        .complete-body {
-          animation: complete-fade-up 0.4s 0.45s ease both;
-        }
-        .stat-pill {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 14px;
-          background: rgba(242,84,91,0.08);
-          border: 1px solid rgba(242,84,91,0.15);
-          border-radius: 8px;
-          font-size: 12.5px;
-        }
-        .stat-pill-num { font-weight: 700; color: #ffa1a6; font-size: 15px; }
-        .stat-pill-label { color: rgba(255,255,255,0.45); }
+        .wz-complete { border: 1px solid var(--wz-line, rgba(255,255,255,0.09)); }
+        .wz-complete__video { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+        .wz-complete__veil { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; background: rgba(12,13,16,0.72); background: linear-gradient(180deg, rgba(12,13,16,0.55) 0%, rgba(12,13,16,0.82) 55%, rgba(12,13,16,0.96) 100%); }
+        .wz-complete__body { position: relative; z-index: 2; padding: 48px 28px 36px; }
+        @media (min-width: 640px) { .wz-complete__body { padding: 64px 48px 44px; } }
+        .wz-complete__stats { display: flex; flex-wrap: wrap; justify-content: center; margin: 0 -6px 4px; }
+        .wz-complete__stats > .wz-stat { flex: 1 1 120px; margin: 0 6px 12px; text-align: center; background: rgba(12,13,16,0.6); }
+        .wz-complete .wz-actions { justify-content: center; }
       `}</style>
 
       {/* Vidéo en fond d'écran */}
       <video
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          zIndex: 0,
-        }}
+        class="wz-complete__video"
         autoPlay
         muted
         playsInline
@@ -204,108 +128,92 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
           type="video/mp4"
         />
       </video>
-      {/* Overlay sombre pour garder le contenu lisible */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
+      {/* Voile sombre pour garder le contenu lisible */}
+      <div class="wz-complete__veil" />
 
       {/* Contenu par-dessus */}
-      <div style={{ position: 'relative', zIndex: 2, padding: '4px 0' }}>
-      <div style="text-align:center;margin-bottom:28px;position:relative;">
-        <div style="position:relative;display:inline-block;">
-          {showConfetti && <Confetti />}
-          <div class="complete-icon-wrap" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(242,84,91,0.2),rgba(224,58,66,0.1));border:2px solid rgba(242,84,91,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-            <div class="complete-check" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#f2545b,#e03a42);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(242,84,91,0.5);">
-              <svg style="width:26px;height:26px;color:#fff;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+      <div class="wz-complete__body">
+        <div class="wz-center">
+          <div class="wz-seal">
+            <IconCheck />
           </div>
         </div>
+        <StepHeader
+          center
+          kicker="Popcornn"
+          title={t('completeStep.configurationComplete')}
+          lead={t('completeStep.clientReady')}
+        />
 
-        <h2 class="complete-title" style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
-          {t('completeStep.configurationComplete')}
-        </h2>
-        <p class="complete-sub" style="font-size:14px;color:rgba(255,255,255,0.4);margin:0;">
-          {t('completeStep.clientReady')}
-        </p>
-      </div>
-
-      {/* Statut de synchronisation */}
-      <div class="complete-body">
-        {checkingSync ? (
-          <div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:20px;text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,0.45);font-size:13.5px;">
-              <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.15);border-top-color:rgba(242,84,91,0.7);border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
-              {t('completeStep.checkingStatus')}
+        {/* Statut de synchronisation */}
+        <div class="wz-stack" style="max-width:560px;margin:0 auto;">
+          {checkingSync ? (
+            <div class="wz-center">
+              <span class="wz-inline" style="justify-content:center;">
+                <Spinner />
+                <span class="wz-text-sm">{t('completeStep.checkingStatus')}</span>
+              </span>
             </div>
-          </div>
-        ) : isSyncing ? (
-          <div style="margin-bottom:20px;">
-            <div style="padding:14px 16px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:12px;margin-bottom:12px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <div style="width:8px;height:8px;border-radius:50%;background:#60a5fa;animation:wizard-pulse 1.2s ease-in-out infinite;" />
-                <span style="font-size:13px;font-weight:600;color:#93c5fd;">{t('completeStep.syncInProgress')}</span>
-              </div>
-              <p style="font-size:12.5px;color:rgba(255,255,255,0.4);margin:0;">{t('completeStep.waitOrAccess')}</p>
+          ) : isSyncing ? (
+            <div class="wz-stack-sm">
+              <Alert tone="info" title={t('completeStep.syncInProgress')}>
+                {t('completeStep.waitOrAccess')}
+              </Alert>
+              <SyncProgress />
             </div>
-            <SyncProgress />
-          </div>
-        ) : syncComplete ? (
-          <div style="padding:14px 16px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:12px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
-            <svg style="width:16px;height:16px;color:#4ade80;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span style="font-size:13px;color:#86efac;">{t('completeStep.syncComplete')}</span>
-          </div>
-        ) : null}
+          ) : syncComplete ? (
+            <Alert tone="success">{t('completeStep.syncComplete')}</Alert>
+          ) : null}
 
-        {/* Stats si disponibles */}
-        {syncStatus?.stats && Object.keys(syncStatus.stats).length > 0 && (
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
-            {Object.entries(syncStatus.stats).slice(0, 4).map(([key, count]) => (
-              <div key={key} class="stat-pill">
-                <span class="stat-pill-num">{count}</span>
-                <span class="stat-pill-label">{key}</span>
-              </div>
-            ))}
-          </div>
-        )}
+          {/* Stats si disponibles */}
+          {syncStatus?.stats && Object.keys(syncStatus.stats).length > 0 && (
+            <div class="wz-complete__stats">
+              {Object.entries(syncStatus.stats).slice(0, 4).map(([key, count]) => (
+                <div key={key} class="wz-stat">
+                  <span class="wz-stat__value">{count}</span>
+                  <span class="wz-stat__label">{key}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Boutons */}
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="wz-actions" style="border-top:0;padding-top:0;margin-top:36px;">
           {isSyncing ? (
             <>
               <button
-                ref={(el) => { buttonRefs.current[0] = el; }}
-                class="wizard-btn-secondary"
-                onClick={onComplete}
-                style="font-size:13.5px;"
+                type="button"
+                class="wz-btn wz-btn--ghost"
+                disabled
               >
-                {t('completeStep.accessDashboardNow')}
+                <Spinner />
+                Synchronisation...
               </button>
               <button
-                class="wizard-btn-primary"
-                disabled
-                style="opacity:0.4;cursor:not-allowed;"
+                ref={(el) => { buttonRefs.current[0] = el; }}
+                type="button"
+                class="wz-btn wz-btn--primary"
+                data-focusable
+                onClick={onComplete}
               >
-                <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
-                Synchronisation...
+                {t('completeStep.accessDashboardNow')}
+                <IconArrowRight />
               </button>
             </>
           ) : (
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              class="wizard-btn-primary"
+              type="button"
+              class="wz-btn wz-btn--primary"
+              data-focusable
               onClick={onComplete}
-              style="padding:12px 28px;font-size:14.5px;"
             >
               {t('wizard.complete.startUsing')}
-              <svg style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+              <IconArrowRight />
             </button>
           )}
         </div>
-      </div>
       </div>
     </div>
   );
