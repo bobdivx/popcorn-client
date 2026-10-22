@@ -20,8 +20,8 @@ Write-Host "[OK] Base64 sauvegarde dans: $base64File" -ForegroundColor Green
 Write-Host ""
 Write-Host "Valeurs pour GitHub Secrets (repo popcorn-client):" -ForegroundColor Cyan
 Write-Host "  ANDROID_KEYSTORE_BASE64 = (contenu de $base64File)" -ForegroundColor Yellow
-Write-Host "  ANDROID_KEYSTORE_PASSWORD = ***REMOVED***" -ForegroundColor Yellow
-Write-Host "  ANDROID_KEY_PASSWORD = ***REMOVED***" -ForegroundColor Yellow
+Write-Host "  ANDROID_KEYSTORE_PASSWORD = <REDACTED>" -ForegroundColor Yellow
+Write-Host "  ANDROID_KEY_PASSWORD = <REDACTED>" -ForegroundColor Yellow
 Write-Host "  ANDROID_KEY_ALIAS = popcorn-key" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "[ATTENTION] Ne commitez JAMAIS keystore-base64.txt dans Git!" -ForegroundColor Red
