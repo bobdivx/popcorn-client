@@ -8,6 +8,7 @@ import { redirectTo } from '../../../lib/utils/navigation.js';
 import { shouldDisplayQRCode } from '../../../lib/utils/device-detection';
 import QRCode from 'qrcode';
 import { useConfirmDialog } from '../../ui/useConfirmDialog';
+import { StepHeader, Alert, Spinner, IconArrowRight } from '../wizardUi';
 
 interface ServerUrlStepProps {
   focusedButtonIndex: number;
@@ -588,254 +589,259 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
 
   // ===== Rendu =====
 
+  const SU_CSS = `
+    .su-choices > .wz-option + .wz-option { margin-top: 12px; }
+    .su-back { display: flex; align-items: center; margin-bottom: 8px; }
+    .su-back > .wz-icon-btn { margin-right: 14px; }
+    .su-qc { display: flex; align-items: flex-start; }
+    .su-qc__qr { flex-shrink: 0; margin-right: 36px; display: flex; flex-direction: column; align-items: center; }
+    .su-qc__qr-box { background: #fff; padding: 14px; border-radius: 2px; }
+    .su-qc__qr-box img { display: block; width: 240px; height: 240px; }
+    .su-qc__qr-caption { margin: 12px 0 0; max-width: 268px; font-size: 0.75rem; line-height: 1.5; color: var(--wz-ink-faint); text-align: center; }
+    .su-qc__side { flex: 1; min-width: 0; }
+    @media (min-width: 1280px) { .su-qc__qr-box img { width: 280px; height: 280px; } .su-qc__qr-caption { max-width: 308px; } }
+    @media (max-width: 899px) {
+      .su-qc { flex-direction: column; align-items: stretch; }
+      .su-qc__qr { margin: 0 0 28px; }
+      .su-qc__qr-box img { width: 220px; height: 220px; max-width: 64vw; max-height: 64vw; }
+    }
+    .su-code-label { display: block; margin-bottom: 12px; font-family: var(--wz-display); font-size: 0.62rem; letter-spacing: 0.32em; text-transform: uppercase; color: var(--wz-ink-faint); }
+    .su-code { padding: 18px 20px; border: 1px solid var(--wz-accent-line); background: var(--wz-accent-soft); font-family: var(--wz-mono); font-weight: 600; font-size: 2.4rem; line-height: 1.1; letter-spacing: 0.28em; color: var(--wz-ink); text-align: center; overflow-x: auto; white-space: nowrap; }
+    @media (max-width: 479px) { .su-code { font-size: 1.8rem; letter-spacing: 0.18em; } }
+    .su-status { display: flex; align-items: center; margin-top: 14px; font-size: 0.85rem; color: var(--wz-ink-dim); }
+    .su-status > .ed-spinner, .su-status > svg { margin-right: 10px; flex-shrink: 0; }
+    .su-status > svg { width: 16px; height: 16px; }
+    .su-status.is-ok { color: var(--wz-ok); }
+    .su-expiry { margin-top: 10px; font-family: var(--wz-mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--wz-warn); }
+    .su-steps { list-style: none; margin: 0; padding: 0; }
+    .su-steps li { display: flex; align-items: flex-start; }
+    .su-steps li + li { margin-top: 12px; }
+    .su-steps .wz-num { margin-right: 14px; flex-shrink: 0; }
+    .su-steps p { margin: 3px 0 0; font-size: 0.88rem; line-height: 1.55; color: var(--wz-ink-dim); }
+    .su-flow { display: flex; align-items: center; margin-top: 18px; font-family: var(--wz-display); font-size: 0.6rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--wz-ink-faint); }
+    .su-flow > span + span { margin-left: 12px; }
+    .su-flow .is-accent { color: var(--wz-accent); }
+    .su-manual-cta { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--wz-line); }
+    .su-scanner { width: 100%; max-width: 380px; margin: 0 auto; overflow: hidden; border: 1px solid var(--wz-accent); }
+    .su-scan-btn { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 28px 20px; min-height: 0; }
+    .su-scan-btn svg { width: 32px; height: 32px; margin: 0 0 12px !important; }
+    .su-scan-btn small { display: block; margin-top: 8px; font-family: var(--wz-body); font-size: 0.78rem; letter-spacing: 0.02em; text-transform: none; opacity: 0.85; }
+    .wz-root.is-tv .su-code { font-size: 3rem; }
+    .wz-root.is-tv .su-qc__qr-box img { width: 300px; height: 300px; max-height: 42vh; max-width: 42vh; }
+  `;
+
   // Écran de choix : première installation ou déjà configuré (sauf si skipInitialChoice = affichage direct du formulaire URL)
   if (installationChoice === null) {
     return (
-      <div className="space-y-6">
+      <div>
+        <style>{SU_CSS}</style>
         {confirmDialog}
-        <h3 className="text-2xl font-bold text-white text-center">{t('wizard.serverUrl.connectClientTitle')}</h3>
-        <p className="text-gray-400 text-center text-sm sm:text-base mb-6">
-          {t('wizard.serverUrl.choiceQuestion')}
-        </p>
-        <div className="grid gap-4 sm:grid-cols-1 max-w-2xl mx-auto">
+        <StepHeader kicker="Serveur" title={t('wizard.serverUrl.connectClientTitle')} lead={t('wizard.serverUrl.choiceQuestion')} />
+        <div class="su-choices">
           <button
             type="button"
+            data-focusable
             onClick={() => {
               setInstallationChoice('firstTime');
               setShowManualConfig(true);
             }}
-            className="text-left p-5 rounded-xl border-2 border-primary-600/50 bg-primary-900/20 hover:bg-primary-900/40 hover:border-primary-500 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="wz-option"
           >
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary-600/50 flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-white mb-1">{t('wizard.serverUrl.choiceFirstTime')}</h4>
-                <p className="text-gray-400 text-sm">{t('wizard.serverUrl.choiceFirstTimeDesc')}</p>
-              </div>
-            </div>
+            <span class="wz-option__icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></span>
+            <span class="wz-option__body">
+              <span class="wz-option__title">{t('wizard.serverUrl.choiceFirstTime')}</span>
+              <span class="wz-option__desc">{t('wizard.serverUrl.choiceFirstTimeDesc')}</span>
+            </span>
           </button>
           <button
             type="button"
+            data-focusable
             onClick={() => setInstallationChoice('alreadyConfigured')}
-            className="text-left p-5 rounded-xl border-2 border-gray-600/50 bg-white/5 hover:bg-white/10 hover:border-primary-600/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="wz-option"
           >
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-600/50 flex items-center justify-center">
-                <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-white mb-1">{t('wizard.serverUrl.choiceAlreadyConfigured')}</h4>
-                <p className="text-gray-400 text-sm">{t('wizard.serverUrl.choiceAlreadyConfiguredDesc')}</p>
-              </div>
-            </div>
+            <span class="wz-option__icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" /></svg></span>
+            <span class="wz-option__body">
+              <span class="wz-option__title">{t('wizard.serverUrl.choiceAlreadyConfigured')}</span>
+              <span class="wz-option__desc">{t('wizard.serverUrl.choiceAlreadyConfiguredDesc')}</span>
+            </span>
           </button>
           <button
             type="button"
+            data-focusable
             onClick={() => {
               setInstallationChoice('localAccount');
               setShowManualConfig(true);
             }}
-            className="text-left p-5 rounded-xl border-2 border-gray-600/50 bg-white/5 hover:bg-white/10 hover:border-primary-600/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+            class="wz-option"
           >
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-600/50 flex items-center justify-center">
-                <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-white mb-1">{t('wizard.serverUrl.choiceLocalAccount')}</h4>
-                <p className="text-gray-400 text-sm">{t('wizard.serverUrl.choiceLocalAccountDesc')}</p>
-              </div>
-            </div>
+            <span class="wz-option__icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg></span>
+            <span class="wz-option__body">
+              <span class="wz-option__title">{t('wizard.serverUrl.choiceLocalAccount')}</span>
+              <span class="wz-option__desc">{t('wizard.serverUrl.choiceLocalAccountDesc')}</span>
+            </span>
           </button>
         </div>
       </div>
     );
   }
 
+  const manualConfigCta = (
+    <div class="su-manual-cta">
+      <button
+        type="button"
+        data-focusable
+        onClick={() => setShowManualConfig(true)}
+        class="wz-option"
+      >
+        <span class="wz-option__icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></span>
+        <span class="wz-option__body">
+          <span class="wz-option__title">{t('wizard.serverUrl.manualConfig')}</span>
+          <span class="wz-option__desc">{t('wizard.serverUrl.manualConfigDesc')}</span>
+        </span>
+      </button>
+    </div>
+  );
+
+  const choiceTitle =
+    installationChoice === 'firstTime' ? t('wizard.serverUrl.choiceFirstTime')
+    : installationChoice === 'alreadyConfigured' ? t('wizard.serverUrl.choiceAlreadyConfigured')
+    : installationChoice === 'localAccount' ? t('wizard.serverUrl.choiceLocalAccount')
+    : null;
+
   // Affichage principal (après choix)
   return (
-    <div className="space-y-6">
+    <div>
+      <style>{SU_CSS}</style>
       {confirmDialog}
-      {!skipInitialChoice && (
-      <div className="flex items-center gap-3 mb-2">
-        <button
-          type="button"
-          onClick={() => { setInstallationChoice(null); setShowManualConfig(false); resetQuickConnect(); }}
-          className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
-          title={t('common.back')}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <h3 className="text-xl font-bold text-white">
-          {installationChoice === 'firstTime' && t('wizard.serverUrl.choiceFirstTime')}
-          {installationChoice === 'alreadyConfigured' && t('wizard.serverUrl.choiceAlreadyConfigured')}
-          {installationChoice === 'localAccount' && t('wizard.serverUrl.choiceLocalAccount')}
-        </h3>
-      </div>
+      {!skipInitialChoice && !showManualConfig && (
+        <StepHeader kicker="Serveur" title={choiceTitle}>
+          <div style="margin-top:18px;">
+            <button
+              type="button"
+              data-focusable
+              class="wz-link"
+              onClick={() => { setInstallationChoice(null); setShowManualConfig(false); resetQuickConnect(); }}
+              title={t('common.back')}
+            >
+              ← {t('common.back')}
+            </button>
+          </div>
+        </StepHeader>
       )}
-      {skipInitialChoice && (
-        <h3 className="text-xl font-bold text-white mb-2">{t('wizard.serverUrl.connectClientTitle')}</h3>
+      {skipInitialChoice && !showManualConfig && (
+        <StepHeader kicker="Serveur" title={t('wizard.serverUrl.connectClientTitle')} />
       )}
-      
+
       {/* Mode mobile "première installation" uniquement (déjà configuré = même flux QR+code que TV) */}
       {isScannerMode && !showManualConfig && installationChoice === 'firstTime' && (
-        <>
+        <div class="wz-stack">
           {/* Message d'accueil clair avec deux options */}
-          <div className="space-y-4">
-            <div className="bg-gradient-to-br from-primary-900/30 to-primary-800/20 border border-primary-700/50 rounded-xl p-5">
-              <h4 className="text-xl font-bold text-white mb-3 text-center">
-                {t('wizard.serverUrl.mobileWelcome')}
-              </h4>
-              <p className="text-gray-300 text-sm text-center mb-4">
-                {t('wizard.serverUrl.mobileChoiceIntro')}
-              </p>
-              
-              {/* Option 1 : Rejoindre installation existante */}
-              <div className="bg-white/5 rounded-lg p-4 mb-3 border border-primary-600/30">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-1">
-                    <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="text-white font-semibold mb-1">
-                      {t('wizard.serverUrl.mobileJoinExisting')}
-                    </h5>
-                    <p className="text-gray-400 text-xs">
-                      {t('wizard.serverUrl.mobileJoinExistingDesc')}
-                    </p>
-                  </div>
+          <div class="wz-panel">
+            <h3 class="wz-h3">{t('wizard.serverUrl.mobileWelcome')}</h3>
+            <p class="wz-text-sm" style="margin:0 0 18px;">{t('wizard.serverUrl.mobileChoiceIntro')}</p>
+            <div class="wz-rows">
+              <div class="wz-row">
+                <span class="wz-row__icon is-on"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" /></svg></span>
+                <div class="wz-row__body">
+                  <span class="wz-row__title">{t('wizard.serverUrl.mobileJoinExisting')}</span>
+                  <span class="wz-row__desc">{t('wizard.serverUrl.mobileJoinExistingDesc')}</span>
                 </div>
               </div>
-
-              {/* Option 2 : Première installation */}
-              <div className="bg-white/5 rounded-lg p-4 border border-gray-600/30">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-1">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h5 className="text-white font-semibold mb-1">
-                      {t('wizard.serverUrl.mobileFirstInstall')}
-                    </h5>
-                    <p className="text-gray-400 text-xs">
-                      {t('wizard.serverUrl.mobileFirstInstallDesc')}
-                    </p>
-                  </div>
+              <div class="wz-row">
+                <span class="wz-row__icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></span>
+                <div class="wz-row__body">
+                  <span class="wz-row__title">{t('wizard.serverUrl.mobileFirstInstall')}</span>
+                  <span class="wz-row__desc">{t('wizard.serverUrl.mobileFirstInstallDesc')}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {quickConnectError && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 text-sm space-y-2">
-              <div className="font-semibold">{quickConnectError}</div>
+            <Alert tone="error" title={quickConnectError}>
               {quickConnectError.includes('caméra') || quickConnectError.includes('permission') ? (
-                <div className="text-xs text-red-400 mt-2">
-                  <p className="font-medium mb-1">{t('wizard.serverUrl.cameraPermissionError')}</p>
-                  <p>{t('wizard.serverUrl.cameraPermissionHelp')}</p>
-                </div>
+                <>
+                  <p style="margin:6px 0 2px;font-weight:500;">{t('wizard.serverUrl.cameraPermissionError')}</p>
+                  <p style="margin:0;">{t('wizard.serverUrl.cameraPermissionHelp')}</p>
+                </>
               ) : quickConnectError.includes('QR code') || quickConnectError.includes('scanner') ? (
-                <div className="text-xs text-red-400 mt-2">
-                  <p className="font-medium mb-1">{t('wizard.serverUrl.qrScanError')}</p>
-                  <p>{t('wizard.serverUrl.qrScanErrorHelp')}</p>
-                </div>
+                <>
+                  <p style="margin:6px 0 2px;font-weight:500;">{t('wizard.serverUrl.qrScanError')}</p>
+                  <p style="margin:0;">{t('wizard.serverUrl.qrScanErrorHelp')}</p>
+                </>
               ) : null}
-            </div>
+            </Alert>
           )}
 
           {/* Scanner QR */}
           {showScanner ? (
-            <div className="space-y-4">
-              <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3 mb-2">
-                <p className="text-blue-300 text-xs text-center">
-                  {t('wizard.serverUrl.scanQRCodeDesc')}
-                </p>
-              </div>
-              <div 
-                id="qr-reader" 
+            <div class="wz-stack-sm">
+              <Alert tone="info">{t('wizard.serverUrl.scanQRCodeDesc')}</Alert>
+              <div
+                id="qr-reader"
                 ref={scannerRef}
-                className="w-full max-w-sm mx-auto rounded-lg overflow-hidden border-2 border-primary-600"
+                class="su-scanner"
               ></div>
               <button
+                type="button"
+                data-focusable
                 onClick={stopScanner}
-                className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                class="wz-btn wz-btn--ghost wz-btn--block"
               >
                 Annuler
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div>
               {/* Bouton Scanner - Option principale */}
-              <div className="space-y-2">
-                <button
-                  ref={(el) => { buttonRefs.current[0] = el; }}
-                  data-focusable
-                  onClick={startScanner}
-                  disabled={authorizingCode}
-                  className="w-full p-6 bg-gradient-to-br from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 shadow-lg"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" />
-                    </svg>
-                    <span className="text-lg font-bold">{t('wizard.serverUrl.scanQRCode')}</span>
-                    <span className="text-sm opacity-90">{t('wizard.serverUrl.mobileJoinExisting')}</span>
-                  </div>
-                </button>
-              </div>
+              <button
+                ref={(el) => { buttonRefs.current[0] = el; }}
+                type="button"
+                data-focusable
+                onClick={startScanner}
+                disabled={authorizingCode}
+                class="wz-btn wz-btn--primary su-scan-btn"
+              >
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" /></svg>
+                <span>{t('wizard.serverUrl.scanQRCode')}</span>
+                <small>{t('wizard.serverUrl.mobileJoinExisting')}</small>
+              </button>
 
               {/* Séparateur */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-px bg-gray-700"></div>
-                <span className="text-gray-500 text-sm">ou</span>
-                <div className="flex-1 h-px bg-gray-700"></div>
-              </div>
+              <div class="wz-divider">ou</div>
 
               {/* Entrer le code manuellement */}
-              <div className="space-y-3">
-                <label className="block text-sm text-gray-400 text-center font-medium">
+              <div class="wz-panel">
+                <label class="wz-label" for="wz-join-code">
                   {t('wizard.serverUrl.enterCodeManually')}
                 </label>
-                <p className="text-xs text-gray-500 text-center px-2">
+                <p class="wz-help" style="margin:0 0 14px;">
                   {t('wizard.serverUrl.enterCodeDesc')}
                 </p>
                 <input
+                  id="wz-join-code"
                   type="text"
                   value={manualCode}
                   onInput={(e) => setManualCode((e.target as HTMLInputElement).value.toUpperCase())}
                   placeholder="XXXXXX"
                   maxLength={6}
-                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-center text-2xl font-mono tracking-[0.3em] placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-600"
+                  class="wz-input wz-input--code"
                   disabled={authorizingCode}
                 />
                 <button
                   ref={(el) => { buttonRefs.current[1] = el; }}
+                  type="button"
                   data-focusable
                   onClick={handleManualCodeSubmit}
                   disabled={manualCode.length !== 6 || authorizingCode}
-                  className="w-full px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="wz-btn wz-btn--ghost wz-btn--block"
+                  style="margin-top:12px;"
                 >
                   {authorizingCode ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="loading loading-spinner loading-sm"></span>
+                    <>
+                      <Spinner />
                       Connexion...
-                    </span>
+                    </>
                   ) : (
                     'Valider le code'
                   )}
@@ -844,322 +850,201 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
             </div>
           )}
 
-          {/* Bouton Configuration manuelle - Plus visible */}
-          <div className="pt-4 border-t border-gray-800">
-            <button
-              onClick={() => setShowManualConfig(true)}
-              className="w-full px-4 py-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white rounded-lg transition-all text-sm font-medium"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {t('wizard.serverUrl.manualConfig')}
-              </span>
-              <p className="text-xs text-gray-500 mt-1">
-                {t('wizard.serverUrl.manualConfigDesc')}
-              </p>
-            </button>
-          </div>
-        </>
+          {/* Bouton Configuration manuelle */}
+          {manualConfigCta}
+        </div>
       )}
 
       {/* ===== Quick Connect (tous devices) : afficher le code + QR, à saisir sur popcorn-web ===== */}
       {installationChoice === 'alreadyConfigured' && !showManualConfig && (
-        <>
-          {/* Layout TV : zone QR centrée pour que la télécommande ne le pousse pas hors écran */}
-          <div className={quickConnectCode && quickConnectQrUrl ? 'flex flex-col min-h-[80vh]' : undefined}>
-            <div className="flex-shrink-0 space-y-4">
+        <div>
           {/* Statut backend : pastille dans le header (Windows/Linux/macOS) — démarrer/arrêter/redémarrer au clic */}
-          {/* Instructions claires avec étapes numérotées */}
-          <div className="bg-gradient-to-br from-primary-900/30 to-primary-800/20 border border-primary-700/50 rounded-xl p-5 space-y-4">
-            <h4 className="text-xl font-bold text-white text-center mb-3">
-              {t('wizard.serverUrl.tvInstructionsTitle')}
-            </h4>
-            
-            {/* Étapes numérotées */}
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  1
-                </div>
-                <p className="text-gray-300 text-sm flex-1 pt-1">
-                  {t('wizard.serverUrl.tvStep1')}
-                </p>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  2
-                </div>
-                <p className="text-gray-300 text-sm flex-1 pt-1">
-                  {t('wizard.serverUrl.tvStep2')}
-                </p>
-              </div>
-              
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  3
-                </div>
-                <p className="text-gray-300 text-sm flex-1 pt-1">
-                  {t('wizard.serverUrl.tvStep3')}
-                </p>
-              </div>
-            </div>
-            
-            {/* Clarification : le QR permet aussi de faire la première config depuis le téléphone */}
-            <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3 mt-3">
-              <p className="text-blue-200 text-xs text-center">
-                {t('wizard.serverUrl.tvQrAlsoSetupFromPhone')}
-              </p>
-            </div>
-            
-            {/* Icône visuelle montrant le processus */}
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <div className="text-center">
-                <svg className="w-8 h-8 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <p className="text-xs text-gray-500">TV</p>
-              </div>
-              <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-              <div className="text-center">
-                <svg className="w-8 h-8 mx-auto text-primary-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0a2 2 0 100-4 2 2 0 000 4zm-8 0a2 2 0 100-4 2 2 0 000 4z" />
-                </svg>
-                <p className="text-xs text-primary-400">QR Code</p>
-              </div>
-              <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-              <div className="text-center">
-                <svg className="w-8 h-8 mx-auto text-primary-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <p className="text-xs text-primary-400">Téléphone</p>
-              </div>
-            </div>
-          </div>
-
           {quickConnectError && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
+            <Alert tone="error" style="margin-bottom:24px;">
               <span>{quickConnectError}</span>
-              <button
-                type="button"
-                onClick={handleRegenerateQuickConnect}
-                className="ml-2 underline hover:no-underline"
-              >
-                Réessayer
-              </button>
-            </div>
+              <div style="margin-top:10px;">
+                <button
+                  type="button"
+                  data-focusable
+                  onClick={handleRegenerateQuickConnect}
+                  class="wz-link wz-link--accent"
+                >
+                  Réessayer
+                </button>
+              </div>
+            </Alert>
           )}
 
           {quickConnectLoading && !quickConnectCode && (
-            <div className="flex justify-center items-center py-12">
-              <span className="loading loading-spinner loading-lg text-white"></span>
+            <div class="wz-center" style="padding:48px 0;">
+              <span class="ed-spinner ed-spinner--sm" aria-hidden="true" />
             </div>
           )}
-            </div>
 
-          {quickConnectCode && (
-            <>
-              {/* Zone centrale dédiée au QR : flex-1 pour occuper l'espace et garder le QR au centre à l'écran */}
-              {quickConnectQrUrl && (
-                <div
-                  ref={qrCodeContainerRef}
-                  id="wizard-qr-code-tv"
-                  className="flex flex-1 flex-col items-center justify-center min-h-[280px] py-6"
-                >
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="bg-white p-4 rounded-xl shadow-2xl border-4 border-primary-500">
-                      <img 
-                        src={quickConnectQrUrl} 
-                        alt="QR Code de connexion" 
-                        className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96" 
-                      />
-                    </div>
-                    <p className="text-gray-400 text-sm text-center max-w-md">
-                      {t('wizard.serverUrl.tvStep3')}
-                    </p>
-                  </div>
+          <div class="su-qc">
+            {/* QR : zone dédiée, gardée visible à l'écran (TV) */}
+            {quickConnectCode && quickConnectQrUrl && (
+              <div
+                ref={qrCodeContainerRef}
+                id="wizard-qr-code-tv"
+                class="su-qc__qr"
+              >
+                <div class="su-qc__qr-box">
+                  <img
+                    src={quickConnectQrUrl}
+                    alt="QR Code de connexion"
+                  />
                 </div>
-              )}
+                <p class="su-qc__qr-caption">
+                  {t('wizard.serverUrl.tvStep3')}
+                </p>
+              </div>
+            )}
 
-              <div className="flex-shrink-0 space-y-4">
-              {/* Code à 6 caractères - Mieux mis en avant */}
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-primary-600/50 rounded-xl p-6 shadow-lg">
-                <div className="text-center space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-3 font-medium">
-                      {t('wizard.serverUrl.tvOrEnterCode')}
-                    </label>
-                    <div className="bg-black/50 rounded-lg p-4 border-2 border-primary-500 overflow-hidden">
-                      <div className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl font-mono font-bold text-white tracking-[0.15em] sm:tracking-[0.25em] md:tracking-[0.3em] mb-2 text-center min-w-0 overflow-x-auto py-1">
-                        {quickConnectCode}
-                      </div>
+            <div class="su-qc__side">
+              {/* Instructions avec étapes numérotées */}
+              <span class="wz-section-label">{t('wizard.serverUrl.tvInstructionsTitle')}</span>
+              <ol class="su-steps">
+                <li><span class="wz-num">01</span><p>{t('wizard.serverUrl.tvStep1')}</p></li>
+                <li><span class="wz-num">02</span><p>{t('wizard.serverUrl.tvStep2')}</p></li>
+                <li><span class="wz-num">03</span><p>{t('wizard.serverUrl.tvStep3')}</p></li>
+              </ol>
+              <div class="su-flow" aria-hidden="true">
+                <span>TV</span><span>→</span><span class="is-accent">QR Code</span><span>→</span><span class="is-accent">Téléphone</span>
+              </div>
+
+              {quickConnectCode && (
+                <div style="margin-top:28px;">
+                  {/* Code à 6 caractères */}
+                  <span class="su-code-label">{t('wizard.serverUrl.tvOrEnterCode')}</span>
+                  <div class="su-code">{quickConnectCode}</div>
+                  <p class="wz-help">{t('wizard.serverUrl.tvStep4')}</p>
+
+                  {/* Compteur de temps restant */}
+                  {quickConnectExpiresAt && quickConnectStatus === 'pending' && (
+                    <div class="su-expiry">
+                      {t('wizard.serverUrl.tvExpiresIn')} {quickConnectRemaining ?? 0} {t('wizard.serverUrl.tvSeconds')}
                     </div>
-                    <p className="text-xs text-gray-500 mt-3">
-                      {t('wizard.serverUrl.tvStep4')}
-                    </p>
+                  )}
+
+                  {/* Statut d'autorisation */}
+                  {quickConnectStatus === 'pending' && (
+                    <div class="su-status">
+                      <span class="ed-spinner ed-spinner--xs" aria-hidden="true" />
+                      {t('wizard.serverUrl.tvWaitingAuth')}
+                    </div>
+                  )}
+                  {quickConnectStatus === 'authorized' && (
+                    <div class="su-status is-ok">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M5 13l4 4L19 7" /></svg>
+                      {t('wizard.serverUrl.tvAuthorized')}
+                    </div>
+                  )}
+
+                  <div class="wz-inline" style="flex-wrap:wrap;margin-top:22px;">
                     {/* Bouton : ouvrir popcorn-web avec le code dans l’URL (comme le QR) */}
                     <a
                       href={`${getPopcornWebBaseUrl()}/quick-connect?code=${quickConnectCode}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto mt-4 px-5 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      data-focusable
+                      class="wz-btn wz-btn--primary"
+                      style="margin:0 12px 10px 0;"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
                       {t('wizard.serverUrl.openPopcornWebToAuthorize')}
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                     </a>
+                    {/* Bouton régénérer */}
+                    <button
+                      type="button"
+                      data-focusable
+                      onClick={handleRegenerateQuickConnect}
+                      disabled={quickConnectLoading}
+                      class="wz-btn wz-btn--quiet"
+                      style="margin:0 0 10px;"
+                    >
+                      Générer un nouveau code
+                    </button>
                   </div>
-
-                  {/* Compteur de temps restant - Plus visible */}
-                  {quickConnectExpiresAt && quickConnectStatus === 'pending' && (
-                    <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-yellow-300 font-semibold">
-                          {t('wizard.serverUrl.tvExpiresIn')} {quickConnectRemaining ?? 0} {t('wizard.serverUrl.tvSeconds')}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Statut d'autorisation - Plus visible */}
-                  {quickConnectStatus === 'pending' && (
-                    <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <span className="loading loading-spinner loading-md text-blue-400"></span>
-                        <span className="text-blue-300 font-medium text-base">
-                          {t('wizard.serverUrl.tvWaitingAuth')}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {quickConnectStatus === 'authorized' && (
-                    <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-green-300 font-semibold text-base">
-                          {t('wizard.serverUrl.tvAuthorized')}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
+              )}
 
-              {/* Bouton régénérer */}
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={handleRegenerateQuickConnect}
-                  disabled={quickConnectLoading}
-                  className="px-3 py-1.5 text-gray-400 hover:text-white text-xs transition-colors disabled:opacity-50"
-                >
-                  Générer un nouveau code
-                </button>
-              </div>
-              </div>
-            </>
-          )}
+              {/* Clarification : le QR permet aussi de faire la première config depuis le téléphone */}
+              <Alert tone="info" style="margin-top:22px;">{t('wizard.serverUrl.tvQrAlsoSetupFromPhone')}</Alert>
+            </div>
+          </div>
 
-          {/* Bouton Configuration manuelle - Plus visible sur TV/Desktop aussi */}
-          <div className="pt-4 border-t border-gray-800">
-            <button
-              onClick={() => setShowManualConfig(true)}
-              className="w-full px-4 py-3 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white rounded-lg transition-all text-sm font-medium"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {t('wizard.serverUrl.manualConfig')}
-              </span>
-              <p className="text-xs text-gray-500 mt-1">
-                {t('wizard.serverUrl.manualConfigDesc')}
-              </p>
-            </button>
-          </div>
-          </div>
-        </>
+          {/* Bouton Configuration manuelle - visible sur TV/Desktop aussi */}
+          {manualConfigCta}
+        </div>
       )}
 
       {/* Section Configuration manuelle */}
       {showManualConfig && (
-        <>
-          {!skipInitialChoice && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                if (installationChoice === 'localAccount') {
-                  setInstallationChoice(null);
-                  setShowManualConfig(false);
-                } else {
-                  setShowManualConfig(false);
-                }
-              }}
-              className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
-              title={installationChoice === 'localAccount' ? t('common.back') : t('wizard.serverUrl.backToQrOrCode')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <p className="text-gray-400 text-sm">
-              Entrez l'URL de votre serveur Popcorn
-            </p>
-          </div>
-          )}
-          {skipInitialChoice && (
-            <p className="text-gray-400 text-sm mb-2">
-              Entrez l'URL de votre serveur Popcorn (ex: http://localhost:3000)
-            </p>
-          )}
+        <div>
+          <StepHeader
+            kicker="Serveur"
+            title={skipInitialChoice ? t('wizard.serverUrl.connectClientTitle') : (choiceTitle || t('wizard.serverUrl.connectClientTitle'))}
+            lead={skipInitialChoice ? "Entrez l'URL de votre serveur Popcorn (ex: http://localhost:3000)" : "Entrez l'URL de votre serveur Popcorn"}
+          >
+            {!skipInitialChoice && (
+              <div style="margin-top:18px;">
+                <button
+                  type="button"
+                  data-focusable
+                  class="wz-link"
+                  onClick={() => {
+                    if (installationChoice === 'localAccount') {
+                      setInstallationChoice(null);
+                      setShowManualConfig(false);
+                    } else {
+                      setShowManualConfig(false);
+                    }
+                  }}
+                  title={installationChoice === 'localAccount' ? t('common.back') : t('wizard.serverUrl.backToQrOrCode')}
+                >
+                  ← {installationChoice === 'localAccount' ? t('common.back') : t('wizard.serverUrl.backToQrOrCode')}
+                </button>
+                {installationChoice !== 'localAccount' && (
+                  <button
+                    type="button"
+                    data-focusable
+                    class="wz-link"
+                    style="margin-left:24px;"
+                    onClick={() => { setInstallationChoice(null); setShowManualConfig(false); resetQuickConnect(); }}
+                    title={t('common.back')}
+                  >
+                    {t('common.back')}
+                  </button>
+                )}
+              </div>
+            )}
+          </StepHeader>
 
           {/* Statut backend : voir la pastille dans le header (démarrer/arrêter/redémarrer) */}
 
+          <div class="wz-stack">
           {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 whitespace-pre-line text-sm space-y-2">
-              <div className="font-semibold">{error.split('\n\n')[0]}</div>
+            <Alert tone="error" title={error.split('\n\n')[0]}>
               {error.includes('\n\n') && (
-                <div className="text-red-400 text-xs mt-2">
+                <div style="white-space:pre-line;">
                   {error.split('\n\n').slice(1).join('\n\n')}
                 </div>
               )}
-            </div>
+            </Alert>
           )}
 
-          {success && (
-            <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300 text-sm animate-fade-in">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="font-medium">{success}</span>
-              </div>
-            </div>
-          )}
+          {success && <Alert tone="success">{success}</Alert>}
 
           {/* Formulaire URL */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">
+          <div class="wz-panel">
+            <label class="wz-label" for="wz-backend-url">
               URL du Backend
             </label>
             <input
+              id="wz-backend-url"
               type="url"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              class="wz-input wz-input--mono"
               placeholder="http://192.168.1.100:3000"
               value={backendUrl}
               onInput={(e) => {
@@ -1169,36 +1054,36 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
               }}
               disabled={testing || loading}
             />
-            <p className="text-xs text-gray-500">
-              Ex: <code className="bg-gray-800 px-1 rounded">http://192.168.1.100:3000</code>
+            <p class="wz-help">
+              Ex: <code class="wz-code">http://192.168.1.100:3000</code>
             </p>
+          </div>
           </div>
 
           {/* Bouton unique : teste la connexion et passe à l'étape suivante si OK */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div class="wz-actions wz-actions--end">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
+              type="button"
               data-focusable
-              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="wz-btn wz-btn--primary"
               onClick={handleNext}
               disabled={testing || loading || !backendUrl.trim()}
             >
               {testing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="loading loading-spinner loading-sm"></span>
+                <>
+                  <Spinner />
                   Connexion en cours...
-                </span>
+                </>
               ) : (
-                <span className="flex items-center justify-center gap-2">
+                <>
                   {t('common.next')}
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </span>
+                  <IconArrowRight />
+                </>
               )}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
