@@ -5,6 +5,7 @@ import { loadCapabilities, useServerCapabilities } from '../../lib/capabilities'
 import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 import { serverApi } from '../../lib/client/server-api';
 import type { InstalledModule } from '../../lib/client/server-api/modules';
+import ProcessModulesSection from './ProcessModulesSection';
 
 /**
  * Paramètres > Modules.
@@ -566,6 +567,9 @@ export default function ModulesSettingsPanel() {
           </ul>
         )}
       </section>
+
+      {/* Modules exécutables signés : masqué si le serveur ne les gère pas (et en version store). */}
+      <ProcessModulesSection />
 
       <section class={cardClass} style={cardStyle} aria-labelledby="modules-server-title">
         <h2 id="modules-server-title" class="text-lg tv:text-2xl" style={headingStyle}>
