@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'preact/hooks';
 import type { SetupStatus } from '../../../lib/client/types';
-import { isTorrentModuleAvailable } from '../../../lib/distribution';
+import { isIndexersModuleAvailable, isTorrentModuleAvailable } from '../../../lib/distribution';
 import { loadCapabilities, useServerCapabilities } from '../../../lib/capabilities';
 
 export type WizardStepId =
@@ -38,7 +38,11 @@ const STEP_ORDER_SERVER_FIRST: WizardStepId[] = ['serverUrl', 'language', 'auth'
 export const STORE_EXCLUDED_STEPS: readonly WizardStepId[] = ['indexers', 'downloadLocation', 'sync'];
 
 export function isWizardStepAvailable(id: WizardStepId): boolean {
-  return !STORE_EXCLUDED_STEPS.includes(id) || isTorrentModuleAvailable();
+  if (!STORE_EXCLUDED_STEPS.includes(id)) return true;
+  // Étape Indexers : proposée dès que le serveur a le module indexers (ex. après installation
+  // d'un module de définitions d'indexers), même sans moteur torrent. Jamais en version store.
+  if (id === 'indexers') return isIndexersModuleAvailable() || isTorrentModuleAvailable();
+  return isTorrentModuleAvailable();
 }
 
 function computeSteps(

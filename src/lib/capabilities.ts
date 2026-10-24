@@ -27,6 +27,16 @@ export interface CapabilityFeatures {
   [key: string]: boolean;
 }
 
+/** Module installé depuis une URL (GET /api/client/capabilities → modules.installed). */
+export interface InstalledModuleSummary {
+  id: string;
+  name: string;
+  version: string;
+  kind: string;
+  provides: string[];
+  active: boolean;
+}
+
 export interface ServerCapabilities {
   apiVersion: number;
   serverVersion: string | null;
@@ -37,6 +47,8 @@ export interface ServerCapabilities {
     specVersion: number | null;
     defaultRepository: string | null;
     definitionsRepositoryConfigured: boolean;
+    /** Modules installés depuis une URL (aucun par défaut). Absent des anciens caches. */
+    installed?: InstalledModuleSummary[];
   };
   /** Serveur antérieur à la route capabilities (comportement historique). */
   legacy: boolean;
@@ -83,11 +95,31 @@ function legacyCapabilities(backendUrl: string): ServerCapabilities {
       uploads: false,
       ratio_tools: false,
     },
-    modules: { host: false, specVersion: null, defaultRepository: null, definitionsRepositoryConfigured: false },
+    modules: {
+      host: false,
+      specVersion: null,
+      defaultRepository: null,
+      definitionsRepositoryConfigured: false,
+      installed: [],
+    },
     legacy: true,
     backendUrl,
     fetchedAt: Date.now(),
   };
+}
+
+function parseInstalled(raw: unknown): InstalledModuleSummary[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && typeof (x as any).id === 'string')
+    .map((x) => ({
+      id: x.id as string,
+      name: typeof x.name === 'string' ? x.name : (x.id as string),
+      version: typeof x.version === 'string' ? x.version : '',
+      kind: typeof x.kind === 'string' ? x.kind : '',
+      provides: Array.isArray(x.provides) ? x.provides.filter((p): p is string => typeof p === 'string') : [],
+      active: x.active !== false,
+    }));
 }
 
 function parse(json: any, backendUrl: string): ServerCapabilities | null {
@@ -119,6 +151,7 @@ function parse(json: any, backendUrl: string): ServerCapabilities | null {
       specVersion: typeof m.spec_version === 'number' ? m.spec_version : null,
       defaultRepository: typeof m.default_repository === 'string' ? m.default_repository : null,
       definitionsRepositoryConfigured: m.definitions_repository_configured === true,
+      installed: parseInstalled(m.installed),
     },
     legacy: false,
     backendUrl,
@@ -172,6 +205,12 @@ export function isCapabilityAvailable(feature: keyof CapabilityFeatures): boolea
   const caps = getCachedCapabilities();
   if (!caps) return feature !== 'uploads' && feature !== 'ratio_tools';
   return caps.features[feature] === true;
+}
+
+/** Vrai si un module actif installé depuis une URL fournit la capacité (ex. `indexer_definitions`). */
+export function hasInstalledModuleProviding(capability: string): boolean {
+  const caps = getCachedCapabilities();
+  return !!caps?.modules.installed?.some((m) => m.active && m.provides.includes(capability));
 }
 
 /** Charge (ou recharge) les capacités du serveur courant. Ne jette jamais. */

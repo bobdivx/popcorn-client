@@ -70,6 +70,7 @@ import { requestsMethods } from './server-api/requests.js';
 import { systemMethods } from './server-api/system.js';
 import { aiMethods } from './server-api/ai.js';
 import { platformsMethods } from './server-api/platforms.js';
+import { modulesMethods } from './server-api/modules.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -211,6 +212,12 @@ interface IServerApiClientPublic {
   getStreamingPlatformExclusives(slug: string, language?: string): Promise<ApiResponse<{ results: import('./server-api/platforms.js').PlatformTitle[] }>>;
   getStreamingPlatformRow(slug: string, mediaType: 'movie' | 'tv', genre: number, language?: string): Promise<ApiResponse<{ results: import('./server-api/platforms.js').PlatformTitle[] }>>;
   getTitleWatchProviders(mediaType: 'movie' | 'tv', tmdbId: number): Promise<ApiResponse<import('./server-api/platforms.js').TitleWatchProviders>>;
+
+  // Modules optionnels installés depuis une URL (admin)
+  listModules(): Promise<ApiResponse<import('./server-api/modules.js').ModulesList>>;
+  installModule(request: import('./server-api/modules.js').ModuleInstallRequest): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
+  updateModule(id: string): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
+  uninstallModule(id: string): Promise<ApiResponse<{ id: string; removed: boolean }>>;
   
   listMediaRequests(params?: { user_id?: string; status?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest[]>>;
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
@@ -559,7 +566,8 @@ Object.assign(ServerApiClient.prototype,
   requestsMethods,
   systemMethods,
   aiMethods,
-  platformsMethods
+  platformsMethods,
+  modulesMethods
 );
 
 // Instance réelle (utilisée quand isDemoMode() est false)

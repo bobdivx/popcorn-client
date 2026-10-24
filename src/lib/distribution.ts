@@ -141,6 +141,7 @@ const TORRENT_API_PATTERNS: readonly RegExp[] = [
   /^\/api\/sync(\/|$)/,
   /^\/api\/client\/torrents(\/|$)/,
   /^\/api\/client\/admin\/indexers(\/|$)/,
+  /^\/api\/client\/admin\/modules(\/|$)/,
   /^\/api\/client\/stream-torrent(\/|$)/,
   /^\/api\/client\/librqbit(\/|$)/,
   /^\/api\/client\/uploader(\/|$)/,
