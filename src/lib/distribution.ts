@@ -11,6 +11,8 @@
  * Sans la variable (web, webOS, desktop, APK GitHub), rien ne change.
  */
 
+import { isCapabilityAvailable } from './capabilities';
+
 export type Distribution = 'default' | 'play';
 
 /**
@@ -24,6 +26,19 @@ export const DISTRIBUTION: Distribution = IS_STORE_BUILD ? 'play' : 'default';
 
 /** Fonctionnalités torrent / indexers / téléchargements disponibles dans ce build. */
 export const TORRENT_FEATURES_ENABLED: boolean = import.meta.env.PUBLIC_DISTRIBUTION !== 'play';
+
+/**
+ * Module torrent utilisable : présent dans ce build ET annoncé par le serveur connecté
+ * (GET /api/client/capabilities). Serveur ancien ou capacités inconnues → vrai (comportement historique).
+ */
+export function isTorrentModuleAvailable(): boolean {
+  return TORRENT_FEATURES_ENABLED && isCapabilityAvailable('torrent');
+}
+
+/** Module indexers utilisable (build + serveur). */
+export function isIndexersModuleAvailable(): boolean {
+  return TORRENT_FEATURES_ENABLED && isCapabilityAvailable('indexers');
+}
 
 /** Chemin de la fiche média (lecture d'un élément de la bibliothèque). */
 export const MEDIA_DETAIL_PATH: string = IS_STORE_BUILD ? '/media' : '/torrents';
@@ -58,20 +73,62 @@ export const STORE_BLOCKED_ROUTE_PREFIXES: readonly string[] = [
   '/settings/discovery',
   '/settings/diagnostics',
   '/settings/audit',
+  '/settings/modules',
 ];
 
-export function isRouteBlockedInStoreBuild(pathname: string): boolean {
-  if (!IS_STORE_BUILD) return false;
+/** Fonctions retirées du produit (upload vers trackers / C411, outils de ratio) : jamais affichées. */
+export const RETIRED_ROUTE_PREFIXES: readonly string[] = ['/settings/uploads', '/settings/ratio'];
+
+/**
+ * Routes du module torrent / indexers, masquées quand le serveur connecté ne les propose pas.
+ * (La fiche média /torrents reste accessible : elle sert aussi à lire la bibliothèque.)
+ */
+export const TORRENT_MODULE_ROUTE_PREFIXES: readonly string[] = [
+  '/downloads',
+  '/search',
+  '/demandes',
+  '/requests',
+  '/settings/indexers',
+  '/settings/indexer-definitions',
+  '/settings/library-indexer',
+  '/settings/sync',
+  '/settings/librqbit',
+  '/settings/requests-admin',
+  '/settings/blacklist',
+  '/settings/discover-sliders',
+  '/settings/content',
+  '/settings/downloads',
+  '/settings/discovery',
+];
+
+function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   const p = (pathname || '/').replace(/\/+$/, '') || '/';
-  return STORE_BLOCKED_ROUTE_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
+  return prefixes.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
+}
+
+/**
+ * Vrai si la route ne doit pas être proposée : fonction retirée, version store, ou module
+ * torrent absent du serveur connecté (nom historique conservé pour les appelants).
+ */
+export function isRouteBlockedInStoreBuild(pathname: string): boolean {
+  if (matchesPrefix(pathname, RETIRED_ROUTE_PREFIXES)) return true;
+  if (IS_STORE_BUILD) return matchesPrefix(pathname, STORE_BLOCKED_ROUTE_PREFIXES);
+  if (!isTorrentModuleAvailable()) return matchesPrefix(pathname, TORRENT_MODULE_ROUTE_PREFIXES);
+  return false;
 }
 
 /** Catégories de paramètres masquées dans la version store. */
 const STORE_HIDDEN_SETTINGS_CATEGORIES = new Set(['content', 'downloads', 'uploads', 'discovery']);
 
+/** Catégories propres au module torrent / indexers. */
+const TORRENT_MODULE_SETTINGS_CATEGORIES = new Set(['content', 'downloads', 'discovery']);
+
 export function isSettingsCategoryAvailable(categoryId: string): boolean {
-  if (!IS_STORE_BUILD) return true;
-  return !STORE_HIDDEN_SETTINGS_CATEGORIES.has(categoryId);
+  // Upload vers trackers (C411) / ratio : retirés.
+  if (categoryId === 'uploads') return false;
+  if (IS_STORE_BUILD) return !STORE_HIDDEN_SETTINGS_CATEGORIES.has(categoryId);
+  if (!isTorrentModuleAvailable()) return !TORRENT_MODULE_SETTINGS_CATEGORIES.has(categoryId);
+  return true;
 }
 
 /**
