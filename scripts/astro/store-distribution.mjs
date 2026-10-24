@@ -34,6 +34,7 @@ export const STORE_BLOCKED_ROUTES = [
   'settings/discovery',
   'settings/diagnostics',
   'settings/audit',
+  'settings/modules',
 ];
 
 export function getDistribution() {
