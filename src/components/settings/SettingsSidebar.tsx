@@ -8,7 +8,7 @@ import {
   Library,
   Wrench,
   LayoutDashboard,
-  Upload,
+  Puzzle,
   Download,
   Tv,
 } from 'lucide-preact';
@@ -16,7 +16,8 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
 import { isTVPlatform } from '../../lib/utils/device-detection';
-import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { IS_STORE_BUILD, isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 type NavItem = {
   id: string;
@@ -26,6 +27,8 @@ type NavItem = {
   permission?: string;
   permissions?: string[];
   pathPrefix?: string;
+  /** Libellé fixe (identique FR/EN) quand aucune clé i18n n'existe. */
+  label?: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -44,12 +47,13 @@ const NAV_ITEMS: NavItem[] = [
     pathPrefix: '/settings/server',
   },
   {
-    id: 'uploads',
-    labelKey: 'settingsPages.uploads.title',
-    href: '/settings/uploads/',
-    icon: Upload,
-    permission: 'settings.indexers',
-    pathPrefix: '/settings/uploads',
+    id: 'modules',
+    labelKey: 'settingsMenu.modules',
+    label: 'Modules',
+    href: '/settings/modules/',
+    icon: Puzzle,
+    permission: 'settings.server',
+    pathPrefix: '/settings/modules',
   },
   {
     id: 'maintenance',
@@ -429,19 +433,25 @@ export default function SettingsSidebar() {
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const serverCapabilities = useServerCapabilities();
+  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
 
   const visibleItems = useMemo(
     () => {
       const items = (mounted ? NAV_ITEMS.filter(isItemVisible) : NAV_ITEMS).filter(
         // Version store : pas de catégories torrent / indexers / téléchargements.
-        (item) => isSettingsCategoryAvailable(item.id) && !isRouteBlockedInStoreBuild(item.href)
+        (item) =>
+          isSettingsCategoryAvailable(item.id) &&
+          !isRouteBlockedInStoreBuild(item.href) &&
+          // Version store : pas de système de modules.
+          !(IS_STORE_BUILD && item.id === 'modules')
       );
       if (typeof window !== 'undefined' && isTVPlatform()) {
         return items.filter((item) => item.id !== 'webos' && item.id !== 'uploads');
       }
       return items;
     },
-    [mounted]
+    [mounted, torrentModule]
   );
 
   return (
@@ -484,13 +494,13 @@ export default function SettingsSidebar() {
                   class={`sn-item${isActive ? ' sn-item--active' : ''}`}
                   tabIndex={0}
                   aria-current={isActive ? 'page' : undefined}
-                  aria-label={t(item.labelKey)}
+                  aria-label={(item.label ?? t(item.labelKey))}
                 >
                   <div class={`sn-icon${isActive ? ' sn-icon--active' : ' sn-icon--inactive'}`}>
                     <Icon class="w-[18px] h-[18px] tv:w-6 tv:h-6" strokeWidth={1.8} aria-hidden />
                   </div>
                   <span class={`sn-label${isActive ? ' sn-label--active' : ' sn-label--inactive'}`}>
-                    {t(item.labelKey)}
+                    {(item.label ?? t(item.labelKey))}
                   </span>
                   {isActive && <div class="sn-dot" aria-hidden />}
                 </a>
