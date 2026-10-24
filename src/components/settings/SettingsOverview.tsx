@@ -1,7 +1,7 @@
 import {
   Monitor,
   UserCircle,
-  Upload,
+  Puzzle,
   Wrench,
   Tv,
   Palette,
@@ -20,6 +20,8 @@ import { TokenManager } from '../../lib/client/storage';
 import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import { isBackendUrlSameAsClientUrl, getBackendUrl } from '../../lib/backend-config';
 import { HubGrid, HubTile, type HubStatus } from './hub/HubTile';
+import { IS_STORE_BUILD, isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 type TileDef = {
   id: string;
@@ -29,12 +31,15 @@ type TileDef = {
   icon: typeof Monitor;
   permission?: string;
   permissions?: string[];
+  /** Libellés fixes FR/EN quand aucune clé i18n n'existe. */
+  title?: { fr: string; en: string };
+  hint?: { fr: string; en: string };
 };
 
 const TILES: TileDef[] = [
   { id: 'server', titleKey: 'settingsMenu.category.system', hintKey: 'settingsMenu.hub.hint.server', href: '/settings/server/', icon: Monitor, permission: 'settings.server' },
   { id: 'system-tools', titleKey: 'settingsMenu.hub.systemTools', hintKey: 'settingsMenu.hub.hint.systemTools', href: '/settings/system/', icon: Settings, permission: 'settings.server' },
-  { id: 'uploads', titleKey: 'settingsPages.uploads.title', hintKey: 'settingsMenu.hub.hint.uploads', href: '/settings/uploads/', icon: Upload, permission: 'settings.indexers' },
+  { id: 'modules', titleKey: 'settingsMenu.modules', hintKey: 'settingsMenu.hub.hint.modules', title: { fr: 'Modules', en: 'Modules' }, hint: { fr: 'Fonctions optionnelles du serveur', en: 'Optional server features' }, href: '/settings/modules/', icon: Puzzle, permission: 'settings.server' },
   { id: 'maintenance', titleKey: 'settingsMenu.category.maintenance', hintKey: 'settingsMenu.hub.hint.maintenance', href: '/settings/maintenance/', icon: Wrench, permission: 'settings.server' },
   { id: 'webos', titleKey: 'settingsMenu.webosDeployment', hintKey: 'settingsMenu.hub.hint.webos', href: '/settings/webos-deployment/', icon: Tv, permission: 'settings.server' },
   { id: 'interface', titleKey: 'settingsMenu.category.interface', hintKey: 'settingsMenu.hub.hint.interface', href: '/settings/ui-preferences/', icon: Palette, permission: 'settings.ui_preferences' },
@@ -47,14 +52,19 @@ const TILES: TileDef[] = [
 ];
 
 function isVisible(item: TileDef): boolean {
+  // Fonctions retirées, version store ou module torrent absent du serveur connecté.
+  if (!isSettingsCategoryAvailable(item.id) || isRouteBlockedInStoreBuild(item.href)) return false;
+  if (IS_STORE_BUILD && item.id === 'modules') return false;
   if (item.permission) return canAccess(item.permission as any);
   if (item.permissions?.length) return item.permissions.some((p) => canAccess(p as any));
   return true;
 }
 
 export default function SettingsOverview() {
-  const { t } = useI18n();
-  const visibleItems = useMemo(() => TILES.filter(isVisible), []);
+  const { t, language } = useI18n();
+  const serverCapabilities = useServerCapabilities();
+  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
+  const visibleItems = useMemo(() => TILES.filter(isVisible), [torrentModule]);
   const [serverStatus, setServerStatus] = useState<HubStatus | null>(null);
   const [serverMeta, setServerMeta] = useState<string | undefined>();
   const [accountStatus, setAccountStatus] = useState<HubStatus | null>(null);
@@ -141,8 +151,8 @@ export default function SettingsOverview() {
               key={item.id}
               href={item.href}
               icon={item.icon}
-              title={t(item.titleKey)}
-              hint={status ? undefined : t(item.hintKey)}
+              title={item.title ? item.title[language === 'en' ? 'en' : 'fr'] : t(item.titleKey)}
+              hint={status ? undefined : item.hint ? item.hint[language === 'en' ? 'en' : 'fr'] : t(item.hintKey)}
               meta={meta}
               status={status ?? undefined}
               statusLabel={
