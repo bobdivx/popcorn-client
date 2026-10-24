@@ -30,7 +30,7 @@ import { candidatesExcluding3DUnlessAllowed } from '../../../../lib/torrents/is3
 import { MediaDetailBackLink } from './ActionsRow';
 import { setMovieWatched, useMovieWatchState } from '../../../../lib/watchedMovies';
 import type { Ref } from 'preact';
-import { TORRENT_FEATURES_ENABLED } from '../../../../lib/distribution';
+import { TORRENT_FEATURES_ENABLED, isTorrentModuleAvailable } from '../../../../lib/distribution';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -141,11 +141,13 @@ export function ActionButtons({
   backHref,
   backLinkRef,
 }: ActionButtonsProps) {
+  // Actions torrent (télécharger, magnet, supprimer) : build avec torrent ET serveur avec le module.
+  const TORRENT_UI = TORRENT_FEATURES_ENABLED && isTorrentModuleAvailable();
   const { t } = useI18n();
   // Version store (PUBLIC_DISTRIBUTION=play) : aucune action de téléchargement / indexers.
-  const onDownloadSingleEpisode = TORRENT_FEATURES_ENABLED ? onDownloadSingleEpisodeProp : undefined;
-  const onDownloadAllEpisodes = TORRENT_FEATURES_ENABLED ? onDownloadAllEpisodesProp : undefined;
-  const seriesIndexerRefresh = TORRENT_FEATURES_ENABLED ? seriesIndexerRefreshProp : undefined;
+  const onDownloadSingleEpisode = TORRENT_UI ? onDownloadSingleEpisodeProp : undefined;
+  const onDownloadAllEpisodes = TORRENT_UI ? onDownloadAllEpisodesProp : undefined;
+  const seriesIndexerRefresh = TORRENT_UI ? seriesIndexerRefreshProp : undefined;
   const isMovieDetail =
     torrent.tmdbType === 'movie' && typeof torrent.tmdbId === 'number' && torrent.tmdbId > 0;
   const movieWatch = useMovieWatchState(isMovieDetail ? torrent.tmdbId : null, isMovieDetail);
@@ -259,7 +261,7 @@ export function ActionButtons({
     !shouldShowPlayButton;
   const isPlayStreamingMode = shouldShowPlayButton && streamingTorrentActive && canStream && !isAvailableLocally && !isDownloadComplete;
   const showDownloadButtonAlongsidePlay =
-    TORRENT_FEATURES_ENABLED &&
+    TORRENT_UI &&
     streamingTorrentActive && canStream && shouldShowPlayButton &&
     !isDownloadComplete && !showProgressNextToCancel && !downloadingToClient;
 
@@ -279,11 +281,11 @@ export function ActionButtons({
     torrent.tmdbId &&
     (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')
   );
-  const showMagnetBtn = TORRENT_FEATURES_ENABLED && !!(
+  const showMagnetBtn = TORRENT_UI && !!(
     torrent._externalMagnetUri ||
     (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))
   );
-  const showDeleteBtn = TORRENT_FEATURES_ENABLED && (isAvailableLocally || isDownloadComplete) && hasInfoHash;
+  const showDeleteBtn = TORRENT_UI && (isAvailableLocally || isDownloadComplete) && hasInfoHash;
   const showPlayFromStart = !!(shouldShowPlayButton && hasSavedPosition && onPlayFromBeginning);
   const hasMoreActions = !!(
     onDownloadAllEpisodes ||
@@ -378,7 +380,7 @@ export function ActionButtons({
           shouldShowButton &&
           !hidePrimaryForDownloadCard &&
           // Version store : uniquement « Lire » (jamais « Télécharger »).
-          (TORRENT_FEATURES_ENABLED ||
+          (TORRENT_UI ||
             (isPackEpisodeSelected ? primaryPackMode === 'play' : shouldShowPlayButton)) && (
           <button
             onClick={() => {
@@ -574,7 +576,7 @@ export function ActionButtons({
         )}
 
         {/* Pack sans sélection */}
-        {TORRENT_FEATURES_ENABLED && isPackWithMultipleFiles && !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) && !shouldShowPlayButton && (
+        {TORRENT_UI && isPackWithMultipleFiles && !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) && !shouldShowPlayButton && (
           <button type="button" disabled tabIndex={-1}
             className="gtv-pill-btn inline-flex items-center gap-2.5 opacity-40 cursor-not-allowed">
             <Download className="h-5 w-5 shrink-0" size={20} />
