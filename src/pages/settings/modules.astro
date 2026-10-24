@@ -1,0 +1,14 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import ModulesSettingsPanel from '../../components/settings/ModulesSettingsPanel';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+---
+
+<SettingsLayout title="Modules - Popcornn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-white mb-4">Modules</h1>
+    <PermissionGuard client:only="preact" permission="settings.server">
+      <ModulesSettingsPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>
