@@ -4,7 +4,7 @@ import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardActions } from './hooks/useWizardActions';
 import { useWizardSteps, getNextStepNumberAfterWelcome, isWizardStepAvailable } from './hooks/useWizardSteps';
 import type { WizardStepId } from './hooks/useWizardSteps';
-import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { TORRENT_FEATURES_ENABLED, isTorrentModuleAvailable } from '../../lib/distribution';
 import { useI18n } from '../../lib/i18n';
 import { ServerUrlStep } from './steps/ServerUrlStep';
 import { LanguageStep } from './steps/LanguageStep';
@@ -336,8 +336,8 @@ export default function Wizard() {
         );
 
       case 'indexers':
-        // Version store : étape absente (composant exclu du build).
-        if (!TORRENT_FEATURES_ENABLED) return null;
+        // Version store : étape absente (composant exclu du build) ; serveur sans module torrent : sautée.
+        if (!TORRENT_FEATURES_ENABLED || !isTorrentModuleAvailable()) return null;
         return (
           <IndexersStep
             setupStatus={setupStatus}
@@ -366,8 +366,8 @@ export default function Wizard() {
         );
 
       case 'downloadLocation':
-        // Version store : étape absente (composant exclu du build).
-        if (!TORRENT_FEATURES_ENABLED) return null;
+        // Version store : étape absente (composant exclu du build) ; serveur sans module torrent : sautée.
+        if (!TORRENT_FEATURES_ENABLED || !isTorrentModuleAvailable()) return null;
         return (
           <DownloadLocationStep
             setupStatus={setupStatus}
@@ -380,8 +380,8 @@ export default function Wizard() {
         );
 
       case 'sync':
-        // Version store : étape absente (composant exclu du build).
-        if (!TORRENT_FEATURES_ENABLED) return null;
+        // Version store : étape absente (composant exclu du build) ; serveur sans module torrent : sautée.
+        if (!TORRENT_FEATURES_ENABLED || !isTorrentModuleAvailable()) return null;
         return (
           <SyncStep
             focusedButtonIndex={focusedButtonIndex}
