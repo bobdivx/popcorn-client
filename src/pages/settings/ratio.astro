@@ -1,8 +1,16 @@
 ---
-import SettingsLayout from '../../layouts/SettingsLayout.astro';
-import SettingsContent from '../../components/settings/SettingsContent';
+// Fonction retirée de Popcornn (upload vers trackers / outils de ratio) : redirection vers les paramètres.
 ---
 
-<SettingsLayout title="Paramètres - Popcornn">
-  <SettingsContent client:only="preact" />
-</SettingsLayout>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="0; url=/settings/" />
+    <title>Popcornn</title>
+    <script is:inline>location.replace('/settings/');</script>
+  </head>
+  <body style="background:#0c0d10;color:#fff;font-family:system-ui,sans-serif">
+    <p><a href="/settings/" style="color:#f2545b">Paramètres</a></p>
+  </body>
+</html>
