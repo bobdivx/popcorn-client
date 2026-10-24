@@ -21,6 +21,7 @@ import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
 import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -145,6 +146,10 @@ export default function SettingsMenu() {
     return list;
   }, []);
 
+  // Capacités du serveur (module torrent présent ou non) : recalcul des catégories visibles.
+  const serverCapabilities = useServerCapabilities();
+  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
+
   const visibleCategories = useMemo(() => {
     return categories.filter((cat) => {
       // Version store : pas de catégories torrent / indexers / téléchargements.
@@ -164,7 +169,7 @@ export default function SettingsMenu() {
       );
       return visibleItems.length > 0;
     });
-  }, [categories]);
+  }, [categories, torrentModule]);
 
   const currentCategory = visibleCategories.find((c) => c.id === selectedCategory) ?? visibleCategories[0];
   const currentItems = useMemo(() => {
@@ -174,7 +179,7 @@ export default function SettingsMenu() {
         (item.permission ? canAccess(item.permission as any) : true) &&
         !isRouteBlockedInStoreBuild(item.href || '')
     );
-  }, [currentCategory]);
+  }, [currentCategory, torrentModule]);
 
   // Lire ?category= depuis l'URL au montage (ex: lien depuis Compte)
   useEffect(() => {
