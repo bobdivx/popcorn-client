@@ -139,7 +139,7 @@ export default function ConnectivityWarning({
                   <p className="text-[11px] text-[var(--ds-text-secondary)] leading-snug mt-1">{detail}</p>
                   <div className="flex flex-col gap-1 mt-2.5">
                     <a
-                      href="/settings/uploads/seeding-diagnostic"
+                      href="/settings/server/"
                       className="inline-flex min-h-[44px] tv:min-h-[48px] items-center text-sm font-semibold text-[var(--ds-accent-violet)] hover:underline rounded-lg px-1"
                       onClick={() => setMenuOpen(false)}
                       data-focusable
