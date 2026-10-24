@@ -10,8 +10,6 @@ import { useFullscreen } from '../../../streaming/player-shared/hooks/useFullscr
 import { QualityBadges } from './QualityBadges';
 import { isMobileDevice, isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
 import IntroVideoWithHlsPreload from '../../../IntroVideoWithHlsPreload';
-import PrerollPlayer from '../../../streaming/hls-player/components/PrerollPlayer';
-import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcorn-web';
 import { useHlsLoader } from '../../../streaming/hls-player/hooks/useHlsLoader';
 import { usePlayerConfig } from '../../../streaming/player-shared/hooks/usePlayerConfig';
 import PlayerLoadingOverlay, {
@@ -152,8 +150,6 @@ export function VideoPlayerWrapper({
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
   const [showFallbackMessage, setShowFallbackMessage] = useState(false);
-  const [showPreroll, setShowPreroll] = useState(false);
-  const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
   /** Message d’overlay pendant le chargement HLS (ex. « Préparation en cours » pendant retries 503) */
   const [hlsLoadingMessage, setHlsLoadingMessage] = useState<string | null>(null);
   const [localPlayerError, setLocalPlayerError] = useState<string | null>(null);
@@ -440,8 +436,6 @@ export function VideoPlayerWrapper({
 
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
-  const STORAGE_ADS_SESSION = 'popcorn_ads_preroll_session';
-  const STORAGE_ADS_DAY = 'popcorn_ads_preroll_day';
 
   useEffect(() => {
     if (wrapperRef) {
@@ -486,124 +480,6 @@ export function VideoPlayerWrapper({
     lastLoggedErrorRef.current = null;
   }, [infoHash, selectedFile?.path, directStreamUrl, visible, isTvPlayback]);
 
-  useEffect(() => {
-    let mounted = true;
-    getPublicAdsSettings(baseUrl)
-      .then((cfg) => {
-        if (mounted) setAdsConfig(cfg);
-      })
-      .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, [baseUrl]);
-
-  useEffect(() => {
-    if (directStreamUrl || effectiveDirectMode) return; // Lecture directe, pas de préchargement HLS
-    if (!showPreroll || showIntro) return;
-    if (!hlsLoaded || !infoHash || !hlsFilePath || !window.Hls) return;
-
-    const preloadHls = () => {
-      try {
-        const normalizedPath = normalizeStreamPath(hlsFilePath);
-        const encodedPath = encodeURIComponent(normalizedPath);
-        const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
-        const hlsUrl = streamBackendUrl?.trim()
-          ? buildProxyUrl(baseUrl, streamBackendUrl.trim(), path, { info_hash: infoHash })
-          : `${baseUrl}${path}?info_hash=${encodeURIComponent(infoHash)}`;
-
-        const backgroundVideo = document.createElement('video');
-        backgroundVideo.style.display = 'none';
-        backgroundVideo.muted = true;
-        backgroundVideo.playsInline = true;
-        preloadVideoRef.current = backgroundVideo;
-        document.body.appendChild(backgroundVideo);
-
-        const hls = new window.Hls({
-          enableWorker: !(isTVPlatform() || isWebOSTV()),
-          lowLatencyMode: false,
-          backBufferLength: 10,
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
-          maxBufferSize: 60 * 1000 * 1000,
-          startLevel: -1,
-          autoStartLoad: true,
-        });
-
-        hlsPreloadRef.current = hls;
-        hls.loadSource(hlsUrl);
-        hls.attachMedia(backgroundVideo);
-
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-          hls.startLoad();
-        });
-      } catch (e) {
-        console.warn('[VideoPlayerWrapper] Erreur préchargement HLS pré‑roll:', e);
-      }
-    };
-
-    preloadHls();
-
-    return () => {
-      if (hlsPreloadRef.current) {
-        try {
-          hlsPreloadRef.current.stopLoad();
-          hlsPreloadRef.current.destroy();
-        } catch (e) {
-          console.warn('[VideoPlayerWrapper] Erreur nettoyage HLS pré‑roll:', e);
-        }
-        hlsPreloadRef.current = null;
-      }
-      if (preloadVideoRef.current && preloadVideoRef.current.parentNode) {
-        preloadVideoRef.current.parentNode.removeChild(preloadVideoRef.current);
-        preloadVideoRef.current = null;
-      }
-    };
-  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl, effectiveDirectMode, streamBackendUrl]);
-
-  useEffect(() => {
-    if (!adsConfig || !selectedFile || !infoHash) return;
-    if (showIntro) return;
-
-    const hasMedia =
-      (adsConfig.type === 'image' && !!adsConfig.imageUrl) ||
-      (adsConfig.type === 'video' && !!adsConfig.videoUrl) ||
-      (adsConfig.type === 'google' && !!adsConfig.googleAdTagUrl) ||
-      (adsConfig.type === 'google_display' && !!adsConfig.googleAdClient && !!adsConfig.googleAdSlot);
-
-    if (!adsConfig.enabled || !hasMedia) return;
-
-    const today = new Date().toISOString().slice(0, 10);
-    let shouldShow = true;
-    try {
-      if (adsConfig.frequency === 'once_per_session') {
-        shouldShow = sessionStorage.getItem(STORAGE_ADS_SESSION) !== '1';
-      } else if (adsConfig.frequency === 'once_per_day') {
-        shouldShow = localStorage.getItem(STORAGE_ADS_DAY) !== today;
-      }
-    } catch (e) {
-      shouldShow = true;
-    }
-
-    if (shouldShow) {
-      setShowPreroll(true);
-    }
-  }, [adsConfig, selectedFile, infoHash, showIntro]);
-
-  const markPrerollSeen = () => {
-    if (!adsConfig) return;
-    const today = new Date().toISOString().slice(0, 10);
-    try {
-      if (adsConfig.frequency === 'once_per_session') {
-        sessionStorage.setItem(STORAGE_ADS_SESSION, '1');
-      } else if (adsConfig.frequency === 'once_per_day') {
-        localStorage.setItem(STORAGE_ADS_DAY, today);
-      }
-    } catch (e) {
-      // ignore storage errors
-    }
-  };
-
   // Afficher l'intro avec préchargement HLS si nécessaire (pas en mode lecture directe)
   if (!directStreamUrl && !effectiveDirectMode && showIntro && selectedFile && hlsFilePath && infoHash) {
     return (
@@ -626,22 +502,6 @@ export function VideoPlayerWrapper({
         hlsFileName={selectedFile.name}
         onHlsReady={(hlsInstance) => {
           console.log('[VideoPlayerWrapper] HLS préchargé et prêt:', hlsInstance);
-        }}
-      />
-    );
-  }
-
-  if (showPreroll && adsConfig) {
-    return (
-      <PrerollPlayer
-        config={adsConfig}
-        onEnded={() => {
-          markPrerollSeen();
-          setShowPreroll(false);
-        }}
-        onSkip={() => {
-          markPrerollSeen();
-          setShowPreroll(false);
         }}
       />
     );
