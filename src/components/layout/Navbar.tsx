@@ -21,6 +21,7 @@ import ConnectivityWarning from './ConnectivityWarning';
 import { isTVPlatform } from '../../lib/utils/device-detection';
 import ThemeToggle from './ThemeToggle';
 import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -164,10 +165,14 @@ export default function Navbar() {
     return () => window.clearInterval(i);
   }, []);
 
+  // Module torrent : présent dans ce build ET annoncé par le serveur (GET /api/client/capabilities).
+  const serverCapabilities = useServerCapabilities();
+  const torrentUi = TORRENT_FEATURES_ENABLED && (serverCapabilities ? serverCapabilities.features.torrent : true);
+
   // Statut de sync unifié : abonnement au store + démarrage du polling quand l'utilisateur est connecté
   useEffect(() => {
     // Version store : pas de synchronisation d'indexers → pas de polling /api/sync/status.
-    if (!user || !TORRENT_FEATURES_ENABLED) {
+    if (!user || !torrentUi) {
       setStoreState({ status: null, loading: false });
       return undefined;
     }
@@ -177,7 +182,7 @@ export default function Navbar() {
       unsub();
       stopPolling();
     };
-  }, [user]);
+  }, [user, torrentUi]);
 
   const loadUser = async () => {
     if (!serverApi.isAuthenticated()) {
@@ -208,7 +213,7 @@ export default function Navbar() {
     // Plateformes de streaming (Netflix, Disney+…) : catalogue + exclusivités par service.
     { label: language === 'en' ? 'Platforms' : 'Plateformes', href: '/plateformes/', match: 'prefix', icon: LayoutGrid },
     // Demandes de contenu (déclenchent des téléchargements) : absentes de la version store.
-    ...(TORRENT_FEATURES_ENABLED
+    ...(torrentUi
       ? [{ label: t('nav.demandes'), href: '/demandes', match: 'prefix' as const, icon: ListPlus }]
       : []),
   ];
@@ -353,7 +358,7 @@ export default function Navbar() {
                     );
                   })}
                   <div className="border-t border-[var(--ds-border)] my-2" aria-hidden />
-                  {TORRENT_FEATURES_ENABLED && (
+                  {torrentUi && (
                     <a
                       href="/downloads"
                       onClick={() => setMobileMenuOpen(false)}
@@ -409,7 +414,7 @@ export default function Navbar() {
             {user ? (
               <>
                 {/* Recherche (torrents / indexers) — absente de la version store */}
-                {TORRENT_FEATURES_ENABLED && (
+                {torrentUi && (
                   <a
                     href="/search"
                     className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active' : ''}`}
@@ -422,7 +427,7 @@ export default function Navbar() {
                 )}
 
                 {/* Téléchargements — xl+ (dans hamburger sinon) ; absents de la version store */}
-                {TORRENT_FEATURES_ENABLED && (
+                {torrentUi && (
                   <a
                     href="/downloads"
                     className={`hidden xl:inline-flex gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative items-center justify-center transition-all duration-200 hover:scale-110 ${isActivePrefix('/downloads') ? 'bg-glass-active' : ''}`}
