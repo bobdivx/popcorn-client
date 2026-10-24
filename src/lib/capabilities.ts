@@ -49,6 +49,11 @@ export interface ServerCapabilities {
     definitionsRepositoryConfigured: boolean;
     /** Modules installés depuis une URL (aucun par défaut). Absent des anciens caches. */
     installed?: InstalledModuleSummary[];
+    /**
+     * Le serveur sait lancer des modules « process » (binaires signés, `modules.process` présent).
+     * `false` : serveur plus ancien. Absent des anciens caches (inconnu → le client sonde la route).
+     */
+    processHost?: boolean;
   };
   /** Serveur antérieur à la route capabilities (comportement historique). */
   legacy: boolean;
@@ -101,6 +106,7 @@ function legacyCapabilities(backendUrl: string): ServerCapabilities {
       defaultRepository: null,
       definitionsRepositoryConfigured: false,
       installed: [],
+      processHost: false,
     },
     legacy: true,
     backendUrl,
@@ -152,6 +158,7 @@ function parse(json: any, backendUrl: string): ServerCapabilities | null {
       defaultRepository: typeof m.default_repository === 'string' ? m.default_repository : null,
       definitionsRepositoryConfigured: m.definitions_repository_configured === true,
       installed: parseInstalled(m.installed),
+      processHost: Array.isArray(m.process),
     },
     legacy: false,
     backendUrl,

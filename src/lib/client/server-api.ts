@@ -70,7 +70,7 @@ import { requestsMethods } from './server-api/requests.js';
 import { systemMethods } from './server-api/system.js';
 import { aiMethods } from './server-api/ai.js';
 import { platformsMethods } from './server-api/platforms.js';
-import { modulesMethods } from './server-api/modules.js';
+import { modulesMethods, processModulesMethods } from './server-api/modules.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -218,6 +218,20 @@ interface IServerApiClientPublic {
   installModule(request: import('./server-api/modules.js').ModuleInstallRequest): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
   updateModule(id: string): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
   uninstallModule(id: string): Promise<ApiResponse<{ id: string; removed: boolean }>>;
+
+  // Modules « process » (binaires signés supervisés par le serveur, admin)
+  listProcessModules(): Promise<ApiResponse<import('./server-api/modules.js').ProcessModulesList>>;
+  previewProcessModule(request: import('./server-api/modules.js').ProcessPreviewRequest): Promise<ApiResponse<{ preview_id: string; preview: import('./server-api/modules.js').ProcessPreview }>>;
+  installProcessModule(previewId: string, options?: { accept_key?: boolean; approve_key_change?: boolean; reinstall?: boolean }): Promise<ApiResponse<{ job_id: string; module_id: string }>>;
+  getProcessJob(jobId: string): Promise<ApiResponse<import('./server-api/modules.js').ProcessJob>>;
+  processModuleAction(id: string, action: 'start' | 'stop' | 'restart' | 'rollback' | 'update'): Promise<ApiResponse<{ id?: string; version?: string; job_id?: string; module_id?: string }>>;
+  uninstallProcessModule(id: string, removeData?: boolean): Promise<ApiResponse<{ id: string; data_removed: boolean }>>;
+  getProcessModuleLogs(id: string, tail?: number): Promise<ApiResponse<{ id: string; lines: import('./server-api/modules.js').ProcessLogLine[] }>>;
+  getProcessModuleSettings(id: string): Promise<ApiResponse<Record<string, unknown>>>;
+  putProcessModuleSettings(id: string, settings: Record<string, unknown>): Promise<ApiResponse<{ id: string }>>;
+  addTrustKey(publicKey: string, label: string): Promise<ApiResponse<{ key_id: string }>>;
+  listTrustKeys(): Promise<ApiResponse<import('./server-api/modules.js').TrustKeys>>;
+  removeTrustKey(keyId: string): Promise<ApiResponse<{ key_id: string; removed: boolean }>>;
   
   listMediaRequests(params?: { user_id?: string; status?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest[]>>;
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
@@ -567,7 +581,8 @@ Object.assign(ServerApiClient.prototype,
   systemMethods,
   aiMethods,
   platformsMethods,
-  modulesMethods
+  modulesMethods,
+  processModulesMethods
 );
 
 // Instance réelle (utilisée quand isDemoMode() est false)

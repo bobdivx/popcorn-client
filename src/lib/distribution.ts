@@ -142,6 +142,8 @@ const TORRENT_API_PATTERNS: readonly RegExp[] = [
   /^\/api\/client\/torrents(\/|$)/,
   /^\/api\/client\/admin\/indexers(\/|$)/,
   /^\/api\/client\/admin\/modules(\/|$)/,
+  // Modules « process » : admin (/api/client/admin/modules/process, couvert ci-dessus) et proxy.
+  /^\/api\/modules(\/|$)/,
   /^\/api\/client\/stream-torrent(\/|$)/,
   /^\/api\/client\/librqbit(\/|$)/,
   /^\/api\/client\/uploader(\/|$)/,
