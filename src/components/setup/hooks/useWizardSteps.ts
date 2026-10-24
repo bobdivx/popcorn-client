@@ -1,6 +1,7 @@
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 import type { SetupStatus } from '../../../lib/client/types';
-import { IS_STORE_BUILD } from '../../../lib/distribution';
+import { isTorrentModuleAvailable } from '../../../lib/distribution';
+import { loadCapabilities, useServerCapabilities } from '../../../lib/capabilities';
 
 export type WizardStepId =
   | 'serverUrl'
@@ -30,11 +31,14 @@ const STEP_ORDER_SERVER_FIRST: WizardStepId[] = ['serverUrl', 'language', 'auth'
  * Calcule la liste des étapes à afficher pour un statut donné (utilisé par useWizardSteps et getNextStepNumberAfterWelcome).
  * @param hasBackendUrl - quand false (premier lancement), l'étape 1 est Auth puis ServerUrl en étape 2
  */
-/** Étapes torrent (indexers, dossier de téléchargement, sync) : absentes de la version store. */
+/**
+ * Étapes du module torrent (indexers, dossier de téléchargement, sync) : absentes de la version
+ * store et sautées quand le serveur connecté n'a pas le module torrent (capabilities).
+ */
 export const STORE_EXCLUDED_STEPS: readonly WizardStepId[] = ['indexers', 'downloadLocation', 'sync'];
 
 export function isWizardStepAvailable(id: WizardStepId): boolean {
-  return !IS_STORE_BUILD || !STORE_EXCLUDED_STEPS.includes(id);
+  return !STORE_EXCLUDED_STEPS.includes(id) || isTorrentModuleAvailable();
 }
 
 function computeSteps(
@@ -51,7 +55,7 @@ function computeSteps(
     wizardStartedWithNeedsSetup,
     hasBackendUrl
   );
-  if (!IS_STORE_BUILD) return steps;
+  if (STORE_EXCLUDED_STEPS.every((id) => isWizardStepAvailable(id))) return steps;
   let n = 1;
   return steps
     .filter((step) => isWizardStepAvailable(step.id))
@@ -138,9 +142,17 @@ export function useWizardSteps(
   getNextStepNumber: (stepId: WizardStepId) => number | null;
   getPreviousStepNumber: (stepId: WizardStepId) => number | null;
 } {
+  // Capacités du serveur : rechargées quand le serveur devient joignable (étape Serveur).
+  const capabilities = useServerCapabilities();
+  const backendReachable = setupStatus?.backendReachable;
+  useEffect(() => {
+    if (backendReachable !== false) void loadCapabilities({ force: true });
+  }, [backendReachable, hasBackendUrl]);
+  const torrentModule = capabilities ? capabilities.features.torrent : null;
+
   const steps = useMemo(
     () => computeSteps(setupStatus, forceShowStepIds, forceAllSteps, wizardStartedWithNeedsSetup, hasBackendUrl),
-    [setupStatus, forceShowStepIds, forceAllSteps, wizardStartedWithNeedsSetup, hasBackendUrl]
+    [setupStatus, forceShowStepIds, forceAllSteps, wizardStartedWithNeedsSetup, hasBackendUrl, torrentModule]
   );
 
   const totalSteps = steps.length;
