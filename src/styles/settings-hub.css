@@ -239,8 +239,14 @@ body:has(.settings-page) {
 }
 
 .hub-tile-cell {
+  /* La tuile remplit la cellule : toutes les tuiles d'une rangée ont la même hauteur. */
+  display: flex;
   min-width: 0;
   animation: hub-tile-in 200ms ease both;
+}
+
+.hub-tile-cell > .hub-tile {
+  flex: 1 1 auto;
 }
 
 .hub-grid > :nth-child(1) { animation-delay: 0ms; }
@@ -377,11 +383,13 @@ body:has(.settings-page) {
 }
 
 .hub-tile-title {
+  /* Titre toujours complet : il passe à la ligne (mots longs coupés proprement), jamais d'ellipse. */
+  display: block;
   max-width: 100%;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
   font-size: 15px;
   font-weight: 500;
   line-height: 1.25;
@@ -393,8 +401,11 @@ body:has(.settings-page) {
   max-width: 100%;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.3;
@@ -406,13 +417,18 @@ body:has(.settings-page) {
 .hub-tile-status--disabled { color: #71717a; }
 
 .hub-tile-meta {
+  /* Source / version (« Intégré au serveur · 1.2.3 ») : jusqu'à 2 lignes au lieu d'une ellipse. */
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  font-size: 11px;
   line-height: 1.3;
   color: #71717a;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .hub-tile-reserve {
@@ -571,20 +587,18 @@ body:has(.settings-page) {
 }
 
 .hub-modal-desc {
+  /* Description complète : le corps de la modale défile, rien n'est coupé. */
   margin: 4px 0 0;
-  overflow: hidden;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
   font-size: 14px;
   line-height: 1.4;
   color: #a1a1aa;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
 }
 
-@media (min-width: 768px) {
-  .hub-modal-desc {
-    -webkit-line-clamp: 6;
-  }
+.hub-modal-title {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .hub-modal-x {
@@ -804,6 +818,19 @@ html[data-tv-platform="true"] .hub-tile-cell {
 }
 
 .modules-hub .hub-tile-hint { color: rgba(244, 241, 236, 0.6); }
+
+/* Téléphone (2 colonnes étroites) : capitales moins espacées pour que les titres tiennent. */
+@media (max-width: 639px) {
+  .modules-hub .hub-tile-title {
+    font-size: 14px;
+    letter-spacing: 0.03em;
+  }
+
+  .hub-tile {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
 .modules-hub .hub-tile-meta { color: rgba(244, 241, 236, 0.45); }
 
 .modules-hub .hub-dot,
