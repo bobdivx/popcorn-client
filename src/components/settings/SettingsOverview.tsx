@@ -58,8 +58,7 @@ function isVisible(item: TileDef): boolean {
 export default function SettingsOverview() {
   const { t, language } = useI18n();
   const serverCapabilities = useServerCapabilities();
-  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
-  const visibleItems = useMemo(() => TILES.filter(isVisible), [torrentModule]);
+  const visibleItems = useMemo(() => TILES.filter(isVisible), [serverCapabilities]);
   const [serverStatus, setServerStatus] = useState<HubStatus | null>(null);
   const [serverMeta, setServerMeta] = useState<string | undefined>();
   const [accountStatus, setAccountStatus] = useState<HubStatus | null>(null);

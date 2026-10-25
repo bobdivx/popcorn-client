@@ -8,6 +8,7 @@ import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
+import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
 
 const BASE_URL = '/settings/playback/';
 
@@ -345,7 +346,8 @@ export default function PlaybackSettingsPanel() {
     <>
       <div className="hub-grid" data-tv-list role="list">
         {qualityCard}
-        {aiCard}
+        {/* IA désactivée côté serveur (capacité annoncée à false) : pas de carte. */}
+        {!isRouteBlockedInStoreBuild('/settings/ai') && aiCard}
         {playbackItems.map((item) => (
           <SettingsNavCard
             key={item.id}

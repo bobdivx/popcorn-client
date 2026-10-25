@@ -409,7 +409,6 @@ export default function SettingsSidebar() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const serverCapabilities = useServerCapabilities();
-  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
 
   const visibleItems = useMemo(
     () => {
@@ -426,7 +425,7 @@ export default function SettingsSidebar() {
       }
       return items;
     },
-    [mounted, torrentModule]
+    [mounted, serverCapabilities]
   );
 
   return (

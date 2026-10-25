@@ -148,7 +148,6 @@ export default function SettingsMenu() {
 
   // Capacités du serveur (module torrent présent ou non) : recalcul des catégories visibles.
   const serverCapabilities = useServerCapabilities();
-  const torrentModule = serverCapabilities ? serverCapabilities.features.torrent : null;
 
   const visibleCategories = useMemo(() => {
     return categories.filter((cat) => {
@@ -170,7 +169,7 @@ export default function SettingsMenu() {
       );
       return visibleItems.length > 0;
     });
-  }, [categories, torrentModule]);
+  }, [categories, serverCapabilities]);
 
   const currentCategory = visibleCategories.find((c) => c.id === selectedCategory) ?? visibleCategories[0];
   const currentItems = useMemo(() => {
@@ -180,7 +179,7 @@ export default function SettingsMenu() {
         (item.permission ? canAccess(item.permission as any) : true) &&
         !isRouteBlockedInStoreBuild(item.href || '')
     );
-  }, [currentCategory, torrentModule]);
+  }, [currentCategory, serverCapabilities]);
 
   // Lire ?category= depuis l'URL au montage (ex: lien depuis Compte)
   useEffect(() => {

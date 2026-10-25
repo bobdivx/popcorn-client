@@ -13,11 +13,12 @@ import { exitDemoMode, isDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { serverApi } from '../../lib/client/server-api';
 import { runAllFromCloud } from '../../lib/sync/index.js';
+import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
 
 export default function AccountPanel() {
   const { t } = useI18n();
   const showLocalUsers = canAccess('settings.local_users' as any);
-  const showFriends = canAccess('settings.friends' as any);
+  const showFriends = canAccess('settings.friends' as any) && !isRouteBlockedInStoreBuild('/settings/friends');
   const demoMode = typeof window !== 'undefined' && isDemoMode();
   const hasCloudToken = typeof window !== 'undefined' && !!TokenManager.getCloudAccessToken();
   const [recoverLoading, setRecoverLoading] = useState(false);

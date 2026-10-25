@@ -2,6 +2,7 @@ import { Clapperboard, Film, FolderOpen, FolderPlus, LayoutGrid, Users } from 'l
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { SettingsNavCard } from './SettingsNavCard';
+import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
 
 type LibraryLinkItem = {
   id: string;
@@ -68,7 +69,10 @@ export default function LibrarySubMenuPanel() {
   const { t } = useI18n();
 
   const visible = LIBRARY_LINK_ITEMS.filter(
-    (item) => !item.permission || canAccess(item.permission as any)
+    (item) =>
+      (!item.permission || canAccess(item.permission as any)) &&
+      // Partage désactivé côté serveur (capacité annoncée à false) : pas de lien Amis.
+      !isRouteBlockedInStoreBuild(item.href)
   );
 
   if (visible.length === 0) return null;

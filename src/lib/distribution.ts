@@ -11,7 +11,7 @@
  * Sans la variable (web, webOS, desktop, APK GitHub), rien ne change.
  */
 
-import { isCapabilityAvailable } from './capabilities';
+import { getCachedCapabilities, isCapabilityAvailable } from './capabilities';
 
 export type Distribution = 'default' | 'play';
 
@@ -110,20 +110,77 @@ export const TORRENT_MODULE_ROUTE_PREFIXES: readonly string[] = [
   '/settings/discovery',
 ];
 
+/** Routes qui exigent le module Indexers (recherche / catalogue / synchro), même avec le moteur torrent. */
+export const INDEXERS_MODULE_ROUTE_PREFIXES: readonly string[] = [
+  '/search',
+  '/settings/indexers',
+  '/settings/indexer-definitions',
+  '/settings/sync',
+];
+
+/** Routes des demandes de contenu (voir `isRequestsAvailable`). */
+export const REQUESTS_ROUTE_PREFIXES: readonly string[] = ['/demandes', '/requests', '/settings/requests-admin'];
+
+/**
+ * Fonctions optionnelles (futurs modules) : leurs pages ne sont masquées que si le serveur annonce
+ * EXPLICITEMENT la capacité à `false` (clé absente / serveur ancien → affichées, comportement actuel).
+ */
+export const OPTIONAL_FEATURE_ROUTE_PREFIXES: ReadonlyArray<{ features: readonly string[]; prefixes: readonly string[] }> = [
+  { features: ['sharing', 'friends'], prefixes: ['/settings/friends'] },
+  { features: ['ai'], prefixes: ['/settings/ai'] },
+  { features: ['webos_deployment', 'webos'], prefixes: ['/settings/webos-deployment'] },
+  { features: ['car_lab'], prefixes: ['/car/lab'] },
+];
+
+/** Vrai si le serveur connecté annonce explicitement l'une de ces capacités à `false` (et aucune à `true`). */
+export function isFeatureExplicitlyDisabled(features: readonly string[]): boolean {
+  const caps = getCachedCapabilities();
+  if (!caps) return false;
+  const values = features.map((f) => caps.features[f]).filter((v) => typeof v === 'boolean');
+  return values.length > 0 && values.every((v) => v === false);
+}
+
 function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   const p = (pathname || '/').replace(/\/+$/, '') || '/';
   return prefixes.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
 }
 
 /**
+ * Capacité manquante pour une route (ex. `torrent`, `indexers`, `requests`, `ai`), ou `null` si la route
+ * est utilisable. Ne tient compte que des capacités annoncées par le serveur (pas de la version store).
+ */
+export function missingCapabilityForRoute(pathname: string): string | null {
+  if (IS_STORE_BUILD) return null;
+  if (!isTorrentModuleAvailable() && matchesPrefix(pathname, TORRENT_MODULE_ROUTE_PREFIXES)) {
+    return matchesPrefix(pathname, REQUESTS_ROUTE_PREFIXES) ? 'requests' : 'torrent';
+  }
+  if (!isIndexersModuleAvailable() && matchesPrefix(pathname, INDEXERS_MODULE_ROUTE_PREFIXES)) return 'indexers';
+  if (!isRequestsAvailable() && matchesPrefix(pathname, REQUESTS_ROUTE_PREFIXES)) return 'requests';
+  for (const entry of OPTIONAL_FEATURE_ROUTE_PREFIXES) {
+    if (matchesPrefix(pathname, entry.prefixes) && isFeatureExplicitlyDisabled(entry.features)) {
+      return entry.features[0];
+    }
+  }
+  return null;
+}
+
+/**
  * Vrai si la route ne doit pas être proposée : fonction retirée, version store, ou module
- * torrent absent du serveur connecté (nom historique conservé pour les appelants).
+ * absent du serveur connecté (nom historique conservé pour les appelants).
  */
 export function isRouteBlockedInStoreBuild(pathname: string): boolean {
   if (matchesPrefix(pathname, RETIRED_ROUTE_PREFIXES)) return true;
   if (IS_STORE_BUILD) return matchesPrefix(pathname, STORE_BLOCKED_ROUTE_PREFIXES);
-  if (!isTorrentModuleAvailable()) return matchesPrefix(pathname, TORRENT_MODULE_ROUTE_PREFIXES);
-  return false;
+  return missingCapabilityForRoute(pathname) !== null;
+}
+
+/**
+ * Catalogue torrent (rangées « populaires », « nouveaux films »…) consultable : il est servi par le
+ * module Indexers (`/api/torrents/list`). Sans lui, l'accueil / Films / Séries montrent la bibliothèque.
+ * Capacités inconnues / serveur ancien → vrai (comportement historique).
+ */
+export function isTorrentCatalogAvailable(): boolean {
+  return TORRENT_FEATURES_ENABLED && isIndexersModuleAvailable();
 }
 
 /** Catégories de paramètres masquées dans la version store. */
