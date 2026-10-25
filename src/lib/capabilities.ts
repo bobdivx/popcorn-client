@@ -41,7 +41,13 @@ export interface ServerCapabilities {
   apiVersion: number;
   serverVersion: string | null;
   edition: 'core' | 'full' | 'legacy';
+  /**
+   * Toutes les capacités annoncées par le serveur (`features`), y compris celles que le client ne
+   * connaît pas encore : les clés booléennes inconnues sont conservées telles quelles.
+   */
   features: CapabilityFeatures;
+  /** Features Cargo compilées dans le binaire (`compiled_features`). Absent des anciens serveurs / caches. */
+  compiledFeatures?: string[];
   modules: {
     host: boolean;
     specVersion: number | null;
@@ -146,12 +152,19 @@ function parse(json: any, backendUrl: string): ServerCapabilities | null {
     uploads: false,
     ratio_tools: false,
   };
+  // Capacités supplémentaires annoncées par le serveur (partage, IA…) : conservées pour l'affichage.
+  for (const [k, v] of Object.entries(f)) {
+    if (typeof v === 'boolean' && !(k in features)) features[k] = v;
+  }
   const m = (d.modules && typeof d.modules === 'object' ? d.modules : {}) as Record<string, unknown>;
   return {
     apiVersion: typeof d.api_version === 'number' ? d.api_version : 1,
     serverVersion: typeof d.server_version === 'string' ? d.server_version : null,
     edition: d.edition === 'core' ? 'core' : 'full',
     features,
+    compiledFeatures: Array.isArray(d.compiled_features)
+      ? d.compiled_features.filter((x: unknown): x is string => typeof x === 'string')
+      : undefined,
     modules: {
       host: m.host === true,
       specVersion: typeof m.spec_version === 'number' ? m.spec_version : null,
