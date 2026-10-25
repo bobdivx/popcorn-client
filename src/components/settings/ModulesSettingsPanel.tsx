@@ -36,11 +36,21 @@ import {
   processTx,
   useProcessModules,
 } from './modules/ProcessModules';
+import {
+  ServerFeatureDetail,
+  buildServerFeatures,
+  featureSource,
+  featureStatus,
+  featureStatusLabel,
+  featureTileIcon,
+  featureTx,
+} from './modules/ServerFeatures';
 
 /**
  * Paramètres > Modules — même lanceur de tuiles que les autres pages du hub (HubTile / HubAddTile /
- * HubModal) : une tuile par module installé, une tuile « + Ajouter un module », puis les tuiles
- * « Clés de confiance » et « Serveur connecté ». Le détail s'ouvre en modale.
+ * HubModal) : une tuile par module installé, une tuile « + Ajouter un module », une tuile par
+ * fonction annoncée par le serveur (capacités, dynamiques), puis « Clés de confiance » et
+ * « Serveur connecté ». Le détail s'ouvre en modale.
  *
  * Le lecteur Popcornn fonctionne seul (bibliothèque locale, Jellyfin, transcodage). Les fonctions
  * optionnelles sont des modules : aucun n'est installé ni proposé par défaut, l'administrateur colle
@@ -62,12 +72,6 @@ const TEXT = {
     version: 'Version',
     unknown: 'Serveur injoignable : état des modules inconnu.',
     unknownShort: 'Injoignable',
-    builtinTitle: 'Fonctions intégrées au serveur',
-    builtinNone: 'Aucune fonction optionnelle compilée dans ce serveur.',
-    torrent: 'Téléchargement torrent',
-    indexers: 'Indexers',
-    sync: 'Synchronisation des indexers',
-    hiddenInBuild: 'non disponible dans cette version de l’application',
     refresh: 'Actualiser',
     addTitle: 'Ajouter un module',
     addDesc: 'Choisis le type de module, puis colle l’URL de son dépôt.',
@@ -129,12 +133,6 @@ const TEXT = {
     version: 'Version',
     unknown: 'Server unreachable: module status unknown.',
     unknownShort: 'Unreachable',
-    builtinTitle: 'Built into the server',
-    builtinNone: 'No optional feature compiled into this server.',
-    torrent: 'Torrent downloads',
-    indexers: 'Indexers',
-    sync: 'Indexer sync',
-    hiddenInBuild: 'not available in this version of the app',
     refresh: 'Refresh',
     addTitle: 'Add a module',
     addDesc: 'Pick the module type, then paste the URL of its repository.',
@@ -191,6 +189,7 @@ type View =
   | { type: 'process'; id: string }
   | { type: 'trust' }
   | { type: 'server' }
+  | { type: 'feature'; key: string }
   | null;
 
 const MODAL_CLASS = 'modules-hub-overlay';
@@ -333,12 +332,6 @@ export default function ModulesSettingsPanel() {
     }
   };
 
-  const builtin: Array<'torrent' | 'indexers' | 'sync'> = [];
-  if (caps) {
-    if (caps.features.torrent) builtin.push('torrent');
-    if (caps.features.indexers) builtin.push('indexers');
-    if (caps.features.sync) builtin.push('sync');
-  }
   const editionLabel = !caps
     ? '—'
     : caps.legacy || caps.edition === 'legacy'
@@ -356,6 +349,10 @@ export default function ModulesSettingsPanel() {
   const processChoice = pm.ready && !unsupported;
   const effectiveAddType: 'data' | 'process' = processChoice ? addType : pm.ready && unsupported ? 'process' : 'data';
   const canAdd = !unsupported || pm.ready;
+
+  const ftx = featureTx(language);
+  const features = caps ? buildServerFeatures(caps, modules, processModules, language) : [];
+  const feature = view?.type === 'feature' ? features.find((f) => f.key === view.key) ?? null : null;
 
   const dataModule = view?.type === 'data' ? modules?.find((m) => m.id === view.id) ?? null : null;
   const processModule = view?.type === 'process' ? processModules.find((m) => m.id === view.id) ?? null : null;
@@ -444,6 +441,29 @@ export default function ModulesSettingsPanel() {
           </HubGrid>
         )}
         {empty && !unsupported && !listError && <p class="hub-empty">{tx.none}</p>}
+      </section>
+
+      <section aria-labelledby="modules-features-title" class="mt-8 tv:mt-12 grid gap-4 tv:gap-6">
+        {sectionTitle('modules-features-title', ftx.section)}
+        {!caps ? (
+          <p class="hub-empty">{tx.unknown}</p>
+        ) : features.length === 0 ? (
+          <p class="hub-empty">{ftx.none}</p>
+        ) : (
+          <HubGrid>
+            {features.map((f) => (
+              <HubTile
+                key={`feature:${f.key}`}
+                title={f.name}
+                icon={featureTileIcon(f.icon)}
+                status={featureStatus(f.state)}
+                statusLabel={featureStatusLabel(f.state, ftx)}
+                meta={featureSource(f, ftx, caps.serverVersion)}
+                onClick={() => open({ type: 'feature', key: f.key })}
+              />
+            ))}
+          </HubGrid>
+        )}
       </section>
 
       <section aria-labelledby="modules-security-title" class="mt-8 tv:mt-12 grid gap-4 tv:gap-6">
@@ -709,6 +729,28 @@ export default function ModulesSettingsPanel() {
         </HubModal>
       )}
 
+      {/* Fonction du serveur */}
+      {feature && (
+        <HubModal
+          open
+          title={feature.name}
+          description={featureSource(feature, ftx, caps?.serverVersion ?? null)}
+          onClose={close}
+          size="lg"
+          className={MODAL_CLASS}
+        >
+          <ServerFeatureDetail
+            feature={feature}
+            tx={ftx}
+            stateLabel={featureStatusLabel(feature.state, ftx)}
+            serverVersion={caps?.serverVersion ?? null}
+            torrentEnabled={TORRENT_FEATURES_ENABLED}
+            onOpenModule={(p) => open(p.type === 'process' ? { type: 'process', id: p.id } : { type: 'data', id: p.id })}
+            onAddModule={canAdd ? () => open({ type: 'add' }) : undefined}
+          />
+        </HubModal>
+      )}
+
       {/* Serveur connecté */}
       {view?.type === 'server' && (
         <HubModal open title={tx.server} onClose={close} size="lg" className={MODAL_CLASS}>
@@ -717,12 +759,6 @@ export default function ModulesSettingsPanel() {
               rows={[
                 [tx.edition, editionLabel],
                 !!caps.serverVersion && [tx.version, caps.serverVersion],
-                [
-                  tx.builtinTitle,
-                  builtin.length === 0
-                    ? tx.builtinNone
-                    : builtin.map((id) => tx[id]).join(', ') + (TORRENT_FEATURES_ENABLED ? '' : ` (${tx.hiddenInBuild})`),
-                ],
                 pm.ready && !!pm.list?.platform && [ptx.platform, pm.list.platform],
               ]}
             />
