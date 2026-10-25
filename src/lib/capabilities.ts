@@ -239,7 +239,12 @@ export function loadCapabilities(options: { force?: boolean } = {}): Promise<Ser
   if (!backendUrl) return Promise.resolve(null);
   const cached = getCachedCapabilities();
   if (!options.force && cached && Date.now() - cached.fetchedAt < TTL_MS) return Promise.resolve(cached);
-  if (inflight) return inflight;
+  if (inflight) {
+    // Rechargement forcé (après une action sur un module) : la requête en cours a pu partir avant
+    // le changement → on relance une requête fraîche une fois celle-ci terminée.
+    if (!options.force) return inflight;
+    return inflight.then(() => loadCapabilities({ force: true }));
+  }
   inflight = (async () => {
     try {
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -269,12 +274,44 @@ export function loadCapabilities(options: { force?: boolean } = {}): Promise<Ser
   return inflight;
 }
 
+/** Revalidation au retour sur l'onglet / l'appli si le cache a plus de 30 s (module activé ailleurs). */
+const REVALIDATE_ON_FOCUS_MS = 30 * 1000;
+let focusRevalidationInstalled = false;
+
+function installFocusRevalidation(): void {
+  if (focusRevalidationInstalled || typeof window === 'undefined') return;
+  focusRevalidationInstalled = true;
+  const revalidate = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    const cached = getCachedCapabilities();
+    if (cached && Date.now() - cached.fetchedAt < REVALIDATE_ON_FOCUS_MS) return;
+    void loadCapabilities({ force: true });
+  };
+  try {
+    document.addEventListener('visibilitychange', revalidate);
+    window.addEventListener('focus', revalidate);
+  } catch {
+    // ignore
+  }
+}
+
 /** Abonnement aux changements (retourne la fonction de désabonnement). */
 export function subscribeCapabilities(listener: (caps: ServerCapabilities | null) => void): () => void {
   if (typeof window === 'undefined') return () => {};
+  installFocusRevalidation();
   const handler = (e: Event) => listener((e as CustomEvent<ServerCapabilities | null>).detail ?? null);
+  // Autre onglet : module activé / désinstallé depuis Paramètres > Modules → mise à jour immédiate ici.
+  const storageHandler = (e: StorageEvent) => {
+    if (e.key !== STORAGE_KEY) return;
+    memory = null;
+    listener(getCachedCapabilities());
+  };
   window.addEventListener(EVENT_NAME, handler);
-  return () => window.removeEventListener(EVENT_NAME, handler);
+  window.addEventListener('storage', storageHandler);
+  return () => {
+    window.removeEventListener(EVENT_NAME, handler);
+    window.removeEventListener('storage', storageHandler);
+  };
 }
 
 /** Hook : capacités du serveur courant (chargées au montage, mises à jour en direct). */

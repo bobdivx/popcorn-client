@@ -401,6 +401,11 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
           }
           await refresh();
           await loadCapabilities({ force: true });
+          // Le module installé démarre ensuite : relecture différée de ses fonctions.
+          setTimeout(() => {
+            void refresh();
+            void loadCapabilities({ force: true });
+          }, 3000);
           return;
         }
       } else if (++misses >= 5) {
@@ -825,6 +830,14 @@ export function ProcessModuleDetail({
     setNotice({ kind: 'ok', text });
     await pm.refresh();
     await loadCapabilities({ force: true });
+    // Démarrage asynchrone : le module annonce ses fonctions une fois « running ». Seconde lecture
+    // différée pour que menus et pages reflètent le nouvel état sans recharger.
+    if (action === 'start' || action === 'restart' || action === 'rollback' || action === 'update') {
+      setTimeout(() => {
+        void pm.refresh();
+        void loadCapabilities({ force: true });
+      }, 3000);
+    }
   };
 
   const onUninstall = async () => {
