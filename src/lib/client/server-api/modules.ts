@@ -24,6 +24,8 @@ export interface InstalledModule {
   data_type?: string | null;
   definitions_count?: number | null;
   native_features: string[];
+  /** Activé par l'administrateur (absent des serveurs antérieurs aux routes enable / disable). */
+  enabled?: boolean;
   active: boolean;
   installed_at: string;
   updated_at: string;
@@ -39,6 +41,15 @@ export interface ModuleInstallResult {
   module: InstalledModule;
   replaced: boolean;
   warnings: string[];
+}
+
+/** Réponse de POST /api/client/admin/modules/{id}/enable | disable. */
+export interface ToggledModule {
+  id: string;
+  kind: string;
+  enabled: boolean;
+  /** Module de données : vue complète. */
+  module?: InstalledModule;
 }
 
 export interface ModuleInstallRequest {
@@ -75,13 +86,34 @@ export const modulesMethods = {
     });
   },
 
+  /**
+   * Désinstalle un module (données ou « process » sur les serveurs récents).
+   * `removeData` : supprime aussi les données du module (`?remove_data=true`, module « process »).
+   */
   async uninstallModule(
     this: ServerApiClientAccess,
-    id: string
+    id: string,
+    removeData = false
   ): Promise<ApiResponse<{ id: string; removed: boolean }>> {
-    return this.backendRequest<{ id: string; removed: boolean }>(`${BASE}/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
+    return this.backendRequest<{ id: string; removed: boolean }>(
+      `${BASE}/${encodeURIComponent(id)}${removeData ? '?remove_data=true' : ''}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  /**
+   * Active / désactive un module (données ou « process ») sans le désinstaller.
+   * Serveur ancien : 404 / 405 (voir `isRouteUnsupported`).
+   */
+  async setModuleEnabled(
+    this: ServerApiClientAccess,
+    id: string,
+    enabled: boolean
+  ): Promise<ApiResponse<ToggledModule>> {
+    return this.backendRequest<ToggledModule>(
+      `${BASE}/${encodeURIComponent(id)}/${enabled ? 'enable' : 'disable'}`,
+      { method: 'POST' }
+    );
   },
 };
 

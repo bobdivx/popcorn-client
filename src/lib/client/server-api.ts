@@ -217,7 +217,8 @@ interface IServerApiClientPublic {
   listModules(): Promise<ApiResponse<import('./server-api/modules.js').ModulesList>>;
   installModule(request: import('./server-api/modules.js').ModuleInstallRequest): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
   updateModule(id: string): Promise<ApiResponse<import('./server-api/modules.js').ModuleInstallResult>>;
-  uninstallModule(id: string): Promise<ApiResponse<{ id: string; removed: boolean }>>;
+  uninstallModule(id: string, removeData?: boolean): Promise<ApiResponse<{ id: string; removed: boolean }>>;
+  setModuleEnabled(id: string, enabled: boolean): Promise<ApiResponse<import('./server-api/modules.js').ToggledModule>>;
 
   // Modules « process » (binaires signés supervisés par le serveur, admin)
   listProcessModules(): Promise<ApiResponse<import('./server-api/modules.js').ProcessModulesList>>;

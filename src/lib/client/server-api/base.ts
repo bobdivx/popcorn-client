@@ -12,6 +12,7 @@ import { isBlockedApiUrl } from '../../distribution.js';
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
 import { TokenManager } from '../storage.js';
 import { markAllSwrStale, swrPolicyFor, swrRequest } from './swrCache.js';
+import { moduleNotInstalledCapability } from '../../module-errors.js';
 
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
@@ -430,6 +431,12 @@ export class ServerApiClientBase {
           errorMessage =
             'Échec du test qBittorrent (hôte, port, utilisateur ou mot de passe incorrect).';
           errorCode = 'InvalidCredentials';
+        }
+        // Fonction devenue module, absente / inactive sur ce serveur (404 `module_not_installed`) :
+        // code dédié pour que les pages affichent un message clair au lieu de l'erreur brute.
+        const missingModule = moduleNotInstalledCapability(data);
+        if (missingModule !== null) {
+          return { success: false, error: 'ModuleNotInstalled', message: errorMessage, details: missingModule };
         }
         return { success: false, error: errorCode, message: errorMessage };
       }
