@@ -1,22 +1,19 @@
 import {
   Monitor,
   Palette,
-  LayoutGrid,
-  Globe,
   UserCircle,
   Play,
   Library,
   Wrench,
   LayoutDashboard,
   Puzzle,
-  Download,
   Tv,
 } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
 import { isTVPlatform } from '../../lib/utils/device-detection';
-import { IS_STORE_BUILD, isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { IS_STORE_BUILD, isHubSettingsCategory, isModuleSettingsRoute, isRouteBlockedInStoreBuild } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type NavItem = {
@@ -88,36 +85,12 @@ const NAV_ITEMS: NavItem[] = [
     pathPrefix: '/settings/playback',
   },
   {
-    id: 'content',
-    labelKey: 'settingsMenu.category.content',
-    href: '/settings/content/',
-    icon: LayoutGrid,
-    permissions: ['settings.indexers', 'settings.sync', 'settings.server'],
-    pathPrefix: '/settings/content',
-  },
-  {
-    id: 'downloads',
-    labelKey: 'settingsMenu.category.downloads',
-    href: '/settings/downloads/',
-    icon: Download,
-    permission: 'settings.server',
-    pathPrefix: '/settings/downloads',
-  },
-  {
     id: 'library',
     labelKey: 'settingsMenu.category.library',
     href: '/settings/library/',
     icon: Library,
     permissions: ['settings.server', 'settings.friends'],
     pathPrefix: '/settings/library',
-  },
-  {
-    id: 'discovery',
-    labelKey: 'settingsMenu.category.discovery',
-    href: '/settings/discovery/',
-    icon: Globe,
-    permission: 'settings.server',
-    pathPrefix: '/settings/discovery',
   },
   {
     id: 'account',
@@ -140,6 +113,8 @@ function isItemActive(item: NavItem, pathname: string, search: string): boolean 
   if (item.id === 'overview') {
     return path === '/settings' && !new URLSearchParams(search).get('category');
   }
+  // Réglages d'un module (indexers, téléchargements, découverte…) : rattachés à Modules.
+  if (item.id === 'modules' && isModuleSettingsRoute(path)) return true;
   if (item.pathPrefix && path.startsWith(item.pathPrefix)) {
     if (item.pathPrefix === '/settings/server') return path === '/settings/server' || path.startsWith('/settings/server/');
     if (item.pathPrefix === '/settings/uploads') return path === '/settings/uploads' || path.startsWith('/settings/uploads/');
@@ -441,7 +416,7 @@ export default function SettingsSidebar() {
       const items = (mounted ? NAV_ITEMS.filter(isItemVisible) : NAV_ITEMS).filter(
         // Version store : pas de catégories torrent / indexers / téléchargements.
         (item) =>
-          isSettingsCategoryAvailable(item.id) &&
+          isHubSettingsCategory(item.id) &&
           !isRouteBlockedInStoreBuild(item.href) &&
           // Version store : pas de système de modules.
           !(IS_STORE_BUILD && item.id === 'modules')
