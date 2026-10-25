@@ -6,10 +6,7 @@ import {
   Tv,
   Palette,
   Play,
-  LayoutGrid,
-  Download,
   Library,
-  Globe,
   Settings,
 } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -20,7 +17,7 @@ import { TokenManager } from '../../lib/client/storage';
 import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import { isBackendUrlSameAsClientUrl, getBackendUrl } from '../../lib/backend-config';
 import { HubGrid, HubTile, type HubStatus } from './hub/HubTile';
-import { IS_STORE_BUILD, isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { IS_STORE_BUILD, isHubSettingsCategory, isRouteBlockedInStoreBuild } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type TileDef = {
@@ -44,16 +41,14 @@ const TILES: TileDef[] = [
   { id: 'webos', titleKey: 'settingsMenu.webosDeployment', hintKey: 'settingsMenu.hub.hint.webos', href: '/settings/webos-deployment/', icon: Tv, permission: 'settings.server' },
   { id: 'interface', titleKey: 'settingsMenu.category.interface', hintKey: 'settingsMenu.hub.hint.interface', href: '/settings/ui-preferences/', icon: Palette, permission: 'settings.ui_preferences' },
   { id: 'playback', titleKey: 'settingsMenu.category.playback', hintKey: 'settingsMenu.hub.hint.playback', href: '/settings/playback/', icon: Play, permission: 'settings.ui_preferences' },
-  { id: 'content', titleKey: 'settingsMenu.category.content', hintKey: 'settingsMenu.hub.hint.content', href: '/settings/content/', icon: LayoutGrid, permissions: ['settings.indexers', 'settings.sync', 'settings.server'] },
-  { id: 'downloads', titleKey: 'settingsMenu.category.downloads', hintKey: 'settingsMenu.hub.hint.downloads', href: '/settings/downloads/', icon: Download, permission: 'settings.server' },
   { id: 'library', titleKey: 'settingsMenu.category.library', hintKey: 'settingsMenu.hub.hint.library', href: '/settings/library/', icon: Library, permissions: ['settings.server', 'settings.friends'] },
-  { id: 'discovery', titleKey: 'settingsMenu.category.discovery', hintKey: 'settingsMenu.hub.hint.discovery', href: '/settings/discovery/', icon: Globe, permission: 'settings.server' },
   { id: 'account', titleKey: 'settingsMenu.category.account', hintKey: 'settingsMenu.hub.hint.account', href: '/settings/account/', icon: UserCircle, permission: 'settings.profile' },
 ];
 
 function isVisible(item: TileDef): boolean {
-  // Fonctions retirées, version store ou module torrent absent du serveur connecté.
-  if (!isSettingsCategoryAvailable(item.id) || isRouteBlockedInStoreBuild(item.href)) return false;
+  // Fonctions retirées, version store, module absent du serveur connecté, ou réglages d'un module
+  // (indexers, téléchargements, découverte) : accessibles depuis la tuile Modules, pas ici.
+  if (!isHubSettingsCategory(item.id) || isRouteBlockedInStoreBuild(item.href)) return false;
   if (IS_STORE_BUILD && item.id === 'modules') return false;
   if (item.permission) return canAccess(item.permission as any);
   if (item.permissions?.length) return item.permissions.some((p) => canAccess(p as any));
