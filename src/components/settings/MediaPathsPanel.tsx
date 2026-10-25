@@ -152,10 +152,10 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
             <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-1">
               {t('settingsMenu.mediaPathsPanel.filmsPath')}
             </label>
-            <code className="block text-sm text-[var(--ds-text-primary)] truncate bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
+            <code className="block text-sm text-[var(--ds-text-primary)] break-words [overflow-wrap:anywhere] bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
               {data.films_path || 'media/films (défaut)'}
             </code>
-            <p className="ds-text-tertiary text-xs mt-1 truncate">{data.films_root}</p>
+            <p className="ds-text-tertiary text-xs mt-1 break-words [overflow-wrap:anywhere]">{data.films_root}</p>
           </div>
           <button
             type="button"
@@ -172,10 +172,10 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
                 <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-1">
                   {t('settingsMenu.mediaPathsPanel.seriesPath')}
                 </label>
-                <code className="block text-sm text-[var(--ds-text-primary)] truncate bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
+                <code className="block text-sm text-[var(--ds-text-primary)] break-words [overflow-wrap:anywhere] bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
                   {data.series_path || 'media/series (défaut)'}
                 </code>
-                <p className="ds-text-tertiary text-xs mt-1 truncate">{data.series_root}</p>
+                <p className="ds-text-tertiary text-xs mt-1 break-words [overflow-wrap:anywhere]">{data.series_root}</p>
               </div>
               <button
                 type="button"
@@ -206,7 +206,7 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
         noPadding
       >
         <div className="flex flex-col max-h-[70vh]">
-          <div className="px-4 py-2 text-sm text-gray-500 font-mono truncate border-b border-white/5">
+          <div className="px-4 py-2 text-sm text-gray-500 font-mono break-words [overflow-wrap:anywhere] border-b border-white/5">
             {browsePath || '/'}
           </div>
           <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">

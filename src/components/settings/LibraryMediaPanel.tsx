@@ -600,7 +600,7 @@ export default function LibraryMediaPanel() {
 
   if (loading) {
     return (
-      <div class="p-4 text-gray-400">
+      <div class="py-4 text-gray-400">
         <span className="inline-flex items-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" />
           {t('settingsMenu.libraryMediaPanel.loading')}
@@ -610,7 +610,7 @@ export default function LibraryMediaPanel() {
   }
 
   return (
-    <div class="p-4 space-y-4">
+    <div class="space-y-4">
       <p className="text-gray-400 text-sm">{t('settingsMenu.libraryMediaPanel.intro')}</p>
 
       <div class="flex flex-wrap items-center gap-4">
