@@ -73,6 +73,18 @@ body:has(.settings-page) {
   max-width: 80rem;
 }
 
+/*
+ * Gabarit commun des pages de réglages (SettingsLayout > .settings-content-area > .ds-container) :
+ * la zone de contenu porte déjà les marges latérales, le haut et le bas. Le `.ds-container
+ * px-3 sm:px-6 py-4 sm:py-6` de chaque page les doublait : fort retrait à gauche sur téléphone et
+ * espace vide avant le titre (« settings-spacer »). Le titre s'aligne ainsi sur celui des hubs.
+ */
+.settings-content-area > .ds-container {
+  margin-left: 0;
+  margin-right: auto;
+  padding: 0;
+}
+
 .settings-page .ds-title-page {
   font-family: Outfit, system-ui, sans-serif;
   font-size: 24px;
