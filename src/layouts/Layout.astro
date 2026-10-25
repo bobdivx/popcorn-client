@@ -162,6 +162,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       })();
     </script>
     <meta name="description" content="Popcornn - Client léger pour serveur Popcornn" />
+    <!-- Application privée (pas la vitrine) : ne pas indexer. robots.txt reste ouvert pour que les moteurs voient ce noindex. -->
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <!-- Android TV / Google TV : viewport CSS 1920×1080 comme webOS (no-op ailleurs) -->
     <TvViewportScript />
