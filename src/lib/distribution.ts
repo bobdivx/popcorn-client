@@ -132,6 +132,28 @@ export function isSettingsCategoryAvailable(categoryId: string): boolean {
 }
 
 /**
+ * Catégories dont les réglages appartiennent à un module (moteur torrent, indexers + synchro,
+ * découverte / demandes) : pas de tuile de premier niveau dans le hub ni dans les menus.
+ * Leurs pages restent des sous-pages ouvertes depuis Paramètres > Modules (détail de la fonction).
+ */
+export const MODULE_OWNED_SETTINGS_CATEGORIES: ReadonlySet<string> = new Set(['content', 'downloads', 'discovery']);
+
+/** Catégorie affichée au premier niveau des paramètres (cœur, disponible dans ce build / serveur). */
+export function isHubSettingsCategory(categoryId: string): boolean {
+  return isSettingsCategoryAvailable(categoryId) && !MODULE_OWNED_SETTINGS_CATEGORIES.has(categoryId);
+}
+
+/** Pages de réglages propres à un module (torrent / indexers / synchro / découverte / demandes). */
+const MODULE_SETTINGS_ROUTE_PREFIXES: readonly string[] = TORRENT_MODULE_ROUTE_PREFIXES.filter((p) =>
+  p.startsWith('/settings/'),
+);
+
+/** Vrai pour une page de réglages d'un module : son « Retour » mène à Paramètres > Modules. */
+export function isModuleSettingsRoute(pathname: string): boolean {
+  return matchesPrefix(pathname, MODULE_SETTINGS_ROUTE_PREFIXES);
+}
+
+/**
  * Endpoints serveur liés aux torrents / indexers / téléchargements.
  * La version store ne les appelle jamais (voir src/lib/store/network-guard.ts).
  */
