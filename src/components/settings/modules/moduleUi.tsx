@@ -55,7 +55,23 @@ export type IconName =
   | 'trash'
   | 'log'
   | 'settings'
-  | 'warning';
+  | 'warning'
+  | 'film'
+  | 'folder'
+  | 'link'
+  | 'compass'
+  | 'inbox'
+  | 'convert'
+  | 'magnet'
+  | 'stream'
+  | 'list'
+  | 'sync'
+  | 'users'
+  | 'sparkle'
+  | 'car'
+  | 'tv'
+  | 'external'
+  | 'arrow';
 
 export function Icon({ name, size = 18, strokeWidth = 1.6 }: { name: IconName; size?: number; strokeWidth?: number }) {
   const common = {
@@ -173,6 +189,114 @@ export function Icon({ name, size = 18, strokeWidth = 1.6 }: { name: IconName; s
           <path d="M12 10v4M12 17.5v.01" />
         </svg>
       );
+    case 'film':
+      return (
+        <svg {...common}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4" />
+        </svg>
+      );
+    case 'folder':
+      return (
+        <svg {...common}>
+          <path d="M4 7a1 1 0 0 1 1-1h4l2 2h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+        </svg>
+      );
+    case 'link':
+      return (
+        <svg {...common}>
+          <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+          <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+        </svg>
+      );
+    case 'compass':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M15 9l-2 4-4 2 2-4z" />
+        </svg>
+      );
+    case 'inbox':
+      return (
+        <svg {...common}>
+          <path d="M4 13l2.5-7h11L20 13v6H4z" />
+          <path d="M4 13h5l1 2h4l1-2h5" />
+        </svg>
+      );
+    case 'convert':
+      return (
+        <svg {...common}>
+          <path d="M4 8h13l-3-3M20 16H7l3 3" />
+        </svg>
+      );
+    case 'magnet':
+      return (
+        <svg {...common}>
+          <path d="M6 4v8a6 6 0 0 0 12 0V4" />
+          <path d="M6 8h4M14 8h4M10 4v8a2 2 0 0 0 4 0V4" />
+        </svg>
+      );
+    case 'stream':
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="12" rx="2" />
+          <path d="M10 8.5l4 2.5-4 2.5zM8 21h8" />
+        </svg>
+      );
+    case 'list':
+      return (
+        <svg {...common}>
+          <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+        </svg>
+      );
+    case 'sync':
+      return (
+        <svg {...common}>
+          <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5" />
+          <path d="M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5" />
+        </svg>
+      );
+    case 'users':
+      return (
+        <svg {...common}>
+          <circle cx="9" cy="9" r="3" />
+          <path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 6.5a3 3 0 0 1 0 5M17.5 14.5a5.5 5.5 0 0 1 3 4.5" />
+        </svg>
+      );
+    case 'sparkle':
+      return (
+        <svg {...common}>
+          <path d="M12 4l1.8 4.7L18.5 10.5l-4.7 1.8L12 17l-1.8-4.7L5.5 10.5l4.7-1.8z" />
+          <path d="M18 16v4M16 18h4" />
+        </svg>
+      );
+    case 'car':
+      return (
+        <svg {...common}>
+          <path d="M5 16V12l2-5h10l2 5v4M3 12h18" />
+          <rect x="3" y="12" width="18" height="5" rx="1" />
+          <path d="M7 17v2M17 17v2" />
+        </svg>
+      );
+    case 'tv':
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="18" height="12" rx="2" />
+          <path d="M8 21h8M12 17v4" />
+        </svg>
+      );
+    case 'external':
+      return (
+        <svg {...common}>
+          <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+        </svg>
+      );
+    case 'arrow':
+      return (
+        <svg {...common}>
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      );
     default:
       return (
         <svg {...common}>
@@ -184,7 +308,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.6 }: { name: IconName; s
 }
 
 /** Icônes au format attendu par `HubTile` (`icon={…}` reçoit `strokeWidth`). */
-const tileIcon = (name: IconName) => {
+export const tileIcon = (name: IconName) => {
   const TileIcon = ({ strokeWidth }: { strokeWidth?: number }) => <Icon name={name} size={24} strokeWidth={strokeWidth} />;
   return TileIcon;
 };
