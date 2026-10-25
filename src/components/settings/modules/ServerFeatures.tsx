@@ -1,6 +1,7 @@
 import type { ServerCapabilities } from '../../../lib/capabilities';
 import type { InstalledModule, ProcessModule } from '../../../lib/client/server-api/modules';
 import type { HubStatus } from '../hub/HubTile';
+import { isRouteBlockedInStoreBuild } from '../../../lib/distribution';
 import { C, FactList, Icon, type IconName, primaryBtn, primaryStyle, secondaryBtn, secondaryStyle, tileIcon } from './moduleUi';
 
 /**
@@ -12,13 +13,20 @@ import { C, FactList, Icon, type IconName, primaryBtn, primaryStyle, secondaryBt
 
 type Lang = 'fr' | 'en';
 type Label = { name: string; desc: string };
+/** Lien secondaire de la modale (réglage voisin propre à la même fonction). */
+type ExtraLink = { href: string; fr: string; en: string };
 
 type FeatureMeta = {
   icon: IconName;
   fr: Label;
   en: Label;
-  /** Page de réglages associée. */
+  /**
+   * Page (ou section, via `?sub=`) des réglages de CETTE fonction. Absente : la fonction n'a pas de
+   * réglage côté client (la modale le dit). Mapping documenté dans docs/SETTINGS_MODULES.md.
+   */
   href?: string;
+  /** Réglages voisins de la même fonction, affichés en boutons secondaires. */
+  links?: ExtraLink[];
   /** Feature Cargo optionnelle dont dépend la capacité (absente du binaire → « Non installé »). */
   compiled?: string;
   /** Fonction torrent : absente des builds sans torrent (TORRENT_FEATURES_ENABLED). */
@@ -45,14 +53,17 @@ const META: Record<string, FeatureMeta> = {
     en: { name: 'Library sources', desc: 'Local folders, NAS shares and other media sources.' },
   },
   jellyfin: {
+    // Pas de page Jellyfin dans le client (pointait à tort vers « Dossiers externes ») :
+    // la connexion se règle dans le module qui fournit la fonction.
     icon: 'server',
-    href: '/settings/library-sources',
     fr: { name: 'Jellyfin', desc: 'Import et lecture de la bibliothèque d’un serveur Jellyfin.' },
     en: { name: 'Jellyfin', desc: 'Imports and plays the library of a Jellyfin server.' },
   },
   discover: {
     icon: 'compass',
-    href: '/settings/discovery',
+    // Clé et langue TMDB (page du cœur, présente dans tous les builds) ; rangées en lien secondaire.
+    href: '/settings/tmdb',
+    links: [{ href: '/settings/discover-sliders', fr: 'Rangées de découverte', en: 'Discover rows' }],
     fr: { name: 'Découverte', desc: 'Pages de découverte TMDB : tendances, sorties, recommandations.' },
     en: { name: 'Discover', desc: 'TMDB discovery pages: trending, new releases, recommendations.' },
   },
@@ -64,13 +75,17 @@ const META: Record<string, FeatureMeta> = {
   },
   transcoding: {
     icon: 'convert',
-    href: '/settings/playback',
+    // Section « Transcodage » de Maintenance (nombre de transcodages simultanés), pas la page Lecture.
+    href: '/settings/maintenance?sub=transcodingConfig',
+    links: [{ href: '/settings/maintenance?sub=transcodeJobs', fr: 'Transcodages en cours', en: 'Running transcodes' }],
     fr: { name: 'Transcodage', desc: 'Conversion à la volée (ffmpeg) pour les appareils qui ne lisent pas le fichier d’origine.' },
     en: { name: 'Transcoding', desc: 'On-the-fly conversion (ffmpeg) for devices that cannot play the original file.' },
   },
   torrent: {
     icon: 'magnet',
-    href: '/settings/downloads',
+    // Client torrent intégré (débits, port d'écoute, DHT, logs).
+    href: '/settings/librqbit',
+    links: [{ href: '/settings/downloads', fr: 'Téléchargements', en: 'Downloads' }],
     compiled: 'torrent',
     torrent: true,
     fr: { name: 'Téléchargement torrent', desc: 'Moteur torrent intégré : ajout, suivi et gestion des téléchargements.' },
@@ -78,7 +93,8 @@ const META: Record<string, FeatureMeta> = {
   },
   stream_torrent: {
     icon: 'stream',
-    href: '/settings/downloads',
+    // Réglage « Télécharger en entier (streaming) » de la page Lecture.
+    href: '/settings/playback?sub=streamingDownloadFull',
     compiled: 'torrent',
     torrent: true,
     fr: { name: 'Lecture pendant le téléchargement', desc: 'Lecture d’un torrent avant la fin de son téléchargement.' },
@@ -94,8 +110,9 @@ const META: Record<string, FeatureMeta> = {
   },
   sync: {
     icon: 'sync',
-    // Hub Indexers & synchro : planification, catégories, import ZIP (ex-tuile « Contenu »).
-    href: '/settings/content',
+    // Section « Sync torrents » (planification) du hub Indexers & synchro ; catégories en lien secondaire.
+    href: '/settings/content?sub=sync',
+    links: [{ href: '/settings/sync', fr: 'Catégories synchronisées', en: 'Synced categories' }],
     compiled: 'indexers',
     torrent: true,
     fr: { name: 'Synchronisation des indexers', desc: 'Synchronisation périodique des catalogues des indexers.' },
@@ -159,6 +176,7 @@ export const FEATURE_TEXT = {
     key: 'Capacité',
     version: 'Version',
     openSettings: 'Ouvrir les réglages',
+    noSettings: 'Pas de réglage dans l’application pour cette fonction : elle se configure dans le module qui la fournit ou sur le serveur.',
     manageModule: (name: string) => `Gérer le module ${name}`,
     addModule: 'Ajouter un module',
     genericDesc: (key: string) => `Capacité « ${key} » annoncée par le serveur.`,
@@ -180,6 +198,7 @@ export const FEATURE_TEXT = {
     key: 'Capability',
     version: 'Version',
     openSettings: 'Open settings',
+    noSettings: 'This feature has no settings in the app: it is configured in the module that provides it or on the server.',
     manageModule: (name: string) => `Manage the ${name} module`,
     addModule: 'Add a module',
     genericDesc: (key: string) => `Capability “${key}” reported by the server.`,
@@ -204,6 +223,8 @@ export type ServerFeature = {
   desc: string;
   icon: IconName;
   href?: string;
+  /** Réglages voisins (libellé déjà traduit). */
+  links: { href: string; label: string }[];
   torrent: boolean;
   /** Annoncée par `features` (intégrée au serveur). */
   builtin: boolean;
@@ -211,6 +232,11 @@ export type ServerFeature = {
   providers: FeatureProvider[];
   state: FeatureState;
 };
+
+/** Page de réglages proposée dans ce build / avec ce serveur (le `?sub=` est ignoré pour le test). */
+function isSettingsHrefAvailable(href: string): boolean {
+  return !isRouteBlockedInStoreBuild(href.split(/[?#]/)[0]);
+}
 
 /** Libellé lisible d'une clé inconnue (`car_lab` → « Car lab »). */
 function humanize(key: string): string {
@@ -281,7 +307,10 @@ export function buildServerFeatures(
       name: label?.name ?? humanize(key),
       desc: label?.desc ?? tx.genericDesc(key),
       icon: meta?.icon ?? 'module',
-      href: meta?.href,
+      href: meta?.href && isSettingsHrefAvailable(meta.href) ? meta.href : undefined,
+      links: (meta?.links ?? [])
+        .filter((l) => isSettingsHrefAvailable(l.href))
+        .map((l) => ({ href: l.href, label: l[lang] })),
       torrent: meta?.torrent === true,
       builtin,
       providers: provs,
@@ -355,6 +384,11 @@ export function ServerFeatureDetail({
           {stateHint}
         </p>
       )}
+      {!f.href && f.links.length === 0 && f.state === 'active' && (
+        <p class="text-sm tv:text-lg" style={{ color: C.muted }}>
+          {tx.noSettings}
+        </p>
+      )}
       {hiddenInBuild && (
         <p class="text-sm tv:text-lg" style={{ color: C.muted }}>
           {tx.hiddenInBuild}
@@ -367,6 +401,14 @@ export function ServerFeatureDetail({
             {tx.openSettings}
           </a>
         )}
+        {f.state === 'active' &&
+          !hiddenInBuild &&
+          f.links.map((l) => (
+            <a key={l.href} href={l.href} data-focusable class={secondaryBtn} style={secondaryStyle}>
+              <Icon name="settings" />
+              {l.label}
+            </a>
+          ))}
         {f.providers.map((p) => (
           <button
             key={`${p.type}:${p.id}`}
