@@ -30,6 +30,7 @@ import {
   IS_STORE_BUILD,
   isIndexersModuleAvailable,
   isRequestsAvailable,
+  isTorrentCatalogAvailable,
   isTorrentModuleAvailable,
 } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
@@ -339,11 +340,17 @@ function FullDashboard() {
   );
 }
 
-/** Version store (PUBLIC_DISTRIBUTION=play) : bibliothèque du serveur uniquement, sans catalogue torrent. */
+/**
+ * Version store (PUBLIC_DISTRIBUTION=play) ou serveur sans module Indexers (mode « media center ») :
+ * bibliothèque du serveur uniquement, sans catalogue torrent (`/api/torrents/list` absent → l'accueil
+ * complet n'afficherait qu'une erreur). Capacités inconnues / serveur ancien → accueil complet.
+ */
 export default function Dashboard() {
+  const capabilities = useServerCapabilities();
+  const libraryOnly = useMemo(() => IS_STORE_BUILD || !isTorrentCatalogAvailable(), [capabilities]);
   useEffect(() => {
-    // Version store : StoreLibraryHome gère son propre chargement → ne pas retenir l'écran unique.
-    if (IS_STORE_BUILD) markHomeReady();
-  }, []);
-  return IS_STORE_BUILD ? <StoreLibraryHome filter="all" /> : <FullDashboard />;
+    // Bibliothèque seule : StoreLibraryHome gère son propre chargement → ne pas retenir l'écran unique.
+    if (libraryOnly) markHomeReady();
+  }, [libraryOnly]);
+  return libraryOnly ? <StoreLibraryHome filter="all" /> : <FullDashboard />;
 }

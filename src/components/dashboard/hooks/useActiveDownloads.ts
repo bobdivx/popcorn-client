@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { clientApi } from '../../../lib/client/api';
 import type { ContentItem, ClientTorrentStats } from '../../../lib/client/types';
+import { isTorrentModuleAvailable } from '../../../lib/distribution';
 
 export function useActiveDownloads() {
   const [activeItems, setActiveItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadActiveTorrents = useCallback(async () => {
+    // Moteur torrent absent du serveur (media center) : pas d'appel (404 toutes les 5 s sinon).
+    if (!isTorrentModuleAvailable()) {
+      setActiveItems([]);
+      setLoading(false);
+      return;
+    }
     try {
       const torrents = await clientApi.listTorrentsEnriched();
       // ClientTorrentStats.progress est une fraction 0–1

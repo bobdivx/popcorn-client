@@ -29,7 +29,8 @@ import {
   uniqueByMedia,
   byPopularity,
 } from './utils/browsePriority';
-import { IS_STORE_BUILD } from '../../lib/distribution';
+import { IS_STORE_BUILD, isTorrentCatalogAvailable } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 import StoreLibraryHome from './StoreLibraryHome';
 
 const SECTION_LIMIT = 48;
@@ -157,5 +158,8 @@ function FullSeriesDashboard() {
 
 /** Version store (PUBLIC_DISTRIBUTION=play) : bibliothèque du serveur uniquement, sans catalogue torrent. */
 export default function SeriesDashboard() {
-  return IS_STORE_BUILD ? <StoreLibraryHome filter="series" /> : <FullSeriesDashboard />;
+  // Serveur sans module Indexers (media center) : bibliothèque seule, comme la version store.
+  const capabilities = useServerCapabilities();
+  const libraryOnly = useMemo(() => IS_STORE_BUILD || !isTorrentCatalogAvailable(), [capabilities]);
+  return libraryOnly ? <StoreLibraryHome filter="series" /> : <FullSeriesDashboard />;
 }
