@@ -20,7 +20,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
-import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { isHubSettingsCategory, isRouteBlockedInStoreBuild, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
@@ -152,8 +152,9 @@ export default function SettingsMenu() {
 
   const visibleCategories = useMemo(() => {
     return categories.filter((cat) => {
-      // Version store : pas de catégories torrent / indexers / téléchargements.
-      if (!isSettingsCategoryAvailable(cat.id)) return false;
+      // Version store / modules : pas de catégories torrent / indexers / téléchargements / découverte
+      // (réglages des modules accessibles depuis Paramètres > Modules).
+      if (!isHubSettingsCategory(cat.id)) return false;
       if (cat.inlineContent) {
         if (cat.inlinePermissions?.length) {
           return cat.inlinePermissions.some((p) => canAccess(p as any));
