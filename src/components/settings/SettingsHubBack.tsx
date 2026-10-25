@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { isModuleSettingsRoute } from '../../lib/distribution';
 
-/** Page parente. Un ?sub= revient à la même page sans ce paramètre, sinon un niveau de chemin. */
+/**
+ * Page parente. Un ?sub= revient à la même page sans ce paramètre ; une page de réglages d'un module
+ * revient à Paramètres > Modules ; sinon un niveau de chemin.
+ */
 function parentSettingsHref(pathname: string, search = ''): string | null {
   const path = pathname.replace(/\/$/, '') || '/';
   if (path !== '/settings' && !path.startsWith('/settings/')) return null;
@@ -13,6 +17,8 @@ function parentSettingsHref(pathname: string, search = ''): string | null {
     return q ? `${base}?${q}` : base;
   }
   if (path === '/settings') return null;
+  // Réglages d'un module (indexers, téléchargements, découverte…) : ouverts depuis Paramètres > Modules.
+  if (path.split('/').filter(Boolean).length === 2 && isModuleSettingsRoute(path)) return '/settings/modules/';
   const parts = path.split('/').filter(Boolean);
   parts.pop();
   if (parts.length === 0) return null;
