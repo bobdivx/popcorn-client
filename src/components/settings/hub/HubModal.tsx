@@ -11,6 +11,8 @@ type HubModalProps = {
   size?: 'lg' | 'xl';
   children: ComponentChildren;
   footer?: ComponentChildren;
+  /** Classe ajoutée au voile (thème propre à une page, ex. `modules-hub-overlay`). */
+  className?: string;
 };
 
 export function HubModal({
@@ -21,6 +23,7 @@ export function HubModal({
   size = 'xl',
   children,
   footer,
+  className,
 }: HubModalProps) {
   const { t } = useI18n();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -77,7 +80,7 @@ export function HubModal({
 
   return createPortal(
     <div
-      class="hub-overlay"
+      class={className ? `hub-overlay ${className}` : 'hub-overlay'}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
