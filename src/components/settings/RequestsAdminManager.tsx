@@ -4,6 +4,8 @@ import type { MediaRequest } from '../../lib/client/server-api/requests';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { CheckCircle, XCircle, Clock, Film, Tv } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import ModuleMissingNotice from '../ui/ModuleMissingNotice';
+import { isModuleNotInstalled, missingModuleCapability } from '../../lib/module-errors';
 
 const STATUS_PENDING = 1;
 const STATUS_APPROVED = 2;
@@ -14,6 +16,8 @@ export default function RequestsAdminManager() {
   const [requests, setRequests] = useState<MediaRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Module Demandes absent du serveur (`404 module_not_installed`) : message dédié, pas d'erreur brute. */
+  const [missingModule, setMissingModule] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('pending');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [actioning, setActioning] = useState<string | null>(null);
@@ -22,12 +26,14 @@ export default function RequestsAdminManager() {
     try {
       setLoading(true);
       setError(null);
+      setMissingModule(null);
       const status = filter === 'all' ? undefined : filter;
       const res = await serverApi.listMediaRequests({ status, limit: 100 });
       if (res.success && res.data) {
         setRequests(res.data);
       } else {
-        setError(res.message || t('requests.errorLoad'));
+        if (isModuleNotInstalled(res)) setMissingModule(missingModuleCapability(res, 'requests'));
+        else setError(res.message || t('requests.errorLoad'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('requests.errorLoad'));
@@ -50,7 +56,8 @@ export default function RequestsAdminManager() {
       if (res.success) {
         await loadRequests();
       } else {
-        setError(res.message || t('requests.errorLoad'));
+        if (isModuleNotInstalled(res)) setMissingModule(missingModuleCapability(res, 'requests'));
+        else setError(res.message || t('requests.errorLoad'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('requests.errorLoad'));
@@ -69,7 +76,8 @@ export default function RequestsAdminManager() {
       if (res.success) {
         await loadRequests();
       } else {
-        setError(res.message || t('requests.errorLoad'));
+        if (isModuleNotInstalled(res)) setMissingModule(missingModuleCapability(res, 'requests'));
+        else setError(res.message || t('requests.errorLoad'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('requests.errorLoad'));
@@ -113,7 +121,9 @@ export default function RequestsAdminManager() {
         ))}
       </div>
 
-      {error && (
+      {missingModule && <ModuleMissingNotice capability={missingModule} />}
+
+      {!missingModule && error && (
         <div class="alert alert-error flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 overflow-hidden">
           <span class="break-words flex-1 min-w-0">{error}</span>
           <button class="btn btn-sm btn-ghost flex-shrink-0" onClick={loadRequests}>
@@ -122,11 +132,11 @@ export default function RequestsAdminManager() {
         </div>
       )}
 
-      {filter === 'pending' && pendingRequests.length === 0 && (
+      {!missingModule && filter === 'pending' && pendingRequests.length === 0 && (
         <p class="text-gray-400 break-words">{t('requestsAdmin.noPendingRequests')}</p>
       )}
 
-      {requests.length === 0 && filter !== 'pending' && (
+      {!missingModule && requests.length === 0 && filter !== 'pending' && (
         <p class="text-gray-400 break-words">{t('requests.noRequests')}</p>
       )}
 

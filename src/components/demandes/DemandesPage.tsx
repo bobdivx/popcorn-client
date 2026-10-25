@@ -13,6 +13,9 @@ import { pickHeroItems } from '../dashboard/utils/browsePriority';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import { useTmdbHighlights } from '../dashboard/hooks/useTmdbHighlights';
 import { highlightTitles } from '../dashboard/utils/highlights';
+import { isRequestsEnabled, useServerCapabilities } from '../../lib/capabilities';
+import { isModuleNotInstalled, missingModuleCapability } from '../../lib/module-errors';
+import ModuleMissingNotice from '../ui/ModuleMissingNotice';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -89,6 +92,9 @@ export default function DemandesPage() {
   const [libraryItems, setLibraryItems] = useState<LibraryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Capacité manquante renvoyée par le serveur (`404 module_not_installed`). */
+  const [missingModule, setMissingModule] = useState<string | null>(null);
+  const caps = useServerCapabilities();
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ContentItem[]>([]);
   const [searching, setSearching] = useState(false);
@@ -144,6 +150,9 @@ export default function DemandesPage() {
         }
         if (myRequestsRes.success && myRequestsRes.data) {
           setMyRequests(myRequestsRes.data);
+          setMissingModule(null);
+        } else if (isModuleNotInstalled(myRequestsRes)) {
+          setMissingModule(missingModuleCapability(myRequestsRes, 'requests'));
         }
         if (libraryRes.success && libraryRes.data) {
           setLibraryItems(libraryRes.data as LibraryRow[]);
@@ -258,6 +267,16 @@ export default function DemandesPage() {
     }
     window.location.href = `/discover?tmdbId=${tmdbId}&type=${type}&from=demandes`;
   };
+
+  // Module Demandes absent / inactif (capacités ou 404 module_not_installed) : message clair.
+  if (!isRequestsEnabled(caps) || missingModule) {
+    return (
+      <div className="min-h-[50vh] px-4 pt-8 sm:pt-12 tv:pt-16">
+        <PageHeader title={t('nav.demandes')} />
+        <ModuleMissingNotice capability={missingModule && missingModule !== 'requests' ? missingModule : 'requests'} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

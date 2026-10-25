@@ -4,6 +4,8 @@ import type { MediaRequest } from '../../lib/client/server-api/requests';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Clock, CheckCircle, XCircle, Film, Tv, Trash2 } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import ModuleMissingNotice from '../ui/ModuleMissingNotice';
+import { isModuleNotInstalled, missingModuleCapability } from '../../lib/module-errors';
 import { FocusableCard } from '../ui/FocusableCard';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 
@@ -163,12 +165,15 @@ export default function MyRequests() {
   const [requests, setRequests] = useState<RequestWithTmdb[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Module Demandes absent du serveur (`404 module_not_installed`) : message dédié, pas d'erreur brute. */
+  const [missingModule, setMissingModule] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const loadRequests = async () => {
     try {
       setLoading(true);
       setError(null);
+      setMissingModule(null);
       const res = await serverApi.listMediaRequests({ limit: 100 });
       if (res.success && res.data) {
         // Charger les infos TMDB pour chaque demande
@@ -201,7 +206,8 @@ export default function MyRequests() {
         );
         setRequests(requestsWithTmdb);
       } else {
-        setError(res.message || t('requests.errorLoad'));
+        if (isModuleNotInstalled(res)) setMissingModule(missingModuleCapability(res, 'requests'));
+        else setError(res.message || t('requests.errorLoad'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('requests.errorLoad'));
@@ -279,7 +285,9 @@ export default function MyRequests() {
           <p>{t('requests.myRequestsExplanation')}</p>
         </div>
 
-        {error && (
+        {missingModule && <ModuleMissingNotice capability={missingModule} />}
+
+        {!missingModule && error && (
           <div class="alert alert-error mb-6">
             <span>{error}</span>
             <button class="btn btn-sm btn-ghost" onClick={loadRequests}>
@@ -288,7 +296,7 @@ export default function MyRequests() {
           </div>
         )}
 
-        {!error && requests.length === 0 && (
+        {!error && !missingModule && requests.length === 0 && (
           <div class="glass-panel rounded-xl p-8 text-center">
             <p class="text-gray-400 text-lg mb-4">{t('requests.noRequests')}</p>
             <a href="/dashboard" class="btn btn-primary">

@@ -17,6 +17,9 @@ import {
 import { serverApi } from '../../lib/client/server-api';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { Modal } from '../ui/Modal';
+import ModuleMissingNotice from '../ui/ModuleMissingNotice';
+import { isSharingEnabled, useServerCapabilities } from '../../lib/capabilities';
+import { isModuleNotInstalled, missingModuleCapability } from '../../lib/module-errors';
 
 type ShareType = 'none' | 'all' | 'selected';
 
@@ -40,6 +43,10 @@ export default function FriendsManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Module « Partage » (serveur modulaire) : absent / désactivé → message clair + lien Modules.
+  const caps = useServerCapabilities();
+  const sharingEnabled = isSharingEnabled(caps);
+  const [missingModule, setMissingModule] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -128,7 +135,9 @@ export default function FriendsManager() {
     if (payloadFriends.length === 0) return;
 
     try {
-      await serverApi.syncFriendShares({ replace_all: true, friends: payloadFriends });
+      const res = await serverApi.syncFriendShares({ replace_all: true, friends: payloadFriends });
+      if (isModuleNotInstalled(res)) setMissingModule(missingModuleCapability(res, 'sharing'));
+      else if (res?.success) setMissingModule(null);
     } catch {
       // non bloquant
     }
@@ -271,6 +280,10 @@ export default function FriendsManager() {
     }
   };
 
+  if (!sharingEnabled) {
+    return <ModuleMissingNotice capability="sharing" />;
+  }
+
   if (!hasCloudToken) {
     return (
       <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
@@ -289,6 +302,7 @@ export default function FriendsManager() {
 
   return (
     <div class="space-y-6">
+      {missingModule && <ModuleMissingNotice capability={missingModule} compact />}
       <div>
         <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2">
           <Users class="w-6 h-6" />

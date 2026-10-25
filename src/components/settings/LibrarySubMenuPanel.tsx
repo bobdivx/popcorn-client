@@ -3,6 +3,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { SettingsNavCard } from './SettingsNavCard';
 import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 type LibraryLinkItem = {
   id: string;
@@ -67,6 +68,8 @@ const LIBRARY_LINK_ITEMS: LibraryLinkItem[] = [
 
 export default function LibrarySubMenuPanel() {
   const { t } = useI18n();
+  // Re-rendu dès que les capacités changent (module partage activé / désactivé) : lien Amis à jour.
+  useServerCapabilities();
 
   const visible = LIBRARY_LINK_ITEMS.filter(
     (item) =>
