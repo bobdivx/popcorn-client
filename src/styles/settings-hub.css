@@ -88,6 +88,32 @@ body:has(.settings-page) {
   }
 }
 
+/*
+ * Titres de page (DsPageHeader, hub) : capitales espacées du thème éditorial. Ils passent à la ligne
+ * au lieu d'être tronqués (« DOSSIERS EXTE… ») ; sur téléphone, taille et interlettrage réduits.
+ */
+.settings-page h1.ds-title-page,
+.settings-page h1.hub-title {
+  margin: 0;
+  max-width: 100%;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+@media (max-width: 639px) {
+  html[data-editorial] .app-main .settings-page h1.ds-title-page,
+  html[data-editorial] .app-main .settings-page h1.hub-title {
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    line-height: 1.25;
+  }
+}
+
 .settings-page h1.ds-title-page + p,
 .settings-page .ds-title-page + .ds-text-secondary {
   margin-top: 8px;

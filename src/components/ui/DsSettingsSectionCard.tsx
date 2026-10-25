@@ -69,7 +69,7 @@ export function DsSettingsSectionCard({
             <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
           </span>
         </div>
-        <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">
+        <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 break-words">
           {title}
         </h2>
         {statusBadge ? (

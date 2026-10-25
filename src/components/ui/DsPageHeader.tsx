@@ -12,7 +12,7 @@ export default function DsPageHeader({ titleKey, subtitleKey, children }: DsPage
   return (
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
       <div className="min-w-0 flex-1">
-        <h1 className="ds-title-page truncate text-xl sm:text-2xl md:text-3xl">{t(titleKey)}</h1>
+        <h1 className="ds-title-page break-words text-xl sm:text-2xl md:text-3xl">{t(titleKey)}</h1>
         {subtitleKey && (
           <p className="ds-text-secondary mt-0.5 sm:mt-1 text-sm sm:text-base">{t(subtitleKey)}</p>
         )}
