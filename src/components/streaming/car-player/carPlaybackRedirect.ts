@@ -1,4 +1,5 @@
 import { isCarPlayerMode, isTeslaBrowser, stampTeslaBrowserHints } from '../../../lib/utils/device-detection';
+import { isCarModuleAvailable } from '../../../lib/distribution';
 
 export interface CarPlaybackTarget {
   slug?: string | null;
@@ -9,9 +10,10 @@ export interface CarPlaybackTarget {
   fileIndex?: number | null;
 }
 
-/** True si la lecture doit passer par `/car` (Tesla / mode voiture). */
+/** True si la lecture doit passer par `/car` (Tesla / mode voiture, module Voiture actif). */
 export function shouldUseCarPlayback(): boolean {
   stampTeslaBrowserHints();
+  if (!isCarModuleAvailable()) return false;
   return isTeslaBrowser() || isCarPlayerMode();
 }
 

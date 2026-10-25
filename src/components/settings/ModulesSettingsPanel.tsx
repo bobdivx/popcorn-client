@@ -203,7 +203,8 @@ const MISSING_LABELS: Record<string, { fr: string; en: string }> = {
   ai: { fr: 'IA', en: 'AI' },
   discover: { fr: 'Découverte', en: 'Discover' },
   webos_deployment: { fr: 'Déploiement webOS', en: 'webOS deployment' },
-  car_lab: { fr: 'Car lab', en: 'Car lab' },
+  car_lab: { fr: 'Voiture', en: 'Car' },
+  car: { fr: 'Voiture', en: 'Car' },
 };
 
 export default function ModulesSettingsPanel() {

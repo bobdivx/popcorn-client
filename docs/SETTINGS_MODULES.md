@@ -49,7 +49,7 @@ Un lien vers une route bloquée (version store, serveur sans module torrent) n'e
 | `indexer_definitions` | Définitions d'indexers | `/settings/indexer-definitions` | — |
 | `sharing`, `friends` | Partage / Amis | `/settings/friends` | — |
 | `ai` | IA | `/settings/ai` | — |
-| `car_lab` / `car` | Car lab | `/car/lab` | — |
+| `car_lab` / `car` | Voiture (module activable) | `/car/lab` (labo) | — |
 | `webos_deployment` / `webos` | Déploiement webOS | `/settings/webos-deployment` | — |
 
 Avant octobre 2026, `jellyfin` pointait vers `/settings/library-sources` (comme `library_sources`),
@@ -79,8 +79,9 @@ message « Cette page nécessite le module … », autre utilisateur → accueil
 | `/settings/discovery` (hub) | `indexers` | Ses sections (rangées, demandes, liste noire, quotas de demandes) exigent toutes Indexers. Une section dont la page est masquée n'apparaît pas dans le hub (ex. demandes si `requests` est à `false`). |
 | `/settings/content` (hub) | `indexers` | Indexers, catégories et planification de la synchro, import de .torrent en lot (lit la liste des indexers). TMDB y figure aussi mais reste accessible par `/settings/tmdb`. |
 | `/settings/library-indexer` | `indexers` | Ancienne URL, redirige vers `/settings/indexers`. |
+| `/car`, `/car/lab`, `/car/probe` | `car_lab` (module activable « Voiture ») | Masquées seulement si `car_lab` est explicitement à `false` : administrateur → Paramètres › Modules (« nécessite le module Voiture »), autre utilisateur → message sur la page. La lecture Tesla repasse alors par le lecteur classique. |
 
-Toutes ces pages exigent aussi le moteur torrent (`torrent`), sauf `/settings/tmdb`.
+Toutes ces pages exigent aussi le moteur torrent (`torrent`), sauf `/settings/tmdb` et `/car*`.
 Capacités inconnues (premier lancement, serveur ancien sans `GET /api/client/capabilities`) :
 tout reste affiché (comportement historique).
 

@@ -146,8 +146,17 @@ export const OPTIONAL_FEATURE_ROUTE_PREFIXES: ReadonlyArray<{ features: readonly
   { features: ['sharing', 'friends'], prefixes: ['/settings/friends'] },
   { features: ['ai'], prefixes: ['/settings/ai'] },
   { features: ['webos_deployment', 'webos'], prefixes: ['/settings/webos-deployment'] },
-  { features: ['car_lab'], prefixes: ['/car/lab'] },
+  // Module activable « Voiture » : lecteur /car, labo /car/lab, diagnostic /car/probe.
+  { features: ['car_lab', 'car'], prefixes: ['/car'] },
 ];
+
+/** Capacités du module activable « Voiture » (`car` = alias). */
+export const CAR_MODULE_FEATURES: readonly string[] = ['car_lab', 'car'];
+
+/** Module Voiture utilisable : masqué seulement si le serveur l'annonce explicitement à `false`. */
+export function isCarModuleAvailable(): boolean {
+  return !isFeatureExplicitlyDisabled(CAR_MODULE_FEATURES);
+}
 
 /** Vrai si le serveur connecté annonce explicitement l'une de ces capacités à `false` (et aucune à `true`). */
 export function isFeatureExplicitlyDisabled(features: readonly string[]): boolean {

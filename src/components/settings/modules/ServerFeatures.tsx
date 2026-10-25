@@ -148,8 +148,8 @@ const META: Record<string, FeatureMeta> = {
   car_lab: {
     icon: 'car',
     href: '/car/lab',
-    fr: { name: 'Car lab', desc: 'Interface voiture expérimentale.' },
-    en: { name: 'Car lab', desc: 'Experimental in-car interface.' },
+    fr: { name: 'Voiture', desc: 'Module activable : lecteur pour navigateur de voiture (Tesla), labo et diagnostic de lecture.' },
+    en: { name: 'Car', desc: 'Optional module: player for in-car browsers (Tesla), playback lab and diagnostics.' },
   },
   webos_deployment: {
     icon: 'tv',
