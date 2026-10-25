@@ -1,7 +1,8 @@
 import type { ComponentType } from 'preact';
 import { useState } from 'preact/hooks';
 
-export type HubStatus = 'connected' | 'limited' | 'disabled';
+/** `error` : état en échec (pastille corail), p. ex. module arrêté sur erreur. */
+export type HubStatus = 'connected' | 'limited' | 'disabled' | 'error';
 
 type IconType = ComponentType<any>;
 
