@@ -14,6 +14,7 @@ import {
   highlightTitles,
   type SuggestionItem,
   linkAvailability,
+  newlyAvailableMovies,
   recentAvailable,
 } from './utils/highlights';
 import {
@@ -25,7 +26,12 @@ import {
   contentItemKey,
   uniqueByMedia,
 } from './utils/browsePriority';
-import { IS_STORE_BUILD, isRequestsAvailable } from '../../lib/distribution';
+import {
+  IS_STORE_BUILD,
+  isIndexersModuleAvailable,
+  isRequestsAvailable,
+  isTorrentModuleAvailable,
+} from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 import StoreLibraryHome from './StoreLibraryHome';
 import { markHomeReady } from '../../lib/boot/pageLoader';
@@ -63,12 +69,18 @@ function FullDashboard() {
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { recentDownloads } = useLibraryBrowse('all');
   const loading = dataLoading && downloadsLoading;
-  const highlights = useTmdbHighlights(['now_playing', 'trending_movie', 'trending_tv', 'on_the_air']);
+  // « Sorties récentes au cinéma » (now_playing) a quitté l'accueil : rangée affichée sur /demandes.
+  const highlights = useTmdbHighlights(['trending_movie', 'trending_tv', 'on_the_air']);
   const titles = useMemo(() => highlightTitles(language), [language]);
   // Titres TMDB absents de la bibliothèque : ils ouvrent la fiche « demande ». Sans demandes
   // possibles (module Indexers absent / requests désactivé), on ne les propose pas sur l'accueil.
   const capabilities = useServerCapabilities();
   const canRequest = useMemo(() => isRequestsAvailable(), [capabilities]);
+  // Rangée « Nouveaux films disponibles » : seulement si le serveur annonce torrent + indexers.
+  const canDownload = useMemo(
+    () => isTorrentModuleAvailable() && isIndexersModuleAvailable(),
+    [capabilities]
+  );
 
   // Écran de chargement unique : l'accueil se révèle quand ses premières données sont là et que
   // l'image du hero est décodée (au plus ~1,2 s d'attente), au lieu d'un skeleton intermédiaire.
@@ -160,7 +172,6 @@ function FullDashboard() {
       [
         ...recentDownloads,
         ...recentAvailable([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries], 12),
-        ...onlyRequestable(linkAvailability(highlights.now_playing ?? [], availabilityIndex), canRequest).slice(0, 6),
         ...onlyRequestable(linkAvailability(highlights.trending_movie ?? [], availabilityIndex), canRequest).slice(0, 6),
       ],
       seenItems
@@ -239,14 +250,14 @@ function FullDashboard() {
       });
     }
 
-    // Rangées « du moment » : TMDB (région FR), reliées aux torrents / à la bibliothèque.
-    const nowPlaying = onlyRequestable(
-      linkAvailability(highlights.now_playing ?? [], availabilityIndex),
-      canRequest
-    ).slice(0, 40);
-    if (nowPlaying.length > 0) {
-      result.push({ id: 'now-playing', title: titles.nowPlaying, items: nowPlaying });
+    // Films récents nouvellement disponibles en téléchargement (torrents indexés), clic → fiche.
+    const newlyAvailable = canDownload ? newlyAvailableMovies(freshMovies, recentMovies, 40) : [];
+    const newlyAvailableKeys = new Set(newlyAvailable.map((item) => contentItemKey(item)));
+    if (newlyAvailable.length > 0) {
+      result.push({ id: 'newly-available-movies', title: titles.newlyAvailableMovies, items: newlyAvailable });
     }
+
+    // Rangées « du moment » : TMDB (région FR), reliées aux torrents / à la bibliothèque.
 
     const trendingWeek = onlyRequestable(
       linkAvailability(
@@ -269,7 +280,9 @@ function FullDashboard() {
 
     // Torrents disponibles réellement récents (≤ 12 mois), classés par seeders.
     const cinemaRecent = recentAvailable(
-      uniqueByMedia([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries]),
+      uniqueByMedia([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries]).filter(
+        (item) => !newlyAvailableKeys.has(contentItemKey(item))
+      ),
       40
     );
     if (cinemaRecent.length > 0) {
@@ -305,6 +318,8 @@ function FullDashboard() {
     highlights,
     availabilityIndex,
     canRequest,
+    canDownload,
+    freshMovies,
     titles,
     t,
   ]);

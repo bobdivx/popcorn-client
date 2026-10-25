@@ -11,6 +11,8 @@ import { RequestAssist } from '../ai/RequestAssist';
 import { PosterCard } from '../page-model/PosterCard';
 import { pickHeroItems } from '../dashboard/utils/browsePriority';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+import { useTmdbHighlights } from '../dashboard/hooks/useTmdbHighlights';
+import { highlightTitles } from '../dashboard/utils/highlights';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -92,6 +94,10 @@ export default function DemandesPage() {
   const [searching, setSearching] = useState(false);
 
   const lang = language === 'fr' ? 'fr-FR' : 'en-US';
+  // « Sorties récentes au cinéma » (TMDB now_playing, région FR, filtré) — déplacée depuis l'accueil.
+  const highlights = useTmdbHighlights(['now_playing']);
+  const nowPlaying = (highlights.now_playing ?? []).slice(0, 40);
+  const nowPlayingTitle = highlightTitles(language).nowPlaying;
 
   useEffect(() => {
     const load = async () => {
@@ -341,7 +347,25 @@ export default function DemandesPage() {
           </CarouselSection>
         )}
 
-        {!showSearch && cinemaReleases.length > 0 && (
+        {!showSearch && nowPlaying.length > 0 && (
+          <CarouselSection title={nowPlayingTitle}>
+            {nowPlaying.map((raw) => {
+              const item = annotate(raw);
+              const badge = badgeFor(item);
+              return (
+                <PosterCard
+                  key={item.id}
+                  item={item}
+                  badge={badge?.label}
+                  badgeTone={badge?.tone}
+                  onNavigate={handleOpen}
+                />
+              );
+            })}
+          </CarouselSection>
+        )}
+
+        {!showSearch && nowPlaying.length === 0 && cinemaReleases.length > 0 && (
           <CarouselSection title={t('discover.cinemaReleases')}>
             {cinemaReleases.map((m) => {
               const item = annotate(toContentItem(m, 'movie'));

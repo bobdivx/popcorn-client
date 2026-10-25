@@ -176,6 +176,37 @@ export function recentAvailable(items: ContentItem[], limit = 48, now = Date.now
     .slice(0, limit);
 }
 
+/**
+ * Films récents nouvellement disponibles en téléchargement : torrents les plus récemment indexés
+ * (`sort=recent`, date d'ajout indexeur), puis sorties récentes disponibles (`sort=release_date`),
+ * limités aux films sortis il y a ≤ 12 mois (évite les vieux films ré-uploadés).
+ */
+export function newlyAvailableMovies(
+  freshlyIndexed: ContentItem[],
+  recentReleases: ContentItem[],
+  limit = 40,
+  now = Date.now()
+): ContentItem[] {
+  const addedAt = (item: ContentItem) => {
+    const t = Date.parse((item as ContentItem & { createdAt?: string }).createdAt || '');
+    return Number.isFinite(t) ? t : 0;
+  };
+  const fresh = [...freshlyIndexed].sort((a, b) => addedAt(b) - addedAt(a));
+  const seen = new Set<string>();
+  const out: ContentItem[] = [];
+  for (const item of [...fresh, ...recentReleases]) {
+    if (item.type !== 'movie') continue;
+    const age = daysSince(item.releaseDate, now);
+    if (!Number.isFinite(age) || age < -7 || age > RECENT_RELEASE_WINDOW_DAYS) continue;
+    const key = contentItemKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 /** URL de navigation : fiche torrent si disponible, sinon fiche découverte TMDB. */
 export function buildSuggestionUrl(item: ContentItem, from: string): string {
   const s = item as SuggestionItem;
@@ -201,5 +232,6 @@ export function highlightTitles(language: string) {
     trendingSeries: en ? 'Trending series this week' : 'Séries tendance de la semaine',
     onTheAir: en ? 'Series airing now · new episodes' : 'Séries du moment · nouveaux épisodes',
     recentAvailable: en ? 'Recent releases available' : 'Nouveautés disponibles (moins d’un an)',
+    newlyAvailableMovies: en ? 'Newly available movies' : 'Nouveaux films disponibles',
   };
 }
