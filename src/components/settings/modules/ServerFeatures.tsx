@@ -94,7 +94,8 @@ const META: Record<string, FeatureMeta> = {
   },
   sync: {
     icon: 'sync',
-    href: '/settings/sync',
+    // Hub Indexers & synchro : planification, catégories, import ZIP (ex-tuile « Contenu »).
+    href: '/settings/content',
     compiled: 'indexers',
     torrent: true,
     fr: { name: 'Synchronisation des indexers', desc: 'Synchronisation périodique des catalogues des indexers.' },
