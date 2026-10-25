@@ -23,7 +23,7 @@ import ThemeToggle from './ThemeToggle';
 import {
   TORRENT_FEATURES_ENABLED,
   IS_STORE_BUILD,
-  isIndexersModuleAvailable,
+  isRouteBlockedInStoreBuild,
   isRequestsAvailable,
   missingCapabilityForRoute,
 } from '../../lib/distribution';
@@ -180,6 +180,7 @@ export default function Navbar() {
   // Capacités inconnues / serveur ancien → affichées (comportement historique).
   const searchUi = TORRENT_FEATURES_ENABLED;
   const requestsUi = torrentUi && isRequestsAvailable();
+  const platformsUi = !isRouteBlockedInStoreBuild('/plateformes');
 
   // Page d'un module absent du serveur (lien direct, favori, module désinstallé) : plutôt qu'une page
   // en erreur, on explique ce qui manque (admin → Paramètres > Modules) ou on revient à l'accueil.
@@ -239,7 +240,10 @@ export default function Navbar() {
     { label: t('nav.films'), href: '/films/', match: 'prefix', icon: Film },
     { label: t('nav.series'), href: '/series/', match: 'prefix', icon: Tv2 },
     // Plateformes de streaming (Netflix, Disney+…) : catalogue + exclusivités par service.
-    { label: language === 'en' ? 'Platforms' : 'Plateformes', href: '/plateformes/', match: 'prefix', icon: LayoutGrid },
+    // Catalogue TMDB : absent en mode bibliothèque seule (serveur sans Indexers ou `discover` désactivé).
+    ...(platformsUi
+      ? [{ label: language === 'en' ? 'Platforms' : 'Plateformes', href: '/plateformes/', match: 'prefix' as const, icon: LayoutGrid }]
+      : []),
     // Demandes de contenu (déclenchent des téléchargements) : absentes de la version store.
     ...(requestsUi
       ? [{ label: t('nav.demandes'), href: '/demandes', match: 'prefix' as const, icon: ListPlus }]

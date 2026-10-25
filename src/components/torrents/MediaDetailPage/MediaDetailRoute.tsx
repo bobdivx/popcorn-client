@@ -30,7 +30,12 @@ import {
   seasonEpisodeCountsFromSeasons,
 } from '../../../lib/utils/seasonOrder';
 import { DsLoader } from '../../ui/DsLoader';
-import { IS_STORE_BUILD, isIndexersModuleAvailable, isRequestsAvailable } from '../../../lib/distribution';
+import {
+  IS_STORE_BUILD,
+  isDiscoverAvailable,
+  isIndexersModuleAvailable,
+  isRequestsAvailable,
+} from '../../../lib/distribution';
 
 type Torrent = MediaDetailPageProps['torrent'];
 
@@ -1808,8 +1813,9 @@ export default function MediaDetailRoute() {
 
           if (!cancelled) {
             // Si on a un tmdbId mais aucun torrent trouvé (variants vide ou absent), rediriger vers Discover
+            // (sauf mode bibliothèque seule : pas de fiche découverte → message + liens ci-dessous).
             const hasNoVariants = !data || !data.variants || (Array.isArray(data.variants) && data.variants.length === 0);
-            if (hasNoVariants && tmdbId && typeof window !== 'undefined') {
+            if (hasNoVariants && tmdbId && typeof window !== 'undefined' && isDiscoverAvailable()) {
               console.log('[MediaDetailRoute] Aucun torrent trouvé pour tmdbId, redirection vers Discover:', tmdbId);
               const titleQ =
                 titleFromQuery && titleFromQuery.trim()
@@ -2392,7 +2398,7 @@ export default function MediaDetailRoute() {
     const tmdbIdParam = urlParams?.get('tmdbId');
     const typeParam = urlParams?.get('type') || 'movie';
     const discoverHref =
-      tmdbIdParam && (typeParam === 'movie' || typeParam === 'tv')
+      tmdbIdParam && (typeParam === 'movie' || typeParam === 'tv') && isDiscoverAvailable()
         ? `/discover?tmdbId=${tmdbIdParam}&type=${typeParam}`
         : null;
 
@@ -2416,6 +2422,14 @@ export default function MediaDetailRoute() {
                 className="text-primary-400 hover:text-primary-300 font-medium"
               >
                 Rechercher sur les indexeurs
+              </a>
+            )}
+            {emptyGroupMainTitle && !discoverHref && !IS_STORE_BUILD && !isIndexersModuleAvailable() && (
+              <a
+                href={`/search?q=${encodeURIComponent(emptyGroupMainTitle)}`}
+                className="text-primary-400 hover:text-primary-300 font-medium"
+              >
+                Rechercher dans ma bibliothèque
               </a>
             )}
             <a href="/dashboard" className="text-blue-400 hover:text-blue-300">

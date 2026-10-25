@@ -201,6 +201,7 @@ const MISSING_LABELS: Record<string, { fr: string; en: string }> = {
   requests: { fr: 'Demandes (nécessite Indexers)', en: 'Requests (needs Indexers)' },
   sharing: { fr: 'Partage', en: 'Sharing' },
   ai: { fr: 'IA', en: 'AI' },
+  discover: { fr: 'Découverte', en: 'Discover' },
   webos_deployment: { fr: 'Déploiement webOS', en: 'webOS deployment' },
   car_lab: { fr: 'Car lab', en: 'Car lab' },
 };

@@ -119,6 +119,13 @@ export const INDEXERS_MODULE_ROUTE_PREFIXES: readonly string[] = [
   '/settings/sync',
 ];
 
+/**
+ * Découverte TMDB (fiche d'un titre absent de la bibliothèque, catalogue par plateforme) :
+ * réservée aux serveurs avec le module Indexers (sans lui, rien ne peut être demandé ni téléchargé :
+ * mode « media center » = bibliothèque seule). Masquée aussi si `discover` est explicitement à `false`.
+ */
+export const DISCOVER_ROUTE_PREFIXES: readonly string[] = ['/discover', '/plateformes'];
+
 /** Routes des demandes de contenu (voir `isRequestsAvailable`). */
 export const REQUESTS_ROUTE_PREFIXES: readonly string[] = ['/demandes', '/requests', '/settings/requests-admin'];
 
@@ -157,6 +164,10 @@ export function missingCapabilityForRoute(pathname: string): string | null {
   }
   if (!isIndexersModuleAvailable() && matchesPrefix(pathname, INDEXERS_MODULE_ROUTE_PREFIXES)) return 'indexers';
   if (!isRequestsAvailable() && matchesPrefix(pathname, REQUESTS_ROUTE_PREFIXES)) return 'requests';
+  if (matchesPrefix(pathname, DISCOVER_ROUTE_PREFIXES)) {
+    if (!isIndexersModuleAvailable()) return 'indexers';
+    if (isFeatureExplicitlyDisabled(['discover'])) return 'discover';
+  }
   for (const entry of OPTIONAL_FEATURE_ROUTE_PREFIXES) {
     if (matchesPrefix(pathname, entry.prefixes) && isFeatureExplicitlyDisabled(entry.features)) {
       return entry.features[0];
@@ -173,6 +184,11 @@ export function isRouteBlockedInStoreBuild(pathname: string): boolean {
   if (matchesPrefix(pathname, RETIRED_ROUTE_PREFIXES)) return true;
   if (IS_STORE_BUILD) return matchesPrefix(pathname, STORE_BLOCKED_ROUTE_PREFIXES);
   return missingCapabilityForRoute(pathname) !== null;
+}
+
+/** Fiche découverte `/discover` utilisable (hors store, serveur avec Indexers, `discover` non désactivé). */
+export function isDiscoverAvailable(): boolean {
+  return !isRouteBlockedInStoreBuild('/discover');
 }
 
 /**

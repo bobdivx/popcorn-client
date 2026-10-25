@@ -7,6 +7,7 @@ import {
   type TitleWatchProviders,
 } from '../../lib/platforms';
 import type { WatchProviderOffer } from '../../lib/client/server-api/platforms';
+import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
 
 interface WatchProvidersProps {
   tmdbId?: number | null;
@@ -83,7 +84,8 @@ export default function WatchProviders({ tmdbId, mediaType, className = '' }: Wa
               );
               const base =
                 'inline-flex items-center justify-center rounded-xl border border-white/15 bg-black/30 p-0.5 transition-all duration-200';
-              return o.platform_slug ? (
+              // Page plateforme absente en mode bibliothèque seule : logo non cliquable.
+              return o.platform_slug && !isRouteBlockedInStoreBuild('/plateformes') ? (
                 <a
                   key={o.provider_id}
                   href={platformHref(o.platform_slug)}
