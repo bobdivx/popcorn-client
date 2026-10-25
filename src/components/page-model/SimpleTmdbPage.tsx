@@ -162,6 +162,11 @@ export function SimpleTmdbPage({
               key={`${section.id}:${contentItemKey(item)}`}
               item={item}
               onNavigate={onNavigate}
+              badge={
+                (item as ContentItem & { suggestionOnly?: boolean }).suggestionOnly
+                  ? t('discover.notInLibrary')
+                  : null
+              }
             />
           );
         })}

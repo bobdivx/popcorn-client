@@ -40,6 +40,15 @@ export function isIndexersModuleAvailable(): boolean {
   return TORRENT_FEATURES_ENABLED && isCapabilityAvailable('indexers');
 }
 
+/**
+ * Demandes de contenu utilisables : build non store ET serveur annonçant `requests` et `indexers`
+ * (une demande approuvée n'aboutit que si le module Indexers est installé). Capacités inconnues /
+ * serveur ancien → vrai (comportement historique).
+ */
+export function isRequestsAvailable(): boolean {
+  return TORRENT_FEATURES_ENABLED && isCapabilityAvailable('requests') && isCapabilityAvailable('indexers');
+}
+
 /** Chemin de la fiche média (lecture d'un élément de la bibliothèque). */
 export const MEDIA_DETAIL_PATH: string = IS_STORE_BUILD ? '/media' : '/torrents';
 

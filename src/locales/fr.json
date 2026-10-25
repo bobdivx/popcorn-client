@@ -190,6 +190,8 @@
     "noSliders": "Aucun slider configuré",
     "noTorrentsYet": "Aucun torrent n'a encore été trouvé pour ce média. Utilisez le bouton Demander pour demander à un administrateur de l'ajouter. Une fois approuvé, le téléchargement démarrera automatiquement.",
     "requestThisMedia": "Demander ce média",
+    "notInLibrary": "Pas dans ta bibliothèque",
+    "requestsUnavailable": "Ce titre n'est pas dans ta bibliothèque. Les demandes ne sont pas disponibles sur ce serveur (module Indexers non installé ou désactivé).",
     "requestSubmitted": "Votre demande a été enregistrée.",
     "requestAlreadySubmitted": "Vous avez déjà demandé ce média.",
     "releaseDateExpected": "Sortie prévue le {date}",

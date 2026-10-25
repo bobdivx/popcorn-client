@@ -12,6 +12,7 @@ import {
   buildAvailabilityIndex,
   buildSuggestionUrl,
   highlightTitles,
+  type SuggestionItem,
   linkAvailability,
   recentAvailable,
 } from './utils/highlights';
@@ -24,7 +25,8 @@ import {
   contentItemKey,
   uniqueByMedia,
 } from './utils/browsePriority';
-import { IS_STORE_BUILD } from '../../lib/distribution';
+import { IS_STORE_BUILD, isRequestsAvailable } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 import StoreLibraryHome from './StoreLibraryHome';
 import { markHomeReady } from '../../lib/boot/pageLoader';
 
@@ -49,6 +51,11 @@ function interleave<T>(a: T[], b: T[]): T[] {
   return out;
 }
 
+/** Sans demandes possibles, ne garde que les suggestions TMDB reliées à un média disponible. */
+function onlyRequestable(items: SuggestionItem[], canRequest: boolean): SuggestionItem[] {
+  return canRequest ? items : items.filter((item) => !item.suggestionOnly);
+}
+
 function FullDashboard() {
   const { t, language } = useI18n();
   const { data, loading: dataLoading, error } = useDashboardData();
@@ -58,6 +65,10 @@ function FullDashboard() {
   const loading = dataLoading && downloadsLoading;
   const highlights = useTmdbHighlights(['now_playing', 'trending_movie', 'trending_tv', 'on_the_air']);
   const titles = useMemo(() => highlightTitles(language), [language]);
+  // Titres TMDB absents de la bibliothèque : ils ouvrent la fiche « demande ». Sans demandes
+  // possibles (module Indexers absent / requests désactivé), on ne les propose pas sur l'accueil.
+  const capabilities = useServerCapabilities();
+  const canRequest = useMemo(() => isRequestsAvailable(), [capabilities]);
 
   // Écran de chargement unique : l'accueil se révèle quand ses premières données sont là et que
   // l'image du hero est décodée (au plus ~1,2 s d'attente), au lieu d'un skeleton intermédiaire.
@@ -149,8 +160,8 @@ function FullDashboard() {
       [
         ...recentDownloads,
         ...recentAvailable([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries], 12),
-        ...linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, 6),
-        ...linkAvailability(highlights.trending_movie ?? [], availabilityIndex).slice(0, 6),
+        ...onlyRequestable(linkAvailability(highlights.now_playing ?? [], availabilityIndex), canRequest).slice(0, 6),
+        ...onlyRequestable(linkAvailability(highlights.trending_movie ?? [], availabilityIndex), canRequest).slice(0, 6),
       ],
       seenItems
     );
@@ -165,6 +176,7 @@ function FullDashboard() {
     popularSeries,
     highlights,
     availabilityIndex,
+    canRequest,
   ]);
 
   const handleNavigate = (item: ContentItem) => {
@@ -228,20 +240,29 @@ function FullDashboard() {
     }
 
     // Rangées « du moment » : TMDB (région FR), reliées aux torrents / à la bibliothèque.
-    const nowPlaying = linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, 40);
+    const nowPlaying = onlyRequestable(
+      linkAvailability(highlights.now_playing ?? [], availabilityIndex),
+      canRequest
+    ).slice(0, 40);
     if (nowPlaying.length > 0) {
       result.push({ id: 'now-playing', title: titles.nowPlaying, items: nowPlaying });
     }
 
-    const trendingWeek = linkAvailability(
-      interleave(highlights.trending_movie ?? [], highlights.trending_tv ?? []),
-      availabilityIndex
+    const trendingWeek = onlyRequestable(
+      linkAvailability(
+        interleave(highlights.trending_movie ?? [], highlights.trending_tv ?? []),
+        availabilityIndex
+      ),
+      canRequest
     ).slice(0, 40);
     if (trendingWeek.length > 0) {
       result.push({ id: 'trending-week', title: titles.trendingWeek, items: trendingWeek });
     }
 
-    const onTheAir = linkAvailability(highlights.on_the_air ?? [], availabilityIndex).slice(0, 40);
+    const onTheAir = onlyRequestable(
+      linkAvailability(highlights.on_the_air ?? [], availabilityIndex),
+      canRequest
+    ).slice(0, 40);
     if (onTheAir.length > 0) {
       result.push({ id: 'on-the-air', title: titles.onTheAir, items: onTheAir });
     }
@@ -283,6 +304,7 @@ function FullDashboard() {
     popularSeries,
     highlights,
     availabilityIndex,
+    canRequest,
     titles,
     t,
   ]);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import RequestButton from '../requests/RequestButton';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -6,6 +6,8 @@ import { ArrowLeft } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import WatchProviders from '../platforms/WatchProviders';
 import { getHighQualityTmdbImageUrl } from '../../lib/utils/tmdb-images';
+import { isRequestsAvailable } from '../../lib/distribution';
+import { useServerCapabilities } from '../../lib/capabilities';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -46,6 +48,9 @@ export default function DiscoverMediaDetail({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+  // Demandes possibles seulement si le serveur annonce `requests` + `indexers` (sinon fiche d'info).
+  const capabilities = useServerCapabilities();
+  const canRequest = useMemo(() => isRequestsAvailable(), [capabilities]);
 
   useEffect(() => {
     const load = async () => {
@@ -87,7 +92,9 @@ export default function DiscoverMediaDetail({
           mediaType === 'movie'
             ? serverApi.getTmdbMovieDetail(tmdbId, lang)
             : serverApi.getTmdbTvDetail(tmdbId, lang),
-          serverApi.listMediaRequests({ limit: 200 }),
+          isRequestsAvailable()
+            ? serverApi.listMediaRequests({ limit: 200 })
+            : Promise.resolve({ success: false, data: null } as const),
         ]);
 
         if (tmdbRes.success && tmdbRes.data) {
@@ -212,7 +219,11 @@ export default function DiscoverMediaDetail({
             <WatchProviders tmdbId={tmdbId} mediaType={mediaType} className="mb-6" />
 
             <div class="glass-panel rounded-xl p-4 sm:p-6 mb-6">
-              {requestSubmitted ? (
+              {!canRequest ? (
+                <p class="text-gray-300 text-sm sm:text-base leading-relaxed">
+                  {t('discover.requestsUnavailable')}
+                </p>
+              ) : requestSubmitted ? (
                 <p class="text-primary-400 text-sm sm:text-base leading-relaxed font-medium flex items-center gap-2">
                   <span class="inline-block w-6 h-6 rounded-full bg-primary-500/30 flex items-center justify-center">✓</span>
                   {t('discover.requestSubmitted')}
@@ -224,7 +235,7 @@ export default function DiscoverMediaDetail({
               )}
             </div>
 
-            {!requestSubmitted && (
+            {canRequest && !requestSubmitted && (
               <div data-tv-initial-focus>
                 <RequestButton
                   tmdbId={tmdbId}

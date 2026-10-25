@@ -190,6 +190,8 @@
     "noSliders": "No sliders configured",
     "noTorrentsYet": "No torrents have been found for this media yet. Use the Request button to ask an administrator to add it. Once approved, the download will start automatically.",
     "requestThisMedia": "Request this media",
+    "notInLibrary": "Not in your library",
+    "requestsUnavailable": "This title is not in your library. Requests are not available on this server (Indexers module not installed or disabled).",
     "requestSubmitted": "Your request has been submitted.",
     "requestAlreadySubmitted": "You have already requested this media.",
     "releaseDateExpected": "Expected release {date}",
