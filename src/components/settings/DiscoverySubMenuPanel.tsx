@@ -8,6 +8,7 @@ import BlacklistManager from './BlacklistManager';
 import QuotaAdminPanel from './QuotaAdminPanel';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
+import { isRouteBlockedInStoreBuild } from '../../lib/distribution';
 
 const BASE_URL = '/settings/discovery/';
 
@@ -27,6 +28,18 @@ type DiscoveryItem = {
   descriptionKey: string;
   icon: typeof Sliders;
 };
+
+/** Page dédiée de chaque section : une section dont la page est masquée (module absent) l'est ici aussi. */
+const SUB_ROUTES: Record<DiscoverySub, string> = {
+  sliders: '/settings/discover-sliders',
+  requests: '/settings/requests-admin',
+  blacklist: '/settings/blacklist',
+  quotas: '/settings/requests-admin',
+};
+
+function isSubAvailable(id: DiscoverySub): boolean {
+  return !isRouteBlockedInStoreBuild(SUB_ROUTES[id]);
+}
 
 const DISCOVERY_ITEMS: DiscoveryItem[] = [
   { id: 'sliders', titleKey: 'discover.sliders', descriptionKey: 'discover.description', icon: Sliders },
@@ -56,12 +69,13 @@ export default function DiscoverySubMenuPanel() {
 
   if (!canAccess('settings.server' as any)) return null;
 
-  const detailItem = DISCOVERY_ITEMS.find((i) => i.id === sub);
+  const items = DISCOVERY_ITEMS.filter((i) => isSubAvailable(i.id));
+  const detailItem = items.find((i) => i.id === sub);
 
   return (
     <>
       <div className="hub-grid" data-tv-list role="list">
-        {DISCOVERY_ITEMS.map((item) => (
+        {items.map((item) => (
           <SettingsNavCard
             key={item.id}
             href={`${BASE_URL}?sub=${item.id}`}

@@ -116,7 +116,16 @@ export const TORRENT_MODULE_ROUTE_PREFIXES: readonly string[] = [
 export const INDEXERS_MODULE_ROUTE_PREFIXES: readonly string[] = [
   '/settings/indexers',
   '/settings/indexer-definitions',
+  '/settings/library-indexer',
   '/settings/sync',
+  // Hub « Indexers & synchro » (TMDB y est aussi, mais a sa page du cœur /settings/tmdb).
+  '/settings/content',
+  // Hub « Découverte & demandes » : rangées, demandes, liste noire, quotas.
+  '/settings/discovery',
+  // Liste noire : ne filtre que les résultats des indexers (recherche / catalogue).
+  '/settings/blacklist',
+  // Rangées de découverte : n'existent qu'avec le catalogue (voir docs/SETTINGS_MODULES.md).
+  '/settings/discover-sliders',
 ];
 
 /**
@@ -124,7 +133,7 @@ export const INDEXERS_MODULE_ROUTE_PREFIXES: readonly string[] = [
  * réservée aux serveurs avec le module Indexers (sans lui, rien ne peut être demandé ni téléchargé :
  * mode « media center » = bibliothèque seule). Masquée aussi si `discover` est explicitement à `false`.
  */
-export const DISCOVER_ROUTE_PREFIXES: readonly string[] = ['/discover', '/plateformes'];
+export const DISCOVER_ROUTE_PREFIXES: readonly string[] = ['/discover', '/plateformes', '/settings/discover-sliders'];
 
 /** Routes des demandes de contenu (voir `isRequestsAvailable`). */
 export const REQUESTS_ROUTE_PREFIXES: readonly string[] = ['/demandes', '/requests', '/settings/requests-admin'];
@@ -206,11 +215,15 @@ const STORE_HIDDEN_SETTINGS_CATEGORIES = new Set(['content', 'downloads', 'uploa
 /** Catégories propres au module torrent / indexers. */
 const TORRENT_MODULE_SETTINGS_CATEGORIES = new Set(['content', 'downloads', 'discovery']);
 
+/** Catégories qui exigent le module Indexers, même avec le moteur torrent (hubs `content` / `discovery`). */
+const INDEXERS_MODULE_SETTINGS_CATEGORIES = new Set(['content', 'discovery']);
+
 export function isSettingsCategoryAvailable(categoryId: string): boolean {
   // Upload vers trackers (C411) / ratio : retirés.
   if (categoryId === 'uploads') return false;
   if (IS_STORE_BUILD) return !STORE_HIDDEN_SETTINGS_CATEGORIES.has(categoryId);
   if (!isTorrentModuleAvailable()) return !TORRENT_MODULE_SETTINGS_CATEGORIES.has(categoryId);
+  if (!isIndexersModuleAvailable()) return !INDEXERS_MODULE_SETTINGS_CATEGORIES.has(categoryId);
   return true;
 }
 
@@ -227,9 +240,9 @@ export function isHubSettingsCategory(categoryId: string): boolean {
 }
 
 /** Pages de réglages propres à un module (torrent / indexers / synchro / découverte / demandes). */
-const MODULE_SETTINGS_ROUTE_PREFIXES: readonly string[] = TORRENT_MODULE_ROUTE_PREFIXES.filter((p) =>
-  p.startsWith('/settings/'),
-);
+const MODULE_SETTINGS_ROUTE_PREFIXES: readonly string[] = Array.from(
+  new Set([...TORRENT_MODULE_ROUTE_PREFIXES, ...INDEXERS_MODULE_ROUTE_PREFIXES, ...DISCOVER_ROUTE_PREFIXES]),
+).filter((p) => p.startsWith('/settings/'));
 
 /** Vrai pour une page de réglages d'un module : son « Retour » mène à Paramètres > Modules. */
 export function isModuleSettingsRoute(pathname: string): boolean {

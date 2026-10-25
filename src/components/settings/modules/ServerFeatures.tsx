@@ -103,6 +103,8 @@ const META: Record<string, FeatureMeta> = {
   indexers: {
     icon: 'list',
     href: '/settings/indexers',
+    // Liste noire : filtre les résultats des indexers (voir docs/SETTINGS_MODULES.md).
+    links: [{ href: '/settings/blacklist', fr: 'Liste noire', en: 'Blacklist' }],
     compiled: 'indexers',
     torrent: true,
     fr: { name: 'Indexers', desc: 'Recherche de contenus sur les indexers configurés.' },

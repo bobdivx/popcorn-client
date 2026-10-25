@@ -44,7 +44,7 @@ Un lien vers une route bloquée (version store, serveur sans module torrent) n'e
 | `requests` | Demandes | `/settings/requests-admin` | — |
 | `torrent` | Téléchargement torrent | `/settings/librqbit` (Client torrent) | Téléchargements (`/settings/downloads`) |
 | `stream_torrent` | Lecture pendant le téléchargement | `/settings/playback?sub=streamingDownloadFull` | — |
-| `indexers` | Indexers | `/settings/indexers` | — |
+| `indexers` | Indexers | `/settings/indexers` | Liste noire (`/settings/blacklist`) |
 | `sync` | Synchronisation des indexers | `/settings/content?sub=sync` (Sync torrents) | Catégories synchronisées (`/settings/sync`) |
 | `indexer_definitions` | Définitions d'indexers | `/settings/indexer-definitions` | — |
 | `sharing`, `friends` | Partage / Amis | `/settings/friends` | — |
@@ -61,6 +61,37 @@ Aucune ancienne route de réglages n'est redirigée vers `/settings/library-sour
 l'administration (commits `aca255f6`…`5e4c0fa2`) a seulement retiré les tuiles de premier niveau
 Contenu / Téléchargements / Découverte (catégories `content`, `downloads`, `discovery`, toujours
 accessibles par URL) et fait revenir leurs pages vers Paramètres › Modules.
+
+## Rattachement des pages de réglages aux modules
+
+Décision d'octobre 2026 : chaque page de réglages appartient à la fonction sans laquelle elle n'a
+pas d'effet. Une page dont le module manque n'est proposée nulle part (hub, menus, liens de la
+modale, sections des hubs) et son URL redirige (administrateur → Paramètres › Modules avec le
+message « Cette page nécessite le module … », autre utilisateur → accueil). Listes dans
+`src/lib/distribution.ts` (`TORRENT_MODULE_ROUTE_PREFIXES`, `INDEXERS_MODULE_ROUTE_PREFIXES`,
+`DISCOVER_ROUTE_PREFIXES`, `OPTIONAL_FEATURE_ROUTE_PREFIXES`).
+
+| Page | Rattachée à | Raison |
+| --- | --- | --- |
+| `/settings/tmdb` | cœur | Clé / langue TMDB : métadonnées et affiches de la bibliothèque, utiles sans aucun module. |
+| `/settings/discover-sliders` | `indexers` (+ `discover` non désactivé) | Les rangées de découverte n'existent que sur l'accueil « catalogue », servi par le module Indexers. Sans lui l'accueil montre la bibliothèque seule. |
+| `/settings/blacklist` | `indexers` | La liste noire ne filtre que les résultats des indexers (recherche, catalogue, demandes). |
+| `/settings/discovery` (hub) | `indexers` | Ses sections (rangées, demandes, liste noire, quotas de demandes) exigent toutes Indexers. Une section dont la page est masquée n'apparaît pas dans le hub (ex. demandes si `requests` est à `false`). |
+| `/settings/content` (hub) | `indexers` | Indexers, catégories et planification de la synchro, import de .torrent en lot (lit la liste des indexers). TMDB y figure aussi mais reste accessible par `/settings/tmdb`. |
+| `/settings/library-indexer` | `indexers` | Ancienne URL, redirige vers `/settings/indexers`. |
+
+Toutes ces pages exigent aussi le moteur torrent (`torrent`), sauf `/settings/tmdb`.
+Capacités inconnues (premier lancement, serveur ancien sans `GET /api/client/capabilities`) :
+tout reste affiché (comportement historique).
+
+Pages utilisateur selon les modules :
+
+- **Recherche** (`/search`) : toujours proposée hors version store. Sans Indexers, elle cherche
+  dans la bibliothèque locale (filtrage client de `GET /library` : films, séries, épisodes). Avec
+  Indexers, la recherche complète a un onglet « Ma bibliothèque » (`/search?scope=library`).
+- **Découverte** (`/discover`, `/plateformes`) : exige Indexers (sinon rien ne peut être demandé ni
+  téléchargé) ; masquée aussi si `discover` est à `false`. Sans elle, l'accueil, Films et Séries
+  montrent la bibliothèque seule (pas de rangées TMDB « du moment »).
 
 ## Mise en page
 
