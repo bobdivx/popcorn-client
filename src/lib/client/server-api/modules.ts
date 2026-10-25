@@ -136,6 +136,8 @@ export interface ProcessPreview {
   key_trusted: boolean;
   key_label: string | null;
   offered_public_key: string | null;
+  /** Clé liée actuellement si la version est signée par une autre clé de confiance (approve_key_change requis). */
+  key_change_from?: string | null;
   installed_version: string | null;
   is_update: boolean;
 }

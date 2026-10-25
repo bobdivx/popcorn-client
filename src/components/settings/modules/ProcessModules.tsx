@@ -82,6 +82,9 @@ export const PROCESS_TEXT = {
       'Clé inconnue et aucune clé publique fournie : ajoute la clé de l’auteur dans « Clés de confiance » ou colle-la dans le champ ci-dessus.',
     unsignedWarn: 'Module non signé : son origine ne peut pas être vérifiée.',
     acceptKey: 'J’ai vérifié cette clé et je lui fais confiance pour ce module',
+    keyChangeWarn: (from: string) =>
+      `Cette version est signée par une autre clé que celle liée au module (${from}). Ne continue que si l’auteur a annoncé ce changement de clé.`,
+    approveKeyChange: 'J’approuve le changement de clé de signature pour ce module',
     reinstall: 'Réinstaller cette version',
     install: 'Installer',
     installUpdate: 'Mettre à jour',
@@ -195,6 +198,9 @@ export const PROCESS_TEXT = {
       'Unknown key and no public key given: add the author’s key under “Trusted keys” or paste it in the field above.',
     unsignedWarn: 'Unsigned module: its origin cannot be verified.',
     acceptKey: 'I checked this key and trust it for this module',
+    keyChangeWarn: (from: string) =>
+      `This release is signed by a different key than the one bound to the module (${from}). Only continue if the author announced this key change.`,
+    approveKeyChange: 'I approve the signing key change for this module',
     reinstall: 'Reinstall this version',
     install: 'Install',
     installUpdate: 'Update',
@@ -501,6 +507,7 @@ export function ProcessInstallForm({
   const [token, setToken] = useState('');
   const [preview, setPreview] = useState<{ id: string; p: ProcessPreview } | null>(null);
   const [acceptKey, setAcceptKey] = useState(false);
+  const [approveKeyChange, setApproveKeyChange] = useState(false);
   const [reinstall, setReinstall] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -515,6 +522,7 @@ export function ProcessInstallForm({
   const resetInstall = () => {
     setPreview(null);
     setAcceptKey(false);
+    setApproveKeyChange(false);
     setReinstall(false);
   };
 
@@ -543,7 +551,11 @@ export function ProcessInstallForm({
     if (!preview || busy) return;
     setBusy('install');
     setNotice(null);
-    const res = await serverApi.installProcessModule(preview.id, { accept_key: acceptKey, reinstall });
+    const res = await serverApi.installProcessModule(preview.id, {
+      accept_key: acceptKey,
+      approve_key_change: approveKeyChange,
+      reinstall,
+    });
     if (!alive.current) return;
     setBusy(null);
     if (res.success && res.data) {
@@ -559,7 +571,13 @@ export function ProcessInstallForm({
 
   const p = preview?.p;
   const needsKeyApproval = !!p && p.signed && !p.key_trusted;
-  const canInstall = !!p && !busy && !pm.jobRunning && (!needsKeyApproval || (acceptKey && !!p.offered_public_key));
+  const keyChangeFrom = p?.key_change_from || null;
+  const canInstall =
+    !!p &&
+    !busy &&
+    !pm.jobRunning &&
+    (!needsKeyApproval || (acceptKey && !!p.offered_public_key)) &&
+    (!keyChangeFrom || approveKeyChange);
   const sameVersion = !!p && p.installed_version === p.release.version;
 
   return (
@@ -682,6 +700,24 @@ export function ProcessInstallForm({
                   <span>{tx.acceptKey}</span>
                 </label>
               )}
+            </div>
+          )}
+          {keyChangeFrom && (
+            <div class="mt-4 grid gap-3">
+              <p role="alert" class="flex gap-2 text-sm tv:text-lg" style={{ color: C.accent }}>
+                <Icon name="warning" />
+                <span>{tx.keyChangeWarn(keyChangeFrom)}</span>
+              </p>
+              <label class="flex items-start gap-3 text-sm tv:text-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  data-focusable
+                  class={checkboxClass}
+                  checked={approveKeyChange}
+                  onChange={(e) => setApproveKeyChange((e.currentTarget as HTMLInputElement).checked)}
+                />
+                <span>{tx.approveKeyChange}</span>
+              </label>
             </div>
           )}
           {sameVersion && (
