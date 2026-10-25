@@ -30,7 +30,7 @@ import {
   seasonEpisodeCountsFromSeasons,
 } from '../../../lib/utils/seasonOrder';
 import { DsLoader } from '../../ui/DsLoader';
-import { IS_STORE_BUILD } from '../../../lib/distribution';
+import { IS_STORE_BUILD, isIndexersModuleAvailable, isRequestsAvailable } from '../../../lib/distribution';
 
 type Torrent = MediaDetailPageProps['torrent'];
 
@@ -2406,10 +2406,11 @@ export default function MediaDetailRoute() {
                 href={discoverHref}
                 className="text-primary-400 hover:text-primary-300 font-medium"
               >
-                Demander ce média
+                {/* Sans demandes possibles (module Indexers absent) : simple fiche d'information. */}
+                {isRequestsAvailable() ? 'Demander ce média' : 'Voir la fiche du média'}
               </a>
             )}
-            {emptyGroupMainTitle && !discoverHref && (
+            {emptyGroupMainTitle && !discoverHref && isIndexersModuleAvailable() && (
               <a
                 href={`/search?q=${encodeURIComponent(emptyGroupMainTitle)}`}
                 className="text-primary-400 hover:text-primary-300 font-medium"
