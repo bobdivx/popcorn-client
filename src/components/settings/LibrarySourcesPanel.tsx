@@ -368,7 +368,7 @@ export default function LibrarySourcesPanel() {
 
   if (loading) {
     return (
-      <div class="p-4 text-gray-400">
+      <div class="py-4 text-gray-400">
         <span className="inline-flex items-center gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" />
           {t('settingsMenu.librarySourcesPanel.loading')}
@@ -377,12 +377,20 @@ export default function LibrarySourcesPanel() {
     );
   }
 
+  const btnPrimary =
+    'inline-flex w-full sm:w-auto items-center justify-center gap-2 min-h-[44px] rounded px-4 text-sm font-medium text-white bg-[#f2545b] hover:bg-[#ff6a70] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f2545b] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d10] disabled:opacity-50';
+  const btnSecondary =
+    'inline-flex w-full sm:w-auto shrink-0 items-center justify-center gap-2 min-h-[44px] rounded border border-white/20 bg-transparent px-4 text-sm text-[#f4f1ec] hover:border-[#f2545b] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f2545b] disabled:opacity-50';
+  const fieldClass =
+    'w-full min-h-[44px] rounded border border-white/15 bg-[#0c0d10] px-3 text-sm text-[#f4f1ec] placeholder-white/40 focus:outline-none focus:border-[#f2545b]';
+
   return (
-    <div class="p-4 space-y-4">
-      <p className="text-gray-400 text-sm">{t('settingsMenu.librarySourcesPanel.intro')}</p>
+    <div class="space-y-4 sm:space-y-5">
+      <p className="text-sm leading-relaxed text-white/60">{t('settingsMenu.librarySourcesPanel.intro')}</p>
 
       {message && (
         <div
+          role="status"
           class={`rounded px-3 py-2 text-sm ${
             message.type === 'success' ? 'bg-green-900/30 text-green-300' : 'bg-red-900/30 text-red-300'
           }`}
@@ -391,38 +399,36 @@ export default function LibrarySourcesPanel() {
         </div>
       )}
 
-      <div class="rounded-lg border border-gray-700 bg-gray-800/50 p-4 space-y-3">
-        <h3 class="text-sm font-medium text-gray-200">
+      {/* Formulaire pleine largeur : champ + « Parcourir » côte à côte dès la tablette, empilés sur téléphone. */}
+      <div class="rounded-lg border border-white/10 bg-white/[0.03] p-3 sm:p-5 space-y-4">
+        <h2 class="text-sm font-medium text-[#f4f1ec]">
           {editingId ? t('settingsMenu.librarySourcesPanel.editSource') : t('common.add')}
-        </h3>
-        <input
-          type="text"
-          class="w-full rounded bg-gray-900 border border-gray-600 px-3 py-2 text-sm text-white placeholder-gray-500"
-          placeholder={t('settingsMenu.librarySourcesPanel.pathPlaceholder')}
-          value={path}
-          onInput={(e) => setPath((e.target as HTMLInputElement).value)}
-        />
-        <div class="flex justify-end">
-          <button
-            type="button"
-            class="inline-flex items-center gap-2 rounded border border-gray-600 bg-gray-900/60 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800"
-            onClick={openBrowse}
-          >
-            <FolderOpen className="w-4 h-4" />
+        </h2>
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            class={`${fieldClass} sm:flex-1 min-w-0`}
+            placeholder={t('settingsMenu.librarySourcesPanel.pathPlaceholder')}
+            aria-label={t('settingsMenu.librarySourcesPanel.pathPlaceholder')}
+            value={path}
+            onInput={(e) => setPath((e.target as HTMLInputElement).value)}
+          />
+          <button type="button" class={btnSecondary} onClick={openBrowse}>
+            <FolderOpen className="w-4 h-4 shrink-0" />
             {t('settingsMenu.librarySourcesPanel.browse')}
           </button>
         </div>
-        <div class="rounded bg-gray-900/60 border border-gray-700 px-3 py-2 text-xs text-gray-400 space-y-1.5">
-          <p class="font-medium text-gray-300">{t('settingsMenu.librarySourcesPanel.pathFormatTitle')}</p>
+        <div class="rounded border border-white/10 bg-black/20 px-3 py-3 text-[13px] leading-relaxed text-white/60 space-y-2 break-words [overflow-wrap:anywhere]">
+          <p class="font-medium text-[#f4f1ec]">{t('settingsMenu.librarySourcesPanel.pathFormatTitle')}</p>
           <p>{t('settingsMenu.librarySourcesPanel.pathFormatWindows')}</p>
           <p>{t('settingsMenu.librarySourcesPanel.pathFormatMac')}</p>
-          <p class="text-gray-500 italic">{t('settingsMenu.librarySourcesPanel.pathFormatNote')}</p>
+          <p class="text-white/45 italic">{t('settingsMenu.librarySourcesPanel.pathFormatNote')}</p>
         </div>
-        <div class="flex flex-wrap gap-4 items-center">
-          <label class="flex items-center gap-2 text-sm text-gray-300">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="grid gap-1.5 text-sm text-white/70">
             <span>{t('settingsMenu.librarySourcesPanel.category')}</span>
             <select
-              class="rounded bg-gray-900 border border-gray-600 px-2 py-1 text-sm text-white"
+              class={fieldClass}
               value={category}
               onChange={(e) => setCategory((e.target as HTMLSelectElement).value as 'FILM' | 'SERIES')}
             >
@@ -430,70 +436,59 @@ export default function LibrarySourcesPanel() {
               <option value="SERIES">{t('settingsMenu.librarySourcesPanel.categorySeries')}</option>
             </select>
           </label>
-          <input
-            type="text"
-            class="rounded bg-gray-900 border border-gray-600 px-3 py-1.5 text-sm text-white placeholder-gray-500 w-40"
-            placeholder={t('settingsMenu.librarySourcesPanel.labelOptional')}
-            value={label}
-            onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
-          />
-          <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <label class="grid gap-1.5 text-sm text-white/70">
+            <span>{t('settingsMenu.librarySourcesPanel.labelOptional')}</span>
             <input
-              type="checkbox"
-              checked={shareWithFriends}
-              onChange={(e) => setShareWithFriends((e.target as HTMLInputElement).checked)}
+              type="text"
+              class={fieldClass}
+              placeholder={t('settingsMenu.librarySourcesPanel.labelOptional')}
+              value={label}
+              onInput={(e) => setLabel((e.target as HTMLInputElement).value)}
             />
-            <Users className="w-4 h-4" />
-            {t('settingsMenu.librarySourcesPanel.shareWithFriends')}
           </label>
         </div>
-        <div class="flex items-center gap-2">
+        <label class="flex items-center gap-2 min-h-[44px] text-sm text-white/70 cursor-pointer">
+          <input
+            type="checkbox"
+            class="h-5 w-5 shrink-0 accent-[#f2545b]"
+            checked={shareWithFriends}
+            onChange={(e) => setShareWithFriends((e.target as HTMLInputElement).checked)}
+          />
+          <Users className="w-4 h-4 shrink-0" />
+          {t('settingsMenu.librarySourcesPanel.shareWithFriends')}
+        </label>
+        <div class="flex flex-col sm:flex-row sm:justify-end gap-2">
           {editingId ? (
             <>
-              <button
-                type="button"
-                class="inline-flex items-center gap-2 rounded bg-primary/80 hover:bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                onClick={handleAddOrUpdate}
-                disabled={adding}
-              >
-                <Pencil className="w-4 h-4" />
-                {adding ? t('common.loading') : saveSourceLabel}
-              </button>
-              <button
-                type="button"
-                class="inline-flex items-center gap-2 rounded border border-gray-600 bg-gray-900/60 px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-800"
-                onClick={handleCancelEdit}
-              >
+              <button type="button" class={btnSecondary} onClick={handleCancelEdit}>
                 {t('common.cancel')}
+              </button>
+              <button type="button" class={btnPrimary} onClick={handleAddOrUpdate} disabled={adding}>
+                <Pencil className="w-4 h-4 shrink-0" />
+                {adding ? t('common.loading') : saveSourceLabel}
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 rounded bg-primary/80 hover:bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              onClick={handleAddOrUpdate}
-              disabled={adding}
-            >
-              <FolderPlus className="w-4 h-4" />
+            <button type="button" class={btnPrimary} onClick={handleAddOrUpdate} disabled={adding}>
+              <FolderPlus className="w-4 h-4 shrink-0" />
               {adding ? t('common.loading') : t('settingsMenu.librarySourcesPanel.addSource')}
             </button>
           )}
         </div>
       </div>
-
       <div class="space-y-2">
         {sources.length === 0 ? (
           <p class="text-gray-500 text-sm py-4">{t('settingsMenu.librarySourcesPanel.noSources')}</p>
         ) : (
-          <ul class="divide-y divide-gray-700 rounded-lg border border-gray-700 overflow-hidden">
+          <ul class="divide-y divide-white/10 rounded-lg border border-white/10 overflow-hidden">
             {sources.map((src) => {
               const isScanning = src.id === (syncStatus?.scanning_source_id ?? scanningId);
               const isSynced = src.last_scanned_at != null && src.last_scanned_at > 0;
               const isEnabled = src.is_enabled !== false;
               return (
-                <li key={src.id} class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-800/30 hover:bg-gray-800/50">
+                <li key={src.id} class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-3 bg-white/[0.03] hover:bg-white/[0.06]">
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-white truncate">{src.path}</p>
+                    <p class="text-sm font-medium text-white break-words [overflow-wrap:anywhere]">{src.path}</p>
                     <p class="text-xs text-gray-400 flex items-center gap-2 flex-wrap">
                       <span>
                         {src.category} {src.label ? `· ${src.label}` : ''}
@@ -582,7 +577,7 @@ export default function LibrarySourcesPanel() {
         noPadding
       >
         <div class="flex flex-col max-h-[70vh]">
-          <div class="px-4 py-2 border-b border-white/10 text-xs text-gray-400 font-mono truncate">
+          <div class="px-4 py-2 border-b border-white/10 text-xs text-gray-400 font-mono break-words [overflow-wrap:anywhere]">
             {browsePath || '/'}
           </div>
 
