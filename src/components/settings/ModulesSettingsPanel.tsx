@@ -194,6 +194,17 @@ type View =
 
 const MODAL_CLASS = 'modules-hub-overlay';
 
+/** Libellés des capacités manquantes (`/settings/modules/?missing=…`). */
+const MISSING_LABELS: Record<string, { fr: string; en: string }> = {
+  torrent: { fr: 'Téléchargement torrent', en: 'Torrent downloads' },
+  indexers: { fr: 'Indexers', en: 'Indexers' },
+  requests: { fr: 'Demandes (nécessite Indexers)', en: 'Requests (needs Indexers)' },
+  sharing: { fr: 'Partage', en: 'Sharing' },
+  ai: { fr: 'IA', en: 'AI' },
+  webos_deployment: { fr: 'Déploiement webOS', en: 'webOS deployment' },
+  car_lab: { fr: 'Car lab', en: 'Car lab' },
+};
+
 export default function ModulesSettingsPanel() {
   const { language } = useI18n();
   const tx: Tx = language === 'en' ? (TEXT.en as unknown as Tx) : TEXT.fr;
@@ -242,6 +253,21 @@ export default function ModulesSettingsPanel() {
 
   useEffect(() => {
     void refreshList();
+  }, []);
+
+  // Arrivée depuis une page d'un module absent (`?missing=torrent`…) : dire ce qui manque.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const missing = new URLSearchParams(window.location.search).get('missing');
+    if (!missing || !/^[a-z0-9_-]{1,40}$/i.test(missing)) return;
+    const en = language === 'en';
+    const label = MISSING_LABELS[missing]?.[en ? 'en' : 'fr'] ?? missing;
+    setNotice({
+      kind: 'error',
+      text: en
+        ? `This page needs the “${label}” module, which is not installed or not active on this server. Install or start it below.`
+        : `Cette page nécessite le module « ${label} », non installé ou inactif sur ce serveur. Installez-le ou démarrez-le ci-dessous.`,
+    });
   }, []);
 
   const afterChange = async () => {

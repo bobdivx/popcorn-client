@@ -20,7 +20,14 @@ import { loadSubscription } from '../../lib/subscription-store';
 import ConnectivityWarning from './ConnectivityWarning';
 import { isTVPlatform } from '../../lib/utils/device-detection';
 import ThemeToggle from './ThemeToggle';
-import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import {
+  TORRENT_FEATURES_ENABLED,
+  IS_STORE_BUILD,
+  isIndexersModuleAvailable,
+  isRequestsAvailable,
+  missingCapabilityForRoute,
+} from '../../lib/distribution';
+import { canAccess } from '../../lib/permissions';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
@@ -168,6 +175,26 @@ export default function Navbar() {
   // Module torrent : présent dans ce build ET annoncé par le serveur (GET /api/client/capabilities).
   const serverCapabilities = useServerCapabilities();
   const torrentUi = TORRENT_FEATURES_ENABLED && (serverCapabilities ? serverCapabilities.features.torrent : true);
+  // Recherche torrents : servie par le module Indexers ; Demandes : `requests` + Indexers.
+  // Capacités inconnues / serveur ancien → affichées (comportement historique).
+  const searchUi = torrentUi && isIndexersModuleAvailable();
+  const requestsUi = torrentUi && isRequestsAvailable();
+
+  // Page d'un module absent du serveur (lien direct, favori, module désinstallé) : plutôt qu'une page
+  // en erreur, on explique ce qui manque (admin → Paramètres > Modules) ou on revient à l'accueil.
+  useEffect(() => {
+    if (IS_STORE_BUILD || !serverCapabilities || typeof window === 'undefined') return;
+    const missing = missingCapabilityForRoute(window.location.pathname);
+    if (!missing) return;
+    let admin = false;
+    try {
+      admin = canAccess('settings.server' as any);
+    } catch {
+      admin = false;
+    }
+    const target = admin ? `/settings/modules/?missing=${encodeURIComponent(missing)}` : '/dashboard';
+    window.location.replace(target);
+  }, [serverCapabilities]);
 
   // Statut de sync unifié : abonnement au store + démarrage du polling quand l'utilisateur est connecté
   useEffect(() => {
@@ -213,7 +240,7 @@ export default function Navbar() {
     // Plateformes de streaming (Netflix, Disney+…) : catalogue + exclusivités par service.
     { label: language === 'en' ? 'Platforms' : 'Plateformes', href: '/plateformes/', match: 'prefix', icon: LayoutGrid },
     // Demandes de contenu (déclenchent des téléchargements) : absentes de la version store.
-    ...(torrentUi
+    ...(requestsUi
       ? [{ label: t('nav.demandes'), href: '/demandes', match: 'prefix' as const, icon: ListPlus }]
       : []),
   ];
@@ -414,7 +441,7 @@ export default function Navbar() {
             {user ? (
               <>
                 {/* Recherche (torrents / indexers) — absente de la version store */}
-                {torrentUi && (
+                {searchUi && (
                   <a
                     href="/search"
                     className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active' : ''}`}
