@@ -1,4 +1,4 @@
-import { Film, FolderOpen, FolderPlus, LayoutGrid, Users } from 'lucide-preact';
+import { Clapperboard, Film, FolderOpen, FolderPlus, LayoutGrid, Users } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { SettingsNavCard } from './SettingsNavCard';
@@ -36,6 +36,15 @@ const LIBRARY_LINK_ITEMS: LibraryLinkItem[] = [
     icon: Film,
     href: '/settings/library-media',
     permission: 'settings.server',
+  },
+  {
+    // Métadonnées TMDB : réglage du cœur (fiches de la bibliothèque), plus rangé sous « Contenu ».
+    id: 'tmdb',
+    titleKey: 'settingsMenu.tmdb.title',
+    descriptionKey: 'settingsMenu.tmdb.description',
+    icon: Clapperboard,
+    href: '/settings/tmdb',
+    permission: 'settings.indexers',
   },
   {
     id: 'library-display',
