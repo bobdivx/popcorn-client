@@ -7,7 +7,7 @@ import PermissionGuard from '../ui/PermissionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
 import ServerStatusCard from './ServerStatusCard';
 import { HubSkeleton } from './hub/HubTile';
-import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { isSettingsCategoryAvailable, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'downloads' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -183,7 +183,9 @@ export default function SettingsContent() {
     );
   }
 
-  const visibleCategory = route.type === 'category' && canSeeCategory(route.id) ? route.id : null;
+  // Catégorie d'un module absent (build store, serveur sans le module) : rien à régler → vue d'ensemble.
+  const visibleCategory =
+    route.type === 'category' && canSeeCategory(route.id) && isSettingsCategoryAvailable(route.id) ? route.id : null;
   if (!visibleCategory) return <SettingsOverview />;
 
   return (
