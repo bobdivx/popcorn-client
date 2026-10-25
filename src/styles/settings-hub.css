@@ -722,3 +722,153 @@ html[data-tv-platform="true"] .hub-btn:focus-visible {
 html[data-tv-platform="true"] .hub-tile-cell {
   animation: none;
 }
+
+/* Statut « en échec » (ex. module arrêté sur erreur). */
+.hub-dot--error { background: #f2545b; }
+.hub-tile-status--error { color: #f2545b; }
+
+/*
+ * Page Modules : mêmes tuiles / modales que le hub, au design éditorial
+ * (corail #f2545b sur #0c0d10, texte #f4f1ec, Josefin Sans 300 capitales, Jost), sans flou ni halo.
+ */
+.modules-hub,
+.modules-hub-overlay .hub-modal {
+  font-family: var(--ed-font-body, 'Jost', sans-serif);
+  color: var(--ed-ink, #f4f1ec);
+}
+
+.modules-hub .hub-title,
+.modules-hub-overlay .hub-modal-title {
+  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ed-ink, #f4f1ec);
+}
+
+.modules-hub .hub-subtitle,
+.modules-hub-overlay .hub-modal-desc {
+  color: rgba(244, 241, 236, 0.6);
+}
+
+.modules-hub .hub-tile {
+  border-color: rgba(244, 241, 236, 0.1);
+  background: rgba(244, 241, 236, 0.03);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.modules-hub .hub-tile:hover,
+.modules-hub .hub-tile:focus-visible {
+  border-color: #f2545b;
+  background: rgba(244, 241, 236, 0.06);
+  box-shadow: none;
+}
+
+.modules-hub .hub-tile-icon {
+  background: rgba(242, 84, 91, 0.1);
+  color: #f2545b;
+}
+
+.modules-hub .hub-tile-title {
+  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ed-ink, #f4f1ec);
+}
+
+.modules-hub .hub-tile-hint { color: rgba(244, 241, 236, 0.6); }
+.modules-hub .hub-tile-meta { color: rgba(244, 241, 236, 0.45); }
+
+.modules-hub .hub-dot,
+.modules-hub .hub-tile:hover .hub-dot,
+.modules-hub .hub-tile:focus-visible .hub-dot {
+  box-shadow: 0 0 0 2px #0c0d10;
+}
+
+.modules-hub .hub-dot--connected { animation: none; }
+
+.modules-hub .hub-tile--add {
+  border-style: dashed;
+  border-color: rgba(244, 241, 236, 0.2);
+  background: transparent;
+}
+
+.modules-hub .hub-tile--add .hub-tile-icon {
+  background: transparent;
+  border-color: rgba(242, 84, 91, 0.5);
+}
+
+.modules-hub .hub-tile--add .hub-tile-title { color: rgba(244, 241, 236, 0.7); }
+
+.modules-hub .hub-tile--add:hover,
+.modules-hub .hub-tile--add:focus-visible {
+  border-color: #f2545b;
+  background: rgba(244, 241, 236, 0.04);
+}
+
+.modules-hub .hub-tile--add:hover .hub-tile-title,
+.modules-hub .hub-tile--add:focus-visible .hub-tile-title {
+  color: var(--ed-ink, #f4f1ec);
+}
+
+.modules-hub .hub-skel { background: rgba(244, 241, 236, 0.04); }
+
+.modules-hub-section-title { margin: 0; }
+
+.modules-hub-overlay {
+  background: rgba(12, 13, 16, 0.88);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.modules-hub-overlay .hub-modal {
+  border-color: rgba(244, 241, 236, 0.12);
+  background: #0c0d10;
+  box-shadow: none;
+}
+
+.modules-hub-overlay .hub-modal-head,
+.modules-hub-overlay .hub-modal-foot {
+  border-color: rgba(244, 241, 236, 0.1);
+  background: #0c0d10;
+}
+
+.modules-hub-overlay .hub-modal-x:focus-visible,
+.modules-hub-overlay .hub-btn:focus-visible {
+  box-shadow: 0 0 0 2px #f2545b;
+}
+
+/* Choix du type de module (modale « Ajouter un module »). */
+.modules-type-choice {
+  border-color: rgba(244, 241, 236, 0.15);
+  background: transparent;
+  color: var(--ed-ink, #f4f1ec);
+  font-family: var(--ed-font-body, 'Jost', sans-serif);
+  cursor: pointer;
+}
+
+.modules-type-choice:hover,
+.modules-type-choice:focus-visible {
+  border-color: rgba(242, 84, 91, 0.7);
+  outline: none;
+}
+
+.modules-type-choice.is-selected {
+  border-color: #f2545b;
+  background: rgba(242, 84, 91, 0.08);
+}
+
+html[data-tv-platform="true"] .modules-hub .hub-tile:focus,
+html[data-tv-platform="true"] .modules-hub .hub-tile:focus-visible,
+html[data-tv-platform="true"] .modules-hub .hub-tile.tv-card-focused {
+  border-color: #f2545b;
+  background: rgba(244, 241, 236, 0.06);
+  box-shadow: 0 0 0 4px #0c0d10, 0 0 0 8px #f2545b;
+}
+
+html[data-tv-platform="true"] .modules-hub-overlay .hub-modal-x:focus,
+html[data-tv-platform="true"] .modules-hub-overlay .hub-btn:focus,
+html[data-tv-platform="true"] .modules-type-choice:focus {
+  box-shadow: 0 0 0 4px #0c0d10, 0 0 0 8px #f2545b;
+}
