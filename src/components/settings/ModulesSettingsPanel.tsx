@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { loadCapabilities, useServerCapabilities } from '../../lib/capabilities';
+import { refreshCapabilitiesNow, supportsModuleToggle, useServerCapabilities } from '../../lib/capabilities';
+import { isRouteUnsupported } from '../../lib/module-errors';
 import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 import { serverApi } from '../../lib/client/server-api';
 import type { InstalledModule } from '../../lib/client/server-api/modules';
@@ -8,6 +9,7 @@ import { HubAddTile, HubGrid, HubSkeleton, HubTile } from './hub/HubTile';
 import { HubModal } from './hub/HubModal';
 import {
   C,
+  checkboxClass,
   DataModuleTileIcon,
   FactList,
   Icon,
@@ -44,6 +46,7 @@ import {
   featureStatusLabel,
   featureTileIcon,
   featureTx,
+  moduleSettingsLinks,
 } from './modules/ServerFeatures';
 
 /**
@@ -108,6 +111,21 @@ const TEXT = {
     confirmRemove: 'Confirmer',
     cancel: 'Annuler',
     removing: 'Suppression…',
+    enable: 'Activer',
+    disable: 'Désactiver',
+    enabling: 'Activation…',
+    disabling: 'Désactivation…',
+    disabledState: 'Désactivé',
+    settings: 'Réglages',
+    settingsSection: 'Réglages des fonctions fournies',
+    successEnable: (name: string) => `Module « ${name} » activé.`,
+    successDisable: (name: string) => `Module « ${name} » désactivé : ses fonctions sont masquées.`,
+    uninstallTitle: (name: string) => `Désinstaller « ${name} » ?`,
+    uninstallDesc:
+      'Le module est retiré du serveur : les menus et pages des fonctions qu’il fournit disparaissent aussitôt. Tu pourras le réinstaller depuis son URL.',
+    removeData: 'Supprimer aussi ses données (réglages, base du module)',
+    errToggleUnsupported:
+      "Ce serveur ne gère pas encore l'activation / désactivation des modules : mets-le à jour pour utiliser ces boutons.",
     successInstall: (name: string, v: string) => `Module « ${name} » ${v} installé.`,
     successReplace: (name: string, v: string) => `Module « ${name} » mis à jour (${v}).`,
     successRemove: 'Module désinstallé.',
@@ -169,6 +187,20 @@ const TEXT = {
     confirmRemove: 'Confirm',
     cancel: 'Cancel',
     removing: 'Removing…',
+    enable: 'Enable',
+    disable: 'Disable',
+    enabling: 'Enabling…',
+    disabling: 'Disabling…',
+    disabledState: 'Disabled',
+    settings: 'Settings',
+    settingsSection: 'Settings of the provided features',
+    successEnable: (name: string) => `Module “${name}” enabled.`,
+    successDisable: (name: string) => `Module “${name}” disabled: its features are hidden.`,
+    uninstallTitle: (name: string) => `Uninstall “${name}”?`,
+    uninstallDesc:
+      'The module is removed from the server: the menus and pages of the features it provides disappear right away. You can reinstall it from its URL.',
+    removeData: 'Also delete its data (settings, module database)',
+    errToggleUnsupported: 'This server cannot enable / disable modules yet: update it to use these buttons.',
     successInstall: (name: string, v: string) => `Module “${name}” ${v} installed.`,
     successReplace: (name: string, v: string) => `Module “${name}” updated (${v}).`,
     successRemove: 'Module uninstalled.',
@@ -191,6 +223,8 @@ type View =
   | { type: 'server' }
   | { type: 'feature'; key: string }
   | null;
+
+type ModuleRef = { type: 'data' | 'process'; id: string; name: string };
 
 const MODAL_CLASS = 'modules-hub-overlay';
 
@@ -221,6 +255,11 @@ export default function ModulesSettingsPanel() {
   const [notice, setNotice] = useState<Notice>(null);
   const [view, setView] = useState<View>(null);
   const [addType, setAddType] = useState<'data' | 'process'>('data');
+  /** Routes enable / disable absentes (404 / 405 reçue) : boutons masqués pour la session. */
+  const [toggleUnsupported, setToggleUnsupported] = useState(false);
+  /** Désinstallation en attente de confirmation (depuis une tuile). */
+  const [pendingUninstall, setPendingUninstall] = useState<ModuleRef | null>(null);
+  const [removeData, setRemoveData] = useState(false);
 
   // Formulaire « module de données »
   const [url, setUrl] = useState('');
@@ -272,16 +311,82 @@ export default function ModulesSettingsPanel() {
     });
   }, []);
 
-  const afterChange = async () => {
-    await refreshList();
-    await loadCapabilities({ force: true });
+  /**
+   * Après une action : listes rechargées et capacités invalidées / relues tout de suite (sans
+   * attendre le TTL) → menus et pages se mettent à jour. `delayed` : un module « process » annonce
+   * ses fonctions une fois démarré → seconde lecture 3 s plus tard.
+   */
+  const afterChange = async (opts: { delayed?: boolean } = {}) => {
+    await Promise.all([refreshList(), pm.supported ? pm.refresh() : Promise.resolve()]);
+    await refreshCapabilitiesNow();
+    if (opts.delayed) {
+      setTimeout(() => {
+        if (!alive.current) return;
+        void (pm.supported ? pm.refresh() : Promise.resolve());
+        void refreshCapabilitiesNow();
+      }, 3000);
+    }
   };
 
   const refreshAll = async () => {
     setBusy('refresh');
     await Promise.all([refreshList(), pm.supported ? pm.refresh() : Promise.resolve()]);
-    await loadCapabilities({ force: true });
+    await refreshCapabilitiesNow();
     if (alive.current) setBusy(null);
+  };
+
+  const canToggle = supportsModuleToggle(caps) && !toggleUnsupported;
+
+  const onToggle = async (m: ModuleRef, enable: boolean) => {
+    if (busy) return;
+    setBusy(`toggle:${m.type}:${m.id}`);
+    setNotice(null);
+    const res = await serverApi.setModuleEnabled(m.id, enable);
+    if (!alive.current) return;
+    setBusy(null);
+    if (res.success) {
+      setNotice({ kind: 'ok', text: enable ? tx.successEnable(m.name) : tx.successDisable(m.name) });
+      await afterChange({ delayed: m.type === 'process' && enable });
+    } else if (isRouteUnsupported(res)) {
+      setToggleUnsupported(true);
+      setNotice({ kind: 'error', text: tx.errToggleUnsupported });
+    } else {
+      setNotice({ kind: 'error', text: errorMessage(res, tx) });
+    }
+  };
+
+  const askUninstall = (m: ModuleRef) => {
+    if (busy) return;
+    setNotice(null);
+    setRemoveData(false);
+    setPendingUninstall(m);
+  };
+
+  const onConfirmUninstall = async () => {
+    const m = pendingUninstall;
+    if (!m || busy) return;
+    setBusy(`remove:${m.id}`);
+    setNotice(null);
+    let res: { success: boolean; error?: string; message?: string };
+    if (m.type === 'data') {
+      res = await serverApi.uninstallModule(m.id);
+    } else {
+      // Route générique (serveur récent), sinon route historique des modules « process ».
+      res = canToggle ? await serverApi.uninstallModule(m.id, removeData) : { success: false, error: 'NotFound' };
+      if (!res.success && isRouteUnsupported(res)) res = await serverApi.uninstallProcessModule(m.id, removeData);
+    }
+    if (!alive.current) return;
+    setBusy(null);
+    if (res.success) {
+      setPendingUninstall(null);
+      setRemoveData(false);
+      setConfirmId(null);
+      setView(null);
+      setNotice({ kind: 'ok', text: tx.successRemove });
+      await afterChange();
+    } else {
+      setNotice({ kind: 'error', text: errorMessage(res, tx) });
+    }
   };
 
   const open = (v: View) => {
@@ -385,6 +490,79 @@ export default function ModulesSettingsPanel() {
   const dataModule = view?.type === 'data' ? modules?.find((m) => m.id === view.id) ?? null : null;
   const processModule = view?.type === 'process' ? processModules.find((m) => m.id === view.id) ?? null : null;
 
+  /** Liens vers les réglages des fonctions fournies par un module (tuile + fiche). */
+  const settingsLinksOf = (m: ModuleRef) => moduleSettingsLinks(features, m.type, m.id);
+
+  /** Boutons rapides d'une tuile de module : réglages, activer / désactiver, désinstaller. */
+  const tileActions = (m: ModuleRef, enabled: boolean) => {
+    const links = settingsLinksOf(m);
+    const toggling = busy === `toggle:${m.type}:${m.id}`;
+    return (
+      <>
+        {links.length === 1 ? (
+          <a href={links[0].href} data-focusable class="hub-tile-action" title={links[0].label}>
+            <Icon name="settings" />
+            {tx.settings}
+          </a>
+        ) : links.length > 1 ? (
+          <button
+            type="button"
+            data-focusable
+            class="hub-tile-action"
+            onClick={() => open(m.type === 'process' ? { type: 'process', id: m.id } : { type: 'data', id: m.id })}
+          >
+            <Icon name="settings" />
+            {tx.settings}
+          </button>
+        ) : null}
+        {canToggle && (
+          <button
+            type="button"
+            data-focusable
+            class="hub-tile-action"
+            aria-pressed={enabled}
+            disabled={!!busy}
+            onClick={() => void onToggle(m, !enabled)}
+          >
+            <Icon name={enabled ? 'stop' : 'play'} />
+            {toggling ? (enabled ? tx.disabling : tx.enabling) : enabled ? tx.disable : tx.enable}
+          </button>
+        )}
+        <button
+          type="button"
+          data-focusable
+          class="hub-tile-action hub-tile-action--danger"
+          disabled={!!busy}
+          onClick={() => askUninstall(m)}
+        >
+          <Icon name="trash" />
+          {tx.remove}
+        </button>
+      </>
+    );
+  };
+
+  /** Section « Réglages des fonctions fournies » d'une fiche module. */
+  const settingsSection = (m: ModuleRef) => {
+    const links = settingsLinksOf(m);
+    if (links.length === 0) return null;
+    return (
+      <div class="grid gap-2">
+        <p class="text-xs tv:text-base" style={{ color: C.faint }}>
+          {tx.settingsSection}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          {links.map((l) => (
+            <a key={l.key} href={l.href} data-focusable class={secondaryBtn} style={secondaryStyle}>
+              <Icon name="settings" />
+              {l.label}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const sectionTitle = (id: string, label: string) => (
     <h2 id={id} class="modules-hub-section-title text-base tv:text-xl" style={subHeadingStyle}>
       {label}
@@ -413,7 +591,7 @@ export default function ModulesSettingsPanel() {
       </header>
 
       <div class="grid gap-4 tv:gap-6 mb-6 tv:mb-8 empty:hidden">
-        {!view && <NoticeBanner notice={notice} detailsLabel={tx.warnings} />}
+        {!view && !pendingUninstall && <NoticeBanner notice={notice} detailsLabel={tx.warnings} />}
         {pm.ready && pm.list?.allow_unsigned && (
           <WarningBox>
             <p>{ptx.devUnsigned}</p>
@@ -443,28 +621,39 @@ export default function ModulesSettingsPanel() {
           <HubSkeleton count={3} />
         ) : (
           <HubGrid>
-            {modules.map((m) => (
-              <HubTile
-                key={`data:${m.id}`}
-                title={m.name}
-                icon={DataModuleTileIcon}
-                status={m.active ? 'connected' : 'disabled'}
-                statusLabel={m.active ? tx.active : tx.inactive}
-                meta={`${kindLabel(m.kind)} · ${m.version}`}
-                onClick={() => open({ type: 'data', id: m.id })}
-              />
-            ))}
-            {processModules.map((m) => (
-              <HubTile
-                key={`process:${m.id}`}
-                title={m.id}
-                icon={ProcessModuleTileIcon}
-                status={processStatus(m.state)}
-                statusLabel={ptx.states[m.state] ?? m.state}
-                meta={`${ptx.kind} · ${m.version || '—'}`}
-                onClick={() => open({ type: 'process', id: m.id })}
-              />
-            ))}
+            {modules.map((m) => {
+              const enabled = m.enabled !== false;
+              const ref: ModuleRef = { type: 'data', id: m.id, name: m.name };
+              return (
+                <HubTile
+                  key={`data:${m.id}`}
+                  title={m.name}
+                  icon={DataModuleTileIcon}
+                  status={!enabled ? 'disabled' : m.active ? 'connected' : 'limited'}
+                  statusLabel={!enabled ? tx.disabledState : m.active ? tx.active : tx.inactive}
+                  meta={`${kindLabel(m.kind)} · ${m.version}`}
+                  onClick={() => open({ type: 'data', id: m.id })}
+                  actions={tileActions(ref, enabled)}
+                />
+              );
+            })}
+            {processModules.map((m) => {
+              const enabled = m.enabled !== false;
+              const ref: ModuleRef = { type: 'process', id: m.id, name: m.id };
+              const stoppedByAdmin = !enabled && (m.state === 'stopped' || !m.state);
+              return (
+                <HubTile
+                  key={`process:${m.id}`}
+                  title={m.id}
+                  icon={ProcessModuleTileIcon}
+                  status={stoppedByAdmin ? 'disabled' : processStatus(m.state)}
+                  statusLabel={stoppedByAdmin ? tx.disabledState : ptx.states[m.state] ?? m.state}
+                  meta={`${ptx.kind} · ${m.version || '—'}`}
+                  onClick={() => open({ type: 'process', id: m.id })}
+                  actions={tileActions(ref, enabled)}
+                />
+              );
+            })}
             {canAdd && <HubAddTile label={tx.addTitle} onClick={() => open({ type: 'add' })} />}
           </HubGrid>
         )}
@@ -645,7 +834,16 @@ export default function ModulesSettingsPanel() {
             <NoticeBanner notice={notice} detailsLabel={tx.warnings} />
             <FactList
               rows={[
-                [tx.state, dataModule.active ? tx.active : <span style={{ color: C.accent }}>{tx.inactive}</span>],
+                [
+                  tx.state,
+                  dataModule.enabled === false ? (
+                    <span style={{ color: C.muted }}>{tx.disabledState}</span>
+                  ) : dataModule.active ? (
+                    tx.active
+                  ) : (
+                    <span style={{ color: C.accent }}>{tx.inactive}</span>
+                  ),
+                ],
                 [tx.version, dataModule.version],
                 [tx.kind, kindLabel(dataModule.kind)],
                 [tx.identifier, dataModule.id, 'break-all'],
@@ -673,6 +871,7 @@ export default function ModulesSettingsPanel() {
                 [tx.updatedAt, formatDate(dataModule.updated_at, language)],
               ]}
             />
+            {settingsSection({ type: 'data', id: dataModule.id, name: dataModule.name })}
             <div class="flex flex-wrap gap-2">
               {confirmId === dataModule.id ? (
                 <>
@@ -700,6 +899,31 @@ export default function ModulesSettingsPanel() {
                 </>
               ) : (
                 <>
+                  {canToggle && (
+                    <button
+                      type="button"
+                      data-focusable
+                      class={secondaryBtn}
+                      style={secondaryStyle}
+                      aria-pressed={dataModule.enabled !== false}
+                      disabled={!!busy}
+                      onClick={() =>
+                        void onToggle(
+                          { type: 'data', id: dataModule.id, name: dataModule.name },
+                          dataModule.enabled === false
+                        )
+                      }
+                    >
+                      <Icon name={dataModule.enabled === false ? 'play' : 'stop'} />
+                      {busy === `toggle:data:${dataModule.id}`
+                        ? dataModule.enabled === false
+                          ? tx.enabling
+                          : tx.disabling
+                        : dataModule.enabled === false
+                          ? tx.enable
+                          : tx.disable}
+                    </button>
+                  )}
                   <button
                     type="button"
                     data-focusable
@@ -734,6 +958,7 @@ export default function ModulesSettingsPanel() {
         <HubModal open title={processModule.id} onClose={close} size="xl" className={MODAL_CLASS}>
           <div class="grid gap-5 tv:gap-7">
             <NoticeBanner notice={notice} />
+            {settingsSection({ type: 'process', id: processModule.id, name: processModule.id })}
             <ProcessModuleDetail
               key={processModule.id}
               m={processModule}
@@ -776,6 +1001,64 @@ export default function ModulesSettingsPanel() {
             onOpenModule={(p) => open(p.type === 'process' ? { type: 'process', id: p.id } : { type: 'data', id: p.id })}
             onAddModule={canAdd ? () => open({ type: 'add' }) : undefined}
           />
+        </HubModal>
+      )}
+
+      {/* Confirmation de désinstallation (depuis une tuile) */}
+      {pendingUninstall && (
+        <HubModal
+          open
+          title={tx.uninstallTitle(pendingUninstall.name)}
+          description={tx.uninstallDesc}
+          onClose={() => {
+            if (busy) return;
+            setPendingUninstall(null);
+            setRemoveData(false);
+          }}
+          size="lg"
+          className={MODAL_CLASS}
+        >
+          <div class="grid gap-5 tv:gap-7">
+            <NoticeBanner notice={notice} />
+            {pendingUninstall.type === 'process' && (
+              <label class="flex items-center gap-3 text-sm tv:text-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  data-focusable
+                  class={checkboxClass}
+                  checked={removeData}
+                  onChange={(e) => setRemoveData((e.currentTarget as HTMLInputElement).checked)}
+                />
+                <span>{tx.removeData}</span>
+              </label>
+            )}
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-focusable
+                class={primaryBtn}
+                style={primaryStyle}
+                disabled={!!busy}
+                onClick={() => void onConfirmUninstall()}
+              >
+                <Icon name="trash" />
+                {busy === `remove:${pendingUninstall.id}` ? tx.removing : tx.confirmRemove}
+              </button>
+              <button
+                type="button"
+                data-focusable
+                class={secondaryBtn}
+                style={secondaryStyle}
+                disabled={!!busy}
+                onClick={() => {
+                  setPendingUninstall(null);
+                  setRemoveData(false);
+                }}
+              >
+                {tx.cancel}
+              </button>
+            </div>
+          </div>
         </HubModal>
       )}
 

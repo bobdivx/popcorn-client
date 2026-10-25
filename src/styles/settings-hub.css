@@ -937,3 +937,80 @@ html[data-tv-platform="true"] .modules-hub-overlay .hub-btn:focus,
 html[data-tv-platform="true"] .modules-type-choice:focus {
   box-shadow: 0 0 0 4px #0c0d10, 0 0 0 8px #f2545b;
 }
+
+/*
+ * Actions rapides sous une tuile (Paramètres > Modules : activer / désactiver / désinstaller).
+ * Pastilles à contour, corail au survol / focus, sans flou ni halo.
+ */
+.hub-tile-cell--actions {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hub-tile-cell--actions > .hub-tile {
+  flex: 1 1 auto;
+}
+
+.hub-tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hub-tile-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(244, 241, 236, 0.2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ed-ink, #f4f1ec);
+  font-family: var(--ed-font-body, 'Jost', sans-serif);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.hub-tile-action:hover,
+.hub-tile-action:focus-visible {
+  border-color: #f2545b;
+  outline: none;
+}
+
+.hub-tile-action--danger {
+  color: #f2545b;
+}
+
+.hub-tile-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hub-tile-action svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+html[data-tv-platform="true"] .hub-tile-action {
+  min-height: 52px;
+  padding: 0 20px;
+  font-size: 18px;
+}
+
+html[data-tv-platform="true"] .hub-tile-action svg {
+  width: 22px;
+  height: 22px;
+}
+
+html[data-tv-platform="true"] .hub-tile-action:focus,
+html[data-tv-platform="true"] .hub-tile-action:focus-visible,
+html[data-tv-platform="true"] .hub-tile-action.tv-card-focused {
+  border-color: #f2545b;
+  box-shadow: 0 0 0 4px #09090b, 0 0 0 8px #fb7a80;
+}

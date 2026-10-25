@@ -321,6 +321,31 @@ export function buildServerFeatures(
   });
 }
 
+/**
+ * Réglages des fonctions qu'un module fournit (pour sa tuile / sa fiche) : seulement les fonctions
+ * actives qui ont une page de réglages dans ce build. Les réglages restent ainsi accessibles depuis
+ * la tuile du module, pas seulement depuis celle de la fonction.
+ */
+export function moduleSettingsLinks(
+  features: ServerFeature[],
+  type: FeatureProvider['type'],
+  id: string,
+): { key: string; label: string; href: string }[] {
+  const out: { key: string; label: string; href: string }[] = [];
+  const seen = new Set<string>();
+  for (const f of features) {
+    if (f.state !== 'active' || !f.providers.some((p) => p.type === type && p.id === id)) continue;
+    const add = (href: string, label: string) => {
+      if (seen.has(href)) return;
+      seen.add(href);
+      out.push({ key: `${f.key}:${href}`, label, href });
+    };
+    if (f.href) add(f.href, f.name);
+    for (const l of f.links) add(l.href, l.label);
+  }
+  return out;
+}
+
 export function featureStatus(state: FeatureState): HubStatus {
   return state === 'active' ? 'connected' : state === 'disabled' ? 'limited' : 'disabled';
 }

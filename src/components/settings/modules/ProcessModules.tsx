@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { loadCapabilities, useServerCapabilities } from '../../../lib/capabilities';
+import { refreshCapabilitiesNow, useServerCapabilities } from '../../../lib/capabilities';
 import { IS_STORE_BUILD } from '../../../lib/distribution';
 import { serverApi } from '../../../lib/client/server-api';
 import type { HubStatus } from '../hub/HubTile';
@@ -400,11 +400,11 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
             noticeRef.current({ kind: 'error', text: last ? describeEvent(last, t) : t.errGeneric });
           }
           await refresh();
-          await loadCapabilities({ force: true });
+          await refreshCapabilitiesNow();
           // Le module installé démarre ensuite : relecture différée de ses fonctions.
           setTimeout(() => {
             void refresh();
-            void loadCapabilities({ force: true });
+            void refreshCapabilitiesNow();
           }, 3000);
           return;
         }
@@ -829,13 +829,13 @@ export function ProcessModuleDetail({
           : tx.actionDone[action];
     setNotice({ kind: 'ok', text });
     await pm.refresh();
-    await loadCapabilities({ force: true });
+    await refreshCapabilitiesNow();
     // Démarrage asynchrone : le module annonce ses fonctions une fois « running ». Seconde lecture
     // différée pour que menus et pages reflètent le nouvel état sans recharger.
     if (action === 'start' || action === 'restart' || action === 'rollback' || action === 'update') {
       setTimeout(() => {
         void pm.refresh();
-        void loadCapabilities({ force: true });
+        void refreshCapabilitiesNow();
       }, 3000);
     }
   };
@@ -853,7 +853,7 @@ export function ProcessModuleDetail({
       setNotice({ kind: 'ok', text: tx.actionDone.uninstall });
       onRemoved();
       await pm.refresh();
-      await loadCapabilities({ force: true });
+      await refreshCapabilitiesNow();
     } else {
       setNotice({ kind: 'error', text: errorMessage(res, tx) });
     }

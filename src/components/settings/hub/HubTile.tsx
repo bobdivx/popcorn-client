@@ -1,4 +1,4 @@
-import type { ComponentType } from 'preact';
+import type { ComponentChildren, ComponentType } from 'preact';
 import { useState } from 'preact/hooks';
 
 /** `error` : état en échec (pastille corail), p. ex. module arrêté sur erreur. */
@@ -16,6 +16,11 @@ type Common = {
   initial?: string;
   faviconUrl?: string;
   index?: number;
+  /**
+   * Actions rapides sous la tuile (ex. activer / désactiver / désinstaller un module). Rendues à côté
+   * du bouton principal (jamais imbriquées dedans), focusables à la télécommande.
+   */
+  actions?: ComponentChildren;
 };
 
 type LinkTile = Common & {
@@ -86,10 +91,13 @@ export function HubTile(props: HubTileProps) {
     />
   );
 
+  const cellClass = props.actions ? 'hub-tile-cell hub-tile-cell--actions' : 'hub-tile-cell';
+  const actions = props.actions ? <div class="hub-tile-actions">{props.actions}</div> : null;
+
   if ('href' in props && props.href) {
     const external = props.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {};
     return (
-      <div class="hub-tile-cell" data-tv-list-item>
+      <div class={cellClass} data-tv-list-item>
         <a
           href={props.href}
           class="hub-tile"
@@ -102,12 +110,13 @@ export function HubTile(props: HubTileProps) {
         >
           {face}
         </a>
+        {actions}
       </div>
     );
   }
 
   return (
-    <div class="hub-tile-cell" data-tv-list-item>
+    <div class={cellClass} data-tv-list-item>
       <button
         type="button"
         class="hub-tile"
@@ -119,6 +128,7 @@ export function HubTile(props: HubTileProps) {
       >
         {face}
       </button>
+      {actions}
     </div>
   );
 }
