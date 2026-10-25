@@ -1,8 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import SearchComponent from '../components/Search';
+import SearchRoute from '../components/search/SearchRoute';
 ---
 
 <Layout title="Recherche - Popcornn">
-  <SearchComponent client:only="preact" />
+  <SearchRoute client:only="preact" />
 </Layout>

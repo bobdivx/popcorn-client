@@ -94,7 +94,6 @@ export const RETIRED_ROUTE_PREFIXES: readonly string[] = ['/settings/uploads', '
  */
 export const TORRENT_MODULE_ROUTE_PREFIXES: readonly string[] = [
   '/downloads',
-  '/search',
   '/demandes',
   '/requests',
   '/settings/indexers',
@@ -110,9 +109,11 @@ export const TORRENT_MODULE_ROUTE_PREFIXES: readonly string[] = [
   '/settings/discovery',
 ];
 
-/** Routes qui exigent le module Indexers (recherche / catalogue / synchro), même avec le moteur torrent. */
+/**
+ * Routes qui exigent le module Indexers (catalogue / synchro), même avec le moteur torrent.
+ * `/search` n'en fait pas partie : sans indexers, elle cherche dans la bibliothèque locale.
+ */
 export const INDEXERS_MODULE_ROUTE_PREFIXES: readonly string[] = [
-  '/search',
   '/settings/indexers',
   '/settings/indexer-definitions',
   '/settings/sync',

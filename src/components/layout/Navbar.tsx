@@ -175,9 +175,10 @@ export default function Navbar() {
   // Module torrent : présent dans ce build ET annoncé par le serveur (GET /api/client/capabilities).
   const serverCapabilities = useServerCapabilities();
   const torrentUi = TORRENT_FEATURES_ENABLED && (serverCapabilities ? serverCapabilities.features.torrent : true);
-  // Recherche torrents : servie par le module Indexers ; Demandes : `requests` + Indexers.
+  // Recherche : toujours proposée hors version store (sans module Indexers, elle cherche dans la
+  // bibliothèque locale). Demandes : `requests` + Indexers.
   // Capacités inconnues / serveur ancien → affichées (comportement historique).
-  const searchUi = torrentUi && isIndexersModuleAvailable();
+  const searchUi = TORRENT_FEATURES_ENABLED;
   const requestsUi = torrentUi && isRequestsAvailable();
 
   // Page d'un module absent du serveur (lien direct, favori, module désinstallé) : plutôt qu'une page
@@ -440,7 +441,7 @@ export default function Navbar() {
 
             {user ? (
               <>
-                {/* Recherche (torrents / indexers) — absente de la version store */}
+                {/* Recherche (indexers, ou bibliothèque locale sans indexers) — absente de la version store */}
                 {searchUi && (
                   <a
                     href="/search"
