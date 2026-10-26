@@ -161,6 +161,9 @@ const META: Record<string, FeatureMeta> = {
 META.car = META.car_lab;
 META.webos = META.webos_deployment;
 
+/** Fonctions sans feature Cargo propre, apportées par un module (Indexers → demandes, Partage). */
+const MODULE_ONLY = new Set(['requests', 'sharing', 'friends', 'indexer_definitions']);
+
 /** Capacités retirées du produit (toujours `false`) : pas de tuile. */
 const RETIRED = new Set(['uploads', 'ratio_tools']);
 
@@ -171,6 +174,7 @@ export const FEATURE_TEXT = {
     disabled: 'Désactivé',
     notInstalled: 'Non installé',
     builtin: 'Intégré au serveur',
+    moduleRequired: 'Module à installer',
     moduleBy: (name: string) => `Module · ${name}`,
     state: 'État',
     source: 'Fournie par',
@@ -193,6 +197,7 @@ export const FEATURE_TEXT = {
     disabled: 'Disabled',
     notInstalled: 'Not installed',
     builtin: 'Built into the server',
+    moduleRequired: 'Module required',
     moduleBy: (name: string) => `Module · ${name}`,
     state: 'State',
     source: 'Provided by',
@@ -246,6 +251,26 @@ function humanize(key: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : key;
 }
 
+/** Noms des modules officiels (le protocole ne transmet que l'id). */
+const KNOWN_MODULE_NAMES: Record<string, Record<Lang, string>> = {
+  'app.popcornn.torrent': { fr: 'Torrent', en: 'Torrent' },
+  'app.popcornn.indexers': { fr: 'Indexers', en: 'Indexers' },
+  'app.popcornn.sharing': { fr: 'Partage', en: 'Sharing' },
+};
+
+/**
+ * Nom lisible d'un module « process » : nom connu, sinon fonction principale fournie
+ * (`provides[0]`), sinon dernier segment de l'id (`org.example.hello` → « Hello »).
+ */
+export function processModuleName(m: { id: string; provides?: string[] | null }, language: string): string {
+  const lang: Lang = language === 'en' ? 'en' : 'fr';
+  const known = KNOWN_MODULE_NAMES[m.id];
+  if (known) return known[lang];
+  const first = (m.provides ?? []).find((k) => META[k]);
+  if (first) return META[first][lang].name;
+  return humanize(m.id.split('.').pop() || m.id);
+}
+
 /** Construit la liste des fonctions à partir des capacités et des modules installés. */
 export function buildServerFeatures(
   caps: ServerCapabilities | null,
@@ -269,7 +294,7 @@ export function buildServerFeatures(
   }
   for (const m of processModules) {
     for (const k of m.provides ?? []) {
-      addProvider(k, { type: 'process', id: m.id, name: m.id, version: m.version || '', active: m.state === 'running' || m.state === 'degraded' || m.state === 'starting' });
+      addProvider(k, { type: 'process', id: m.id, name: processModuleName(m, language), version: m.version || '', active: m.state === 'running' || m.state === 'degraded' || m.state === 'starting' });
     }
   }
   // Serveur sans liste à jour : les modules résumés dans les capacités servent de repli.
@@ -294,14 +319,19 @@ export function buildServerFeatures(
     const meta = META[key];
     const label = meta?.[lang];
     const provs = providers.get(key) ?? [];
-    const builtin = caps?.features[key] === true;
+    // Intégrée = annoncée active SANS module actif qui la fournisse (sinon c'est le module qui
+    // l'apporte : « Module · Torrent », pas « Intégré au serveur »).
+    const builtin = caps?.features[key] === true && !provs.some((p) => p.active);
     let state: FeatureState;
-    if (builtin || provs.some((p) => p.active)) state = 'active';
+    if (caps?.features[key] === true || provs.some((p) => p.active)) state = 'active';
     else if (provs.length > 0) state = 'disabled';
     else if (meta?.compiled) {
       // Feature Cargo optionnelle : absente du binaire → non installée, sinon désactivée.
       const inBinary = compiled ? compiled.includes(meta.compiled) : caps?.edition === 'full' || caps?.legacy === true;
       state = inBinary ? 'disabled' : 'not_installed';
+    } else if (caps?.modules?.processHost && MODULE_ONLY.has(key)) {
+      // Serveur à modules : fonction apportée seulement par un module, aucun installé.
+      state = 'not_installed';
     } else if (!caps || key in (caps.features ?? {})) state = 'disabled';
     else state = 'not_installed';
     return {
@@ -354,10 +384,11 @@ export function featureStatusLabel(state: FeatureState, tx: FeatureTx): string {
   return state === 'active' ? tx.active : state === 'disabled' ? tx.disabled : tx.notInstalled;
 }
 
-/** Sous-titre de tuile : intégré au serveur ou module qui la fournit. */
+/** Sous-titre de tuile : module qui la fournit, intégrée au serveur, ou module à installer. */
 export function featureSource(f: ServerFeature, tx: FeatureTx, serverVersion: string | null): string {
   const p = f.providers.find((x) => x.active) ?? f.providers[0];
   if (p && !f.builtin) return `${tx.moduleBy(p.name)}${p.version ? ` · ${p.version}` : ''}`;
+  if (f.state === 'not_installed') return tx.moduleRequired;
   return serverVersion && f.builtin ? `${tx.builtin} · ${serverVersion}` : tx.builtin;
 }
 
