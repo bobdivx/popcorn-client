@@ -44,7 +44,8 @@ import {
  * - Masqués si le serveur ne connaît pas ces routes (capabilities sans `modules.process`, ou 404/405).
  * - Absents de la version store (IS_STORE_BUILD) ; routes bloquées aussi par le garde réseau.
  * - Suivi par sondage (pas d'EventSource : pas d'en-tête d'authentification, et plus sûr sur webOS).
- * - Aucune clé de confiance par défaut : l'administrateur n'ajoute que des clés qu'il a vérifiées.
+ * - Seule clé de confiance par défaut : la clé officielle Popcornn (intégrée au serveur, non
+ *   supprimable, sert au catalogue officiel). L'administrateur n'ajoute que des clés qu'il a vérifiées.
  *
  * L'état (liste, clés, opération en cours) vit dans `useProcessModules` au niveau de la page : une
  * installation continue d'être suivie quand la modale « Ajouter un module » est fermée.
@@ -157,6 +158,7 @@ export const PROCESS_TEXT = {
     addKey: 'Ajouter la clé',
     keyAdded: (id: string) => `Clé ${id} ajoutée.`,
     removeKey: 'Retirer',
+    officialKey: 'Clé officielle Popcornn · intégrée au serveur, non supprimable',
     confirmRemoveKey: 'Confirmer le retrait',
     keyRemoved: 'Clé retirée.',
     keyModules: 'Modules liés',
@@ -274,6 +276,7 @@ export const PROCESS_TEXT = {
     addKey: 'Add key',
     keyAdded: (id: string) => `Key ${id} added.`,
     removeKey: 'Remove',
+    officialKey: 'Official Popcornn key · built into the server, cannot be removed',
     confirmRemoveKey: 'Confirm removal',
     keyRemoved: 'Key removed.',
     keyModules: 'Bound modules',
@@ -1172,7 +1175,12 @@ export function TrustKeysPanel({
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 shrink-0">
-                  {confirmKey === k.key_id ? (
+                  {k.official ? (
+                    <span class="inline-flex items-center gap-2 text-xs tv:text-base" style={{ color: C.accent }}>
+                      <Icon name="lock" />
+                      {tx.officialKey}
+                    </span>
+                  ) : confirmKey === k.key_id ? (
                     <>
                       <ActionButton label={tx.confirmRemoveKey} icon="trash" primary disabled={locked} onClick={() => void onRemoveKey(k.key_id)} />
                       <ActionButton label={tx.cancel} icon="rollback" disabled={locked} onClick={() => setConfirmKey(null)} />

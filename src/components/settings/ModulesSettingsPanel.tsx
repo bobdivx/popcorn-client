@@ -38,6 +38,8 @@ import {
   processTx,
   useProcessModules,
 } from './modules/ProcessModules';
+import { catalogTileIcon, catalogTileState, installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
+import type { CatalogModule } from '../../lib/client/server-api/modules';
 import {
   ServerFeatureDetail,
   buildServerFeatures,
@@ -57,8 +59,10 @@ import {
  * « Serveur connecté ». Le détail s'ouvre en modale.
  *
  * Le lecteur Popcornn fonctionne seul (bibliothèque locale, Jellyfin, transcodage). Les fonctions
- * optionnelles sont des modules : aucun n'est installé ni proposé par défaut, l'administrateur colle
- * l'URL du dépôt de son choix. Modules « process » masqués si le serveur ne les gère pas.
+ * optionnelles sont des modules : aucun n'est installé par défaut. Le « Catalogue officiel » (modules
+ * signés par la clé officielle Popcornn, voir ModuleStore) les propose en un clic ; les modules
+ * spéciaux (indexers…) s'ajoutent par URL avec la tuile « + ». Modules « process » et catalogue
+ * masqués si le serveur ne les gère pas.
  * Page absente de la version store (STORE_BLOCKED_ROUTE_PREFIXES).
  */
 const TEXT = {
@@ -274,6 +278,9 @@ export default function ModulesSettingsPanel() {
   const [gitRef, setGitRef] = useState('');
 
   const pm = useProcessModules(ptx, setNotice);
+  const stx = storeTx(language);
+  // Catalogue relu (cache serveur) à chaque changement de la liste des modules process.
+  const store = useModuleCatalog(caps, pm.supported, pm.list);
 
   const alive = useRef(true);
   useEffect(() => {
@@ -335,9 +342,22 @@ export default function ModulesSettingsPanel() {
     }
   };
 
+  const onCatalogInstall = async (m: CatalogModule) => {
+    setBusy(`catalog:${m.id}`);
+    setNotice(null);
+    await installFromCatalog(m, {
+      stx,
+      errTx: ptx,
+      setNotice,
+      startJob: pm.startJob,
+      afterChange: () => afterChange({ delayed: true }),
+    });
+    if (alive.current) setBusy(null);
+  };
+
   const refreshAll = async () => {
     setBusy('refresh');
-    await Promise.all([refreshList(), pm.supported ? pm.refresh() : Promise.resolve()]);
+    await Promise.all([refreshList(), pm.supported ? pm.refresh() : Promise.resolve(), store.supported ? store.refresh() : Promise.resolve()]);
     await refreshCapabilitiesNow();
     if (alive.current) setBusy(null);
   };
@@ -643,6 +663,62 @@ export default function ModulesSettingsPanel() {
           </p>
         )}
       </div>
+
+      {store.supported && (store.catalog || store.error) && (
+        <section aria-labelledby="modules-store-title" class="mb-8 tv:mb-12 grid gap-4 tv:gap-6">
+          {sectionTitle('modules-store-title', stx.section)}
+          <p class="text-sm tv:text-lg max-w-2xl" style={{ color: C.muted }}>
+            {stx.intro}
+          </p>
+          {store.error && !store.catalog && (
+            <p role="alert" class="text-sm tv:text-lg" style={{ color: C.accent }}>
+              {stx.error}
+            </p>
+          )}
+          {store.catalog && store.catalog.modules.length === 0 && <p class="hub-empty">{stx.empty}</p>}
+          {store.catalog && store.catalog.modules.length > 0 && (
+            <HubGrid>
+              {store.catalog.modules.map((m) => {
+                const st = catalogTileState(m, stx);
+                const installing = busy === `catalog:${m.id}` || (pm.jobRunning && pm.job?.moduleId === m.id);
+                const label =
+                  st.action === 'install' ? stx.install : st.action === 'update' ? stx.update : st.action === 'start' ? stx.start : '';
+                const version =
+                  m.installed_version && m.update_available ? `${m.installed_version} → ${m.version}` : m.installed_version || m.version;
+                return (
+                  <HubTile
+                    key={`store:${m.id}`}
+                    title={m.name}
+                    hint={m.compatible ? m.description : m.incompatible_reason || m.description}
+                    icon={catalogTileIcon(m)}
+                    status={st.status}
+                    statusLabel={m.update_available && m.installed ? stx.updateAvailable(m.version) : st.label}
+                    meta={`${ptx.kind} · ${version}`}
+                    onClick={() => {
+                      if (m.installed) open({ type: 'process', id: m.id });
+                      else if (st.action === 'install' && !busy && !pm.jobRunning) void onCatalogInstall(m);
+                    }}
+                    actions={
+                      st.action ? (
+                        <button
+                          type="button"
+                          data-focusable
+                          class={`hub-tile-action ${st.action === 'install' ? 'hub-tile-action--primary' : ''}`}
+                          disabled={!!busy || pm.jobRunning}
+                          onClick={() => void onCatalogInstall(m)}
+                        >
+                          <Icon name={st.action === 'start' ? 'play' : 'download'} />
+                          {installing ? stx.installing : label}
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                );
+              })}
+            </HubGrid>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="modules-installed-title" class="grid gap-4 tv:gap-6">
         {sectionTitle('modules-installed-title', tx.installedSection)}

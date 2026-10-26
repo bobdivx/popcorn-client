@@ -208,6 +208,8 @@ export interface TrustedKey {
   public_key: string;
   label: string;
   added_at?: string | null;
+  /** Clé officielle Popcornn (intégrée au serveur, non supprimable). */
+  official?: boolean;
 }
 
 export interface TrustKeys {
@@ -216,6 +218,68 @@ export interface TrustKeys {
   bindings: Record<string, string>;
   allow_unsigned: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Catalogue officiel (« store ») : modules process signés par la clé officielle Popcornn,
+// installables en un clic. Les indexers n'y figurent jamais (installation par URL uniquement).
+// Serveur ancien : 404 / 405 → le catalogue est masqué, l'installation par URL reste disponible.
+// ---------------------------------------------------------------------------
+
+export type CatalogModuleStatus = 'not_installed' | 'active' | 'disabled' | string;
+
+export interface CatalogModule {
+  id: string;
+  name: string;
+  description: string;
+  /** Nom d'icône SVG du client (jamais une URL). */
+  icon: string | null;
+  category: string | null;
+  version: string;
+  kind: 'process' | string;
+  scopes: string[];
+  requires?: { server?: string; protocol?: number };
+  platforms?: string[];
+  homepage?: string | null;
+  status: CatalogModuleStatus;
+  installed: boolean;
+  installed_version: string | null;
+  enabled: boolean;
+  state: string | null;
+  update_available: boolean;
+  compatible: boolean;
+  incompatible_reason: string | null;
+  signed_by_official?: boolean | null;
+}
+
+export interface ModuleCatalog {
+  url: string;
+  serial: number;
+  generated_at: string | null;
+  official_key_id: string;
+  platform: string | null;
+  server_version: string | null;
+  modules: CatalogModule[];
+}
+
+export interface CatalogInstallResult {
+  job_id: string | null;
+  module_id: string;
+  version?: string;
+  is_update?: boolean;
+  already_installed?: boolean;
+}
+
+const CBASE = '/api/client/admin/modules/catalog';
+
+export const catalogMethods = {
+  async getModuleCatalog(this: ServerApiClientAccess, refresh = false): Promise<ApiResponse<ModuleCatalog>> {
+    return this.backendRequest<ModuleCatalog>(`${CBASE}${refresh ? '?refresh=true' : ''}`, { method: 'GET' });
+  },
+
+  async installCatalogModule(this: ServerApiClientAccess, id: string): Promise<ApiResponse<CatalogInstallResult>> {
+    return this.backendRequest<CatalogInstallResult>(`${CBASE}/${encodeURIComponent(id)}/install`, { method: 'POST' });
+  },
+};
 
 const PBASE = '/api/client/admin/modules/process';
 const enc = encodeURIComponent;

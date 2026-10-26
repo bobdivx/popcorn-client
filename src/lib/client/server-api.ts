@@ -70,7 +70,7 @@ import { requestsMethods } from './server-api/requests.js';
 import { systemMethods } from './server-api/system.js';
 import { aiMethods } from './server-api/ai.js';
 import { platformsMethods } from './server-api/platforms.js';
-import { modulesMethods, processModulesMethods } from './server-api/modules.js';
+import { catalogMethods, modulesMethods, processModulesMethods } from './server-api/modules.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -233,6 +233,10 @@ interface IServerApiClientPublic {
   addTrustKey(publicKey: string, label: string): Promise<ApiResponse<{ key_id: string }>>;
   listTrustKeys(): Promise<ApiResponse<import('./server-api/modules.js').TrustKeys>>;
   removeTrustKey(keyId: string): Promise<ApiResponse<{ key_id: string; removed: boolean }>>;
+
+  // Catalogue officiel des modules (« store », admin) — absent des anciens serveurs (404 / 405)
+  getModuleCatalog(refresh?: boolean): Promise<ApiResponse<import('./server-api/modules.js').ModuleCatalog>>;
+  installCatalogModule(id: string): Promise<ApiResponse<import('./server-api/modules.js').CatalogInstallResult>>;
   
   listMediaRequests(params?: { user_id?: string; status?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest[]>>;
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
@@ -583,7 +587,8 @@ Object.assign(ServerApiClient.prototype,
   aiMethods,
   platformsMethods,
   modulesMethods,
-  processModulesMethods
+  processModulesMethods,
+  catalogMethods
 );
 
 // Instance réelle (utilisée quand isDemoMode() est false)

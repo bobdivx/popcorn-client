@@ -74,6 +74,11 @@ export interface ServerCapabilities {
      * `false` : serveur plus ancien. Absent des anciens caches (inconnu → le client sonde la route).
      */
     processHost?: boolean;
+    /**
+     * Catalogue officiel signé (« store ») annoncé par le serveur (`modules.catalog`).
+     * `undefined` : serveur ancien ou cache ancien (le client sonde la route, 404 → masqué).
+     */
+    catalog?: boolean;
     /** Modules « process » résumés (`modules.process`). Absent des anciens serveurs / caches. */
     process?: ProcessModuleSummary[];
     /**
@@ -223,6 +228,7 @@ export function parseCapabilities(json: any, backendUrl: string): ServerCapabili
       definitionsRepositoryConfigured: m.definitions_repository_configured === true,
       installed: parseInstalled(m.installed),
       processHost: Array.isArray(m.process),
+      catalog: typeof m.catalog === 'boolean' ? m.catalog : undefined,
       process: parseProcess(m.process),
       toggleRoutes: detectToggleRoutes(f, m),
     },
