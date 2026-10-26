@@ -111,6 +111,7 @@ export const PROCESS_TEXT = {
     state: 'État',
     restartsLabel: 'Redémarrages',
     lastError: 'Dernière erreur',
+    lastIncident: 'Dernier incident',
     signedBy: 'Clé',
     unsignedModule: 'non signé',
     installedAt: 'Installé le',
@@ -227,6 +228,7 @@ export const PROCESS_TEXT = {
     state: 'State',
     restartsLabel: 'Restarts',
     lastError: 'Last error',
+    lastIncident: 'Last incident',
     signedBy: 'Key',
     unsignedModule: 'unsigned',
     installedAt: 'Installed on',
@@ -420,6 +422,16 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
       if (timer) clearTimeout(timer);
     };
   }, [job?.jobId, job?.done]);
+
+  // Module en « Démarrage » : relecture toutes les 2 s jusqu'à un état stable (puis capacités).
+  const starting = (list?.modules ?? []).some((m) => m.state === 'starting');
+  useEffect(() => {
+    if (!starting) return;
+    const timer = setTimeout(() => {
+      void refresh().then(() => refreshCapabilitiesNow());
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [starting, list]);
 
   const supported = !IS_STORE_BUILD && !knownUnsupported && !hidden;
   return {
@@ -918,7 +930,16 @@ export function ProcessModuleDetail({
           m.provides.length > 0 && [tx.provides, m.provides.join(', ')],
           m.installed_versions.length > 1 && [tx.versions, m.installed_versions.join(', ')],
           !!m.release_url && [tx.source, m.release_url, 'break-all text-xs tv:text-base'],
-          !!m.last_error && [tx.lastError, <span style={{ color: C.accent }}>{m.last_error}</span>],
+          // Conservé par le serveur après une reprise : « Dernier incident » (daté) si le module tourne.
+          !!m.last_error && [
+            m.state === 'running' ? tx.lastIncident : tx.lastError,
+            <span style={{ color: m.state === 'running' ? C.faint : C.accent }}>
+              {m.last_error_at
+                ? `${new Date(m.last_error_at).toLocaleString(language === 'en' ? 'en-GB' : 'fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · `
+                : ''}
+              {m.last_error}
+            </span>,
+          ],
         ]}
       />
 
@@ -953,6 +974,8 @@ export function ProcessModuleDetail({
           <>
             {running ? (
               <ActionButton label={tx.stop} icon="stop" disabled={locked} onClick={() => void onAction('stop')} />
+            ) : m.state === 'failed' ? (
+              <ActionButton label={tx.restart} icon="restart" primary disabled={locked} onClick={() => void onAction('restart')} />
             ) : (
               <ActionButton label={tx.start} icon="play" primary disabled={locked} onClick={() => void onAction('start')} />
             )}

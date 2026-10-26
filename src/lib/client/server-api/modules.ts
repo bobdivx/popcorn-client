@@ -135,6 +135,8 @@ export interface ProcessModule {
   pid: number | null;
   restarts: number;
   last_error: string | null;
+  /** Horodatage (ms epoch) de `last_error` ; conservé après une reprise. */
+  last_error_at?: number | null;
   health: { status?: string; details?: unknown } | null;
   provides: string[];
   routes?: unknown[];

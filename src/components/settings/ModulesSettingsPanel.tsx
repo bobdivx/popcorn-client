@@ -47,6 +47,7 @@ import {
   featureTileIcon,
   featureTx,
   moduleSettingsLinks,
+  processModuleName,
 } from './modules/ServerFeatures';
 
 /**
@@ -114,6 +115,9 @@ const TEXT = {
     enable: 'Activer',
     disable: 'Désactiver',
     enabling: 'Activation…',
+    restart: 'Redémarrer',
+    restarting: 'Redémarrage…',
+    successRestart: (name: string) => `Module « ${name} » relancé.`,
     disabling: 'Désactivation…',
     disabledState: 'Désactivé',
     settings: 'Réglages',
@@ -190,6 +194,9 @@ const TEXT = {
     enable: 'Enable',
     disable: 'Disable',
     enabling: 'Enabling…',
+    restart: 'Restart',
+    restarting: 'Restarting…',
+    successRestart: (name: string) => `Module “${name}” restarted.`,
     disabling: 'Disabling…',
     disabledState: 'Disabled',
     settings: 'Settings',
@@ -355,6 +362,22 @@ export default function ModulesSettingsPanel() {
     }
   };
 
+  /** Relance d'un module « process » en échec (revérifie signature et binaire). */
+  const onRestart = async (m: ModuleRef) => {
+    if (busy) return;
+    setBusy(`restart:${m.id}`);
+    setNotice(null);
+    const res = await serverApi.processModuleAction(m.id, 'restart');
+    if (!alive.current) return;
+    setBusy(null);
+    if (res.success) {
+      setNotice({ kind: 'ok', text: tx.successRestart(m.name) });
+      await afterChange({ delayed: true });
+    } else {
+      setNotice({ kind: 'error', text: errorMessage(res, tx) });
+    }
+  };
+
   const askUninstall = (m: ModuleRef) => {
     if (busy) return;
     setNotice(null);
@@ -494,11 +517,17 @@ export default function ModulesSettingsPanel() {
   const settingsLinksOf = (m: ModuleRef) => moduleSettingsLinks(features, m.type, m.id);
 
   /** Boutons rapides d'une tuile de module : réglages, activer / désactiver, désinstaller. */
-  const tileActions = (m: ModuleRef, enabled: boolean) => {
+  const tileActions = (m: ModuleRef, enabled: boolean, failed = false) => {
     const links = settingsLinksOf(m);
     const toggling = busy === `toggle:${m.type}:${m.id}`;
     return (
       <>
+        {failed && (
+          <button type="button" data-focusable class="hub-tile-action" disabled={!!busy} onClick={() => void onRestart(m)}>
+            <Icon name="restart" />
+            {busy === `restart:${m.id}` ? tx.restarting : tx.restart}
+          </button>
+        )}
         {links.length === 1 ? (
           <a href={links[0].href} data-focusable class="hub-tile-action" title={links[0].label}>
             <Icon name="settings" />
@@ -639,18 +668,19 @@ export default function ModulesSettingsPanel() {
             })}
             {processModules.map((m) => {
               const enabled = m.enabled !== false;
-              const ref: ModuleRef = { type: 'process', id: m.id, name: m.id };
+              const name = processModuleName(m, language);
+              const ref: ModuleRef = { type: 'process', id: m.id, name };
               const stoppedByAdmin = !enabled && (m.state === 'stopped' || !m.state);
               return (
                 <HubTile
                   key={`process:${m.id}`}
-                  title={m.id}
+                  title={name}
                   icon={ProcessModuleTileIcon}
                   status={stoppedByAdmin ? 'disabled' : processStatus(m.state)}
                   statusLabel={stoppedByAdmin ? tx.disabledState : ptx.states[m.state] ?? m.state}
                   meta={`${ptx.kind} · ${m.version || '—'}`}
                   onClick={() => open({ type: 'process', id: m.id })}
-                  actions={tileActions(ref, enabled)}
+                  actions={tileActions(ref, enabled, m.state === 'failed')}
                 />
               );
             })}
@@ -955,10 +985,10 @@ export default function ModulesSettingsPanel() {
 
       {/* Détail d'un module exécutable */}
       {processModule && (
-        <HubModal open title={processModule.id} onClose={close} size="xl" className={MODAL_CLASS}>
+        <HubModal open title={processModuleName(processModule, language)} onClose={close} size="xl" className={MODAL_CLASS}>
           <div class="grid gap-5 tv:gap-7">
             <NoticeBanner notice={notice} />
-            {settingsSection({ type: 'process', id: processModule.id, name: processModule.id })}
+            {settingsSection({ type: 'process', id: processModule.id, name: processModuleName(processModule, language) })}
             <ProcessModuleDetail
               key={processModule.id}
               m={processModule}
