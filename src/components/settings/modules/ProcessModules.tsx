@@ -3,6 +3,7 @@ import { refreshCapabilitiesNow, useServerCapabilities } from '../../../lib/capa
 import { IS_STORE_BUILD } from '../../../lib/distribution';
 import { serverApi } from '../../../lib/client/server-api';
 import type { HubStatus } from '../hub/HubTile';
+import { processModuleName } from './ServerFeatures';
 import {
   isProcessModulesUnsupported,
   type ProcessJobEvent,
@@ -313,6 +314,16 @@ function describeEvent(ev: ProcessJobEvent, tx: ProcessTx): string {
   return label;
 }
 
+/** Langue d'un jeu de textes (les noms lisibles des modules en dépendent). */
+function txLanguage(tx: ProcessTx): 'fr' | 'en' {
+  return tx === PROCESS_TEXT.en ? 'en' : 'fr';
+}
+
+/** Nom lisible d'un module à partir de son id (« Torrent » au lieu de `app.popcornn.torrent`). */
+export function processModuleLabel(id: string, tx: ProcessTx, provides?: string[] | null): string {
+  return processModuleName({ id, provides }, txLanguage(tx));
+}
+
 export interface JobView {
   jobId: string;
   moduleId: string;
@@ -397,7 +408,7 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
         if (done) {
           const last = events[events.length - 1];
           if (last && last.step === 'done') {
-            noticeRef.current({ kind: 'ok', text: t.doneInstall(job.moduleId, last.version || '') });
+            noticeRef.current({ kind: 'ok', text: t.doneInstall(processModuleLabel(job.moduleId, t), last.version || '') });
           } else {
             noticeRef.current({ kind: 'error', text: last ? describeEvent(last, t) : t.errGeneric });
           }
@@ -460,7 +471,7 @@ export function ProcessJobProgress({ job, tx }: { job: JobView | null; tx: Proce
   return (
     <div class={panelClass} role="status" aria-live="polite">
       <p class="text-sm tv:text-lg">
-        <span style={{ color: C.faint }}>{job.moduleId} · </span>
+        <span style={{ color: C.faint }}>{processModuleLabel(job.moduleId, tx)} · </span>
         {lastEvent ? describeEvent(lastEvent, tx) : `${tx.steps.downloading}…`}
       </p>
       {dlPct !== null && (
@@ -675,7 +686,7 @@ export function ProcessInstallForm({
           </h4>
           <FactList
             rows={[
-              [tx.module, p.release.id, 'break-all'],
+              [tx.module, `${processModuleLabel(p.release.id, tx)} (${p.release.id})`, 'break-all'],
               [
                 tx.version,
                 `${p.release.version}${p.is_update && p.installed_version ? ` · ${tx.update(p.installed_version)}` : ''}`,
