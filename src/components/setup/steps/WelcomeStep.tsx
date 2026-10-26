@@ -248,7 +248,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
           <span class="wz-section-label">À configurer</span>
           <ol class="wz-list wz-list--lines" style="border-top:1px solid var(--wz-line);">
             {[
-              'Un indexer pour récupérer les torrents',
+              'Un indexer pour récupérer les torrents (facultatif)',
               'Une clé API TMDB pour les métadonnées',
               'L\'emplacement de téléchargement',
             ].map((text, i) => (

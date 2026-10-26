@@ -2403,7 +2403,13 @@
     "filterByCountry": "Pays",
     "filterAll": "Toutes / Tous",
     "suggestedForYourLanguage": "Suggestions pour votre langue",
-    "noResultsForSearch": "Aucun indexeur ne correspond à votre recherche ou aux filtres."
+    "noResultsForSearch": "Aucun indexeur ne correspond à votre recherche ou aux filtres.",
+    "title": "Configuration des indexers",
+    "leadOptional": "Les indexers sont les sources dans lesquelles Popcornn recherche films et séries. Cette étape est facultative.",
+    "optionalNotice": "Étape facultative : sans indexer, votre bibliothèque locale (les fichiers déjà présents sur le serveur) fonctionne normalement. Vous pourrez ajouter des indexers plus tard depuis Paramètres → Modules.",
+    "importDelayHint": "(si vous venez de vous connecter, l'import automatique peut prendre quelques secondes)",
+    "configured": "Au moins un indexer est configuré",
+    "skip": "Passer cette étape"
   },
   "indexerDefinitionDocs": {
     "open": "Documentation",

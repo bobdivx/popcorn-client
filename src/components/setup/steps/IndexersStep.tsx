@@ -11,6 +11,7 @@ import {
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { Info } from 'lucide-preact';
 import { StepHeader, StepLoading, Alert, Spinner, CheckButton, IconArrowLeft, IconArrowRight } from '../wizardUi';
+import { getIndexersStepContinueAction } from '../indexersStepPolicy';
 
 const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
 function getStoredUseJackett(): boolean {
@@ -407,8 +408,8 @@ export function IndexersStep({
   const header = (
     <StepHeader
       kicker="Sources"
-      title="Configuration des indexers"
-      lead="Les indexers sont les sources dans lesquelles Popcornn recherche films et séries. Ajoutez-en au moins un pour continuer."
+      title={t('setupIndexersStep.title')}
+      lead={t('setupIndexersStep.leadOptional')}
     />
   );
 
@@ -422,6 +423,8 @@ export function IndexersStep({
   }
 
   const hasIndexers = indexers.length > 0;
+  // Étape facultative : sans indexer, on peut passer (bibliothèque locale seule).
+  const continueAction = getIndexersStepContinueAction(indexers.length);
 
   const openManualForm = () => {
     setShowDefinitionSelector(false);
@@ -489,12 +492,12 @@ export function IndexersStep({
 
       <div class="wz-stack">
       {hasIndexers ? (
-        <Alert tone="success">Au moins un indexer est configuré</Alert>
+        <Alert tone="success">{t('setupIndexersStep.configured')}</Alert>
       ) : (
-        <Alert tone="warning">
-          Aucun indexer configuré. Veuillez en ajouter au moins un.
+        <Alert tone="info">
+          {t('setupIndexersStep.optionalNotice')}
           {' '}
-          <span class="wz-muted">(si tu viens de te connecter, l'import automatique peut prendre quelques secondes)</span>
+          <span class="wz-muted">{t('setupIndexersStep.importDelayHint')}</span>
         </Alert>
       )}
 
@@ -970,9 +973,9 @@ export function IndexersStep({
           class="wz-btn wz-btn--primary"
           data-focusable
           onClick={onNext}
-          disabled={!hasIndexers}
+          data-action={continueAction}
         >
-          Suivant
+          {continueAction === 'skip' ? t('setupIndexersStep.skip') : t('common.next')}
           <IconArrowRight />
         </button>
       </div>

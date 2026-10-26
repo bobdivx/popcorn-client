@@ -336,8 +336,10 @@ export default function Wizard() {
         );
 
       case 'indexers':
-        // Version store : étape absente (composant exclu du build) ; serveur sans module torrent : sautée.
-        if (!TORRENT_FEATURES_ENABLED || !isTorrentModuleAvailable()) return null;
+        // Version store : étape absente (composant exclu du build). Même règle que la liste des
+        // étapes (isWizardStepAvailable) : proposée dès que le serveur a le module indexers, même
+        // sans moteur torrent (édition de base + module indexers) ; sinon sautée. Étape facultative.
+        if (!TORRENT_FEATURES_ENABLED || !isWizardStepAvailable('indexers')) return null;
         return (
           <IndexersStep
             setupStatus={setupStatus}
