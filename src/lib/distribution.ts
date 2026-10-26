@@ -177,10 +177,12 @@ function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
  */
 export function missingCapabilityForRoute(pathname: string): string | null {
   if (IS_STORE_BUILD) return null;
+  // Pages des indexers (réglages, synchro…) : nommer le module Indexers en premier, même si le
+  // moteur torrent manque aussi (sinon `?missing=torrent` pour /settings/indexers).
+  if (!isIndexersModuleAvailable() && matchesPrefix(pathname, INDEXERS_MODULE_ROUTE_PREFIXES)) return 'indexers';
   if (!isTorrentModuleAvailable() && matchesPrefix(pathname, TORRENT_MODULE_ROUTE_PREFIXES)) {
     return matchesPrefix(pathname, REQUESTS_ROUTE_PREFIXES) ? 'requests' : 'torrent';
   }
-  if (!isIndexersModuleAvailable() && matchesPrefix(pathname, INDEXERS_MODULE_ROUTE_PREFIXES)) return 'indexers';
   if (!isRequestsAvailable() && matchesPrefix(pathname, REQUESTS_ROUTE_PREFIXES)) return 'requests';
   if (matchesPrefix(pathname, DISCOVER_ROUTE_PREFIXES)) {
     if (!isIndexersModuleAvailable()) return 'indexers';

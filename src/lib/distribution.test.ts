@@ -35,6 +35,8 @@ describe('routes selon les capacités du serveur', () => {
     expect(missingCapabilityForRoute('/discover')).not.toBeNull();
     expect(missingCapabilityForRoute('/plateformes/')).not.toBeNull();
     expect(missingCapabilityForRoute('/downloads')).toBe('torrent');
+    expect(missingCapabilityForRoute('/settings/indexers')).toBe('indexers');
+    expect(missingCapabilityForRoute('/settings/sync')).toBe('indexers');
     expect(missingCapabilityForRoute('/settings/tmdb')).toBeNull();
     expect(missingCapabilityForRoute('/car')).toBeNull();
     expect(isDiscoverAvailable()).toBe(false);
