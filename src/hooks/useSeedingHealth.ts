@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { isFeatureEnabled, loadCapabilities } from '../lib/capabilities';
 
 export interface SeedingDiagnostic {
   status: 'ok' | 'warning' | 'error';
@@ -14,6 +15,13 @@ export function useSeedingHealth() {
   const [loading, setLoading] = useState(true);
 
   const fetchDiagnostic = async () => {
+    // Sans module torrent (serveur « cœur »), la route n'existe pas : pas d'appel (ni de 404
+    // chaque minute). Réévalué à chaque passage : l'installation du module relance le suivi.
+    if (!isFeatureEnabled(await loadCapabilities().catch(() => null), 'torrent')) {
+      setDiagnostic(null);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await serverApi.getSeedingDiagnostic();
       if (res.success && res.data) {
