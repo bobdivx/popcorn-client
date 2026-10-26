@@ -982,17 +982,6 @@ html[data-tv-platform="true"] .modules-type-choice:focus {
   outline: none;
 }
 
-.hub-tile-action--primary {
-  border-color: #f2545b;
-  background: #f2545b;
-  color: var(--ed-ink, #f4f1ec);
-}
-
-.hub-tile-action--primary:hover,
-.hub-tile-action--primary:focus-visible {
-  border-color: var(--ed-ink, #f4f1ec);
-}
-
 .hub-tile-action--danger {
   color: #f2545b;
 }

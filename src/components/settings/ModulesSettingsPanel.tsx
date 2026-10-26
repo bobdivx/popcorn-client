@@ -38,7 +38,7 @@ import {
   processTx,
   useProcessModules,
 } from './modules/ProcessModules';
-import { catalogTileIcon, catalogTileState, installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
+import { catalogIconName, catalogTileState, installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
 import type { CatalogModule } from '../../lib/client/server-api/modules';
 import {
   ServerFeatureDetail,
@@ -59,9 +59,10 @@ import {
  * « Serveur connecté ». Le détail s'ouvre en modale.
  *
  * Le lecteur Popcornn fonctionne seul (bibliothèque locale, Jellyfin, transcodage). Les fonctions
- * optionnelles sont des modules : aucun n'est installé par défaut. Le « Catalogue officiel » (modules
- * signés par la clé officielle Popcornn, voir ModuleStore) les propose en un clic ; les modules
- * spéciaux (indexers…) s'ajoutent par URL avec la tuile « + ». Modules « process » et catalogue
+ * optionnelles sont des modules : aucun n'est installé par défaut. La tuile « + » ouvre d'abord le
+ * catalogue officiel (modules signés par la clé officielle Popcornn, voir ModuleStore, installation
+ * en un clic) ; « Ajouter depuis GitHub (URL) » ouvre l'ajout par URL pour les modules particuliers
+ * (indexers inclus, jamais au catalogue). Modules « process » et catalogue
  * masqués si le serveur ne les gère pas.
  * Page absente de la version store (STORE_BLOCKED_ROUTE_PREFIXES).
  */
@@ -227,6 +228,7 @@ const TEXT = {
 type Tx = (typeof TEXT)['fr'];
 
 type View =
+  | { type: 'store' }
   | { type: 'add' }
   | { type: 'data'; id: string }
   | { type: 'process'; id: string }
@@ -525,6 +527,17 @@ export default function ModulesSettingsPanel() {
   const processChoice = pm.ready && !unsupported;
   const effectiveAddType: 'data' | 'process' = processChoice ? addType : pm.ready && unsupported ? 'process' : 'data';
   const canAdd = !unsupported || pm.ready;
+  /** « + » : d'abord le catalogue officiel ; serveur sans catalogue → ajout par URL directement. */
+  const openAdd = () => {
+    if (store.supported) {
+      void store.reload();
+      open({ type: 'store' });
+    } else {
+      open({ type: 'add' });
+    }
+  };
+  /** Modules proposés par le store : non installés, ou installés avec une mise à jour. */
+  const storeModules = (store.catalog?.modules ?? []).filter((m) => !m.installed || (m.update_available && m.compatible));
 
   const ftx = featureTx(language);
   const features = caps ? buildServerFeatures(caps, modules, processModules, language) : [];
@@ -664,62 +677,6 @@ export default function ModulesSettingsPanel() {
         )}
       </div>
 
-      {store.supported && (store.catalog || store.error) && (
-        <section aria-labelledby="modules-store-title" class="mb-8 tv:mb-12 grid gap-4 tv:gap-6">
-          {sectionTitle('modules-store-title', stx.section)}
-          <p class="text-sm tv:text-lg max-w-2xl" style={{ color: C.muted }}>
-            {stx.intro}
-          </p>
-          {store.error && !store.catalog && (
-            <p role="alert" class="text-sm tv:text-lg" style={{ color: C.accent }}>
-              {stx.error}
-            </p>
-          )}
-          {store.catalog && store.catalog.modules.length === 0 && <p class="hub-empty">{stx.empty}</p>}
-          {store.catalog && store.catalog.modules.length > 0 && (
-            <HubGrid>
-              {store.catalog.modules.map((m) => {
-                const st = catalogTileState(m, stx);
-                const installing = busy === `catalog:${m.id}` || (pm.jobRunning && pm.job?.moduleId === m.id);
-                const label =
-                  st.action === 'install' ? stx.install : st.action === 'update' ? stx.update : st.action === 'start' ? stx.start : '';
-                const version =
-                  m.installed_version && m.update_available ? `${m.installed_version} → ${m.version}` : m.installed_version || m.version;
-                return (
-                  <HubTile
-                    key={`store:${m.id}`}
-                    title={m.name}
-                    hint={m.compatible ? m.description : m.incompatible_reason || m.description}
-                    icon={catalogTileIcon(m)}
-                    status={st.status}
-                    statusLabel={m.update_available && m.installed ? stx.updateAvailable(m.version) : st.label}
-                    meta={`${ptx.kind} · ${version}`}
-                    onClick={() => {
-                      if (m.installed) open({ type: 'process', id: m.id });
-                      else if (st.action === 'install' && !busy && !pm.jobRunning) void onCatalogInstall(m);
-                    }}
-                    actions={
-                      st.action ? (
-                        <button
-                          type="button"
-                          data-focusable
-                          class={`hub-tile-action ${st.action === 'install' ? 'hub-tile-action--primary' : ''}`}
-                          disabled={!!busy || pm.jobRunning}
-                          onClick={() => void onCatalogInstall(m)}
-                        >
-                          <Icon name={st.action === 'start' ? 'play' : 'download'} />
-                          {installing ? stx.installing : label}
-                        </button>
-                      ) : undefined
-                    }
-                  />
-                );
-              })}
-            </HubGrid>
-          )}
-        </section>
-      )}
-
       <section aria-labelledby="modules-installed-title" class="grid gap-4 tv:gap-6">
         {sectionTitle('modules-installed-title', tx.installedSection)}
         {loading ? (
@@ -760,7 +717,7 @@ export default function ModulesSettingsPanel() {
                 />
               );
             })}
-            {canAdd && <HubAddTile label={tx.addTitle} onClick={() => open({ type: 'add' })} />}
+            {canAdd && <HubAddTile label={tx.addTitle} onClick={openAdd} />}
           </HubGrid>
         )}
         {empty && !unsupported && !listError && <p class="hub-empty">{tx.none}</p>}
@@ -810,10 +767,105 @@ export default function ModulesSettingsPanel() {
         </HubGrid>
       </section>
 
+      {/* Ajouter un module : catalogue officiel (store) d'abord */}
+      {view?.type === 'store' && (
+        <HubModal open title={stx.title} description={stx.intro} onClose={close} size="xl" className={MODAL_CLASS}>
+          <div class="grid gap-5 tv:gap-7">
+            <NoticeBanner notice={notice} detailsLabel={tx.warnings} />
+            {pm.jobRunning && <ProcessJobProgress job={pm.job} tx={ptx} />}
+            {!store.catalog && store.loading && <HubSkeleton count={2} />}
+            {store.error && !store.catalog && (
+              <p role="alert" class="text-sm tv:text-lg" style={{ color: C.accent }}>
+                {stx.error}
+              </p>
+            )}
+            {store.catalog && storeModules.length === 0 && (
+              <p class="text-sm tv:text-lg" style={{ color: C.muted }}>
+                {store.catalog.modules.length === 0 ? stx.empty : stx.allInstalled}
+              </p>
+            )}
+            {storeModules.length > 0 && (
+              <ul class="divide-y divide-white/10" data-tv-list>
+                {storeModules.map((m) => {
+                  const st = catalogTileState(m, stx);
+                  const installing = busy === `catalog:${m.id}` || (pm.jobRunning && pm.job?.moduleId === m.id);
+                  const label = st.action === 'update' ? stx.update : st.action === 'start' ? stx.start : stx.install;
+                  const version =
+                    m.installed_version && m.update_available ? `${m.installed_version} → ${m.version}` : m.version;
+                  return (
+                    <li key={m.id} class="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-tv-list-item>
+                      <div class="flex gap-4 min-w-0">
+                        <span class="mt-0.5 shrink-0" style={{ color: C.accent }}>
+                          <Icon name={catalogIconName(m)} size={28} />
+                        </span>
+                        <div class="min-w-0">
+                          <p class="text-base tv:text-xl" style={subHeadingStyle}>
+                            {m.name}
+                          </p>
+                          {m.description && (
+                            <p class="mt-1 text-sm tv:text-lg" style={{ color: C.muted }}>
+                              {m.description}
+                            </p>
+                          )}
+                          <p class="mt-1 text-xs tv:text-base" style={{ color: C.faint }}>
+                            {ptx.kind} · {version}
+                            {!m.compatible && m.incompatible_reason ? ` · ${stx.incompatible} : ${m.incompatible_reason}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      {st.action && (
+                        <button
+                          type="button"
+                          data-focusable
+                          class={`${primaryBtn} shrink-0`}
+                          style={primaryStyle}
+                          disabled={!!busy || pm.jobRunning}
+                          onClick={() => void onCatalogInstall(m)}
+                        >
+                          <Icon name={st.action === 'start' ? 'play' : 'download'} />
+                          {installing ? stx.installing : label}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <div class="border-t border-white/10 pt-5 tv:pt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm tv:text-lg max-w-xl" style={{ color: C.muted }}>
+                {stx.githubHint}
+              </p>
+              <button
+                type="button"
+                data-focusable
+                class={`${secondaryBtn} shrink-0`}
+                style={secondaryStyle}
+                onClick={() => open({ type: 'add' })}
+              >
+                <Icon name="link" />
+                {stx.fromGithub}
+              </button>
+            </div>
+          </div>
+        </HubModal>
+      )}
+
       {/* Ajouter un module */}
       {view?.type === 'add' && (
         <HubModal open title={tx.addTitle} description={tx.addDesc} onClose={close} size="xl" className={MODAL_CLASS}>
           <div class="grid gap-5 tv:gap-7">
+            {store.supported && (
+              <button
+                type="button"
+                data-focusable
+                class={`${secondaryBtn} justify-self-start`}
+                style={secondaryStyle}
+                onClick={() => open({ type: 'store' })}
+              >
+                <Icon name="rollback" />
+                {stx.backToCatalog}
+              </button>
+            )}
             <NoticeBanner notice={notice} detailsLabel={tx.warnings} />
             {processChoice && (
               <div role="radiogroup" aria-label={tx.typeLabel} class="grid gap-3 sm:grid-cols-2" data-tv-list>
@@ -1105,7 +1157,7 @@ export default function ModulesSettingsPanel() {
             serverVersion={caps?.serverVersion ?? null}
             torrentEnabled={TORRENT_FEATURES_ENABLED}
             onOpenModule={(p) => open(p.type === 'process' ? { type: 'process', id: p.id } : { type: 'data', id: p.id })}
-            onAddModule={canAdd ? () => open({ type: 'add' }) : undefined}
+            onAddModule={canAdd ? openAdd : undefined}
           />
         </HubModal>
       )}

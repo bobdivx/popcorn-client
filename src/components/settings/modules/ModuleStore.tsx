@@ -15,16 +15,20 @@ import { type IconName, type Notice, errorMessage, tileIcon } from './moduleUi';
  * - « Installer » = `POST …/catalog/{id}/install` : le serveur télécharge la release signée,
  *   vérifie SHA-256 + minisign, installe puis démarre le module. Le suivi réutilise les opérations
  *   des modules process (`useProcessModules().startJob`).
- * - Les indexers n'y figurent jamais : ils s'installent par URL (tuile « + Ajouter un module »).
+ * - La tuile « + » ouvre ce catalogue (modules non installés / mises à jour) ; « Ajouter depuis
+ *   GitHub (URL) » ouvre l'ajout par URL. Les indexers n'y figurent jamais (URL uniquement).
  * - Serveur ancien (route 404 / 405, ou `modules.catalog: false`) : section masquée, l'installation
  *   par URL reste disponible.
  */
 
 export const STORE_TEXT = {
   fr: {
-    section: 'Catalogue officiel',
-    intro:
-      'Modules officiels Popcornn, signés et vérifiés par ton serveur avant installation. Les modules spéciaux (indexers…) s’ajoutent par URL avec la tuile « + ».',
+    title: 'Ajouter un module',
+    intro: 'Modules officiels Popcornn, signés et vérifiés par ton serveur avant installation.',
+    fromGithub: 'Ajouter depuis GitHub (URL)',
+    githubHint: 'Module particulier (indexers…) absent du catalogue : colle l’URL de son dépôt GitHub.',
+    allInstalled: 'Tous les modules officiels sont déjà installés.',
+    backToCatalog: 'Catalogue officiel',
     install: 'Installer',
     update: 'Mettre à jour',
     start: 'Activer',
@@ -42,9 +46,12 @@ export const STORE_TEXT = {
     jobStarted: (name: string) => `Installation de ${name} lancée.`,
   },
   en: {
-    section: 'Official catalog',
-    intro:
-      'Official Popcornn modules, signed and verified by your server before installation. Special modules (indexers…) are added by URL with the “+” tile.',
+    title: 'Add a module',
+    intro: 'Official Popcornn modules, signed and verified by your server before installation.',
+    fromGithub: 'Add from GitHub (URL)',
+    githubHint: 'Special module (indexers…) not in the catalog: paste the URL of its GitHub repository.',
+    allInstalled: 'All official modules are already installed.',
+    backToCatalog: 'Official catalog',
     install: 'Install',
     update: 'Update',
     start: 'Enable',
