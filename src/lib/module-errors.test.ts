@@ -5,6 +5,8 @@ import {
   missingModuleCapability,
   isRouteUnsupported,
   modulesPageHref,
+  moduleApiCapability,
+  blockedModuleCapability,
 } from './module-errors';
 
 describe('moduleNotInstalledCapability', () => {
@@ -56,5 +58,26 @@ describe('modulesPageHref', () => {
     expect(modulesPageHref('sharing')).toBe('/settings/modules/?missing=sharing');
     expect(modulesPageHref('')).toBe('/settings/modules/');
     expect(modulesPageHref('<script>')).toBe('/settings/modules/');
+  });
+});
+
+describe('routes des modules', () => {
+  it('capacité de la route (plus long préfixe)', () => {
+    expect(moduleApiCapability('/api/client/torrents/enriched')).toBe('torrent');
+    expect(moduleApiCapability('/api/torrents/list?category=films')).toBe('indexers');
+    expect(moduleApiCapability('/api/torrents/list-files?x=1')).toBe('torrent');
+    expect(moduleApiCapability('/api/friends/shares')).toBe('sharing');
+    expect(moduleApiCapability('/api/requests')).toBe('requests');
+    expect(moduleApiCapability('/api/library')).toBeNull();
+    expect(moduleApiCapability('/api/torrentsx')).toBeNull();
+  });
+  it('appel évité seulement si le serveur annonce la fonction absente', () => {
+    const core = { features: { torrent: false, indexers: false, sharing: true } as Record<string, boolean> };
+    expect(blockedModuleCapability('/api/client/torrents/enriched', core)).toBe('torrent');
+    expect(blockedModuleCapability('/api/torrents/list?category=films', core)).toBe('indexers');
+    expect(blockedModuleCapability('/api/friends/shares', core)).toBeNull();
+    expect(blockedModuleCapability('/api/requests', core)).toBeNull();
+    expect(blockedModuleCapability('/api/client/torrents/enriched', null)).toBeNull();
+    expect(blockedModuleCapability('/api/client/torrents/enriched', { ...core, legacy: true })).toBeNull();
   });
 });

@@ -53,3 +53,75 @@ export function modulesPageHref(capability?: string | null): string {
   const c = (capability || '').trim();
   return /^[a-z0-9_-]{1,40}$/i.test(c) ? `/settings/modules/?missing=${encodeURIComponent(c)}` : '/settings/modules/';
 }
+
+/**
+ * Routes historiques des fonctions devenues modules (miroir de `LEGACY_PREFIXES` du serveur,
+ * backend/src/modules/legacy.rs, + demandes). Le plus long préfixe correspondant l'emporte.
+ */
+const MODULE_API_PREFIXES: ReadonlyArray<readonly [string, readonly string[]]> = [
+  [
+    'torrent',
+    [
+      '/announce',
+      '/librqbit',
+      '/api/client/librqbit',
+      '/api/client/torrents',
+      '/api/client/stream-torrent',
+      '/api/stream-torrent',
+      '/api/admin/client-torrent',
+      '/api/admin/download-clients',
+      '/api/admin/torrent-files',
+      '/api/admin/torrents',
+      '/api/admin/tags',
+      '/api/torrents/external',
+      '/api/torrents/list-files',
+    ],
+  ],
+  [
+    'indexers',
+    [
+      '/api/indexers',
+      '/api/sync',
+      '/api/torrents',
+      '/api/admin/indexers',
+      '/api/client/admin/indexers',
+      '/api/admin/quality-profiles',
+      '/api/admin/quality-upgrades',
+      '/api/admin/rss-feeds',
+      '/api/admin/watchlist',
+      '/api/admin/exclusions',
+      '/api/client/flaresolverr',
+      '/api/client/indexer-definitions',
+      '/api/debug/check-torrent-download',
+    ],
+  ],
+  ['sharing', ['/api/friends']],
+  ['requests', ['/api/requests', '/api/media-requests']],
+];
+
+/** Capacité (module) dont relève une route d'API, `null` pour une route du cœur. */
+export function moduleApiCapability(endpoint: string): string | null {
+  const path = endpoint.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  let best: { cap: string; len: number } | null = null;
+  for (const [cap, prefixes] of MODULE_API_PREFIXES) {
+    for (const p of prefixes) {
+      if ((path === p || path.startsWith(`${p}/`)) && (!best || p.length > best.len)) best = { cap, len: p.length };
+    }
+  }
+  return best?.cap ?? null;
+}
+
+/**
+ * Capacité absente qui rend l'appel inutile : le serveur annonce explicitement la fonction
+ * désactivée (il répondrait `404 module_not_installed`). Capacités inconnues, serveur ancien
+ * ou clé absente : `null` (on appelle, comportement historique).
+ */
+export function blockedModuleCapability(
+  endpoint: string,
+  caps: { legacy?: boolean; features: Record<string, boolean> } | null,
+): string | null {
+  if (!caps || caps.legacy) return null;
+  const cap = moduleApiCapability(endpoint);
+  if (!cap) return null;
+  return caps.features[cap] === false ? cap : null;
+}

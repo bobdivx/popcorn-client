@@ -9,6 +9,19 @@ import { handleResponse, handleError, extractInfoHashFromError } from './utils.j
 import { getBackendUrl } from '../../backend-config.js';
 import { TokenManager } from '../storage.js';
 import { clientIdentityHeaders } from '../../client-identity.js';
+import { getCachedCapabilities, loadCapabilities } from '../../capabilities.js';
+import { blockedModuleCapability } from '../../module-errors.js';
+
+/**
+ * Module torrent absent (serveur à modules, `features.torrent === false`) : la liste est vide
+ * sans appel réseau. Attend les capacités au premier chargement (cache encore vide), sinon le
+ * tableau de bord interroge `/api/client/torrents/enriched` avant de savoir (404).
+ */
+async function torrentModuleMissing(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const caps = getCachedCapabilities() ?? (await loadCapabilities().catch(() => null));
+  return blockedModuleCapability('/api/client/torrents', caps) !== null;
+}
 
 // En-tete d'auth serveur pour les fetch normaux : le token cloud identifie le membre cote serveur.
 // Les transports sans en-tete (EventSource) passent le token en query (voir getLibrqbitStreamLogsUrl).
@@ -74,6 +87,7 @@ export class TorrentsService {
    * Récupérer la liste de tous les torrents
    */
   async listTorrents(): Promise<ClientTorrentStats[]> {
+    if (await torrentModuleMissing()) return [];
     try {
       const url = await this.getRequestUrl('torrents');
       const response = await this.af(url);
@@ -89,6 +103,7 @@ export class TorrentsService {
    * À utiliser pour la page /downloads pour afficher immédiatement poster et nom du média.
    */
   async listTorrentsEnriched(): Promise<ClientTorrentStats[]> {
+    if (await torrentModuleMissing()) return [];
     try {
       const url = await this.getRequestUrl('torrents/enriched');
       const response = await this.af(url);

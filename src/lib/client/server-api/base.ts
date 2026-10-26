@@ -12,7 +12,8 @@ import { isBlockedApiUrl } from '../../distribution.js';
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
 import { TokenManager } from '../storage.js';
 import { markAllSwrStale, swrPolicyFor, swrRequest } from './swrCache.js';
-import { moduleNotInstalledCapability } from '../../module-errors.js';
+import { blockedModuleCapability, moduleApiCapability, moduleNotInstalledCapability } from '../../module-errors.js';
+import { getCachedCapabilities, loadCapabilities } from '../../capabilities.js';
 
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
@@ -296,6 +297,16 @@ export class ServerApiClientBase {
    */
   protected async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
     const method = (options.method || 'GET').toUpperCase();
+    // Fonction annoncée absente par le serveur (module non installé / inactif) : réponse locale
+    // identique à son `404 module_not_installed`, sans requête réseau (accueil en mode cœur).
+    // Capacités pas encore connues (premier affichage) : chargées d'abord, pour ces routes seulement.
+    if (!baseUrlOverride && moduleApiCapability(endpoint)) {
+      const caps = getCachedCapabilities() ?? (typeof window !== 'undefined' ? await loadCapabilities().catch(() => null) : null);
+      const missing = blockedModuleCapability(endpoint, caps);
+      if (missing) {
+        return { success: false, error: 'ModuleNotInstalled', message: `module non installé : ${missing}`, details: missing };
+      }
+    }
     if (retryCount === 0 && !baseUrlOverride && !options.signal && typeof window !== 'undefined') {
       const policy = method === 'GET' ? swrPolicyFor(endpoint, method) : null;
       if (policy) {
