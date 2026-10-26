@@ -5,6 +5,7 @@
  */
 
 import { serverApi } from './client/server-api';
+import { isFeatureEnabled, loadCapabilities } from './capabilities';
 
 export interface SyncProgressStore {
   current_indexer?: string | null;
@@ -74,6 +75,14 @@ export function subscribeSyncStatusStore(listener: Listener): () => void {
 }
 
 export async function refreshSyncStatusStore(): Promise<void> {
+  // Synchro des indexers absente du serveur (module Indexers non installé) : pas d'appel.
+  if (!isFeatureEnabled(await loadCapabilities().catch(() => null), 'sync')) {
+    state.status = null;
+    state.loading = false;
+    notify();
+    if (listeners.size > 0) schedulePolling();
+    return;
+  }
   // Ne passer en loading que s'il n'y a pas encore de statut (premier chargement).
   // En polling (déjà un status), ne pas toucher à loading pour éviter que la barre de sync s'affiche/disparaisse en continu.
   const isPollingRefresh = state.status !== null;
