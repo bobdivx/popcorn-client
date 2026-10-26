@@ -54,6 +54,18 @@ describe('routes selon les capacités du serveur', () => {
     expect(isSettingsCategoryAvailable('downloads')).toBe(true);
   });
 
+  it('indexers sans torrent : demandes proposées, téléchargements non', () => {
+    features = { ...CORE, torrent: false, indexers: true, requests: true };
+    expect(missingCapabilityForRoute('/demandes')).toBeNull();
+    expect(missingCapabilityForRoute('/settings/requests-admin')).toBeNull();
+    expect(missingCapabilityForRoute('/downloads')).toBe('torrent');
+    expect(missingCapabilityForRoute('/settings/indexers')).toBeNull();
+    expect(missingCapabilityForRoute('/settings/sync')).toBeNull();
+    expect(missingCapabilityForRoute('/settings/librqbit')).toBe('torrent');
+    features = { ...CORE, torrent: true, indexers: true, requests: false };
+    expect(missingCapabilityForRoute('/demandes')).toBe('requests');
+  });
+
   it('serveur complet : tout est disponible', () => {
     features = { ...CORE, torrent: true, indexers: true };
     for (const p of ['/search', '/discover', '/plateformes/', '/settings/blacklist', '/settings/discover-sliders', '/settings/content', '/demandes']) {

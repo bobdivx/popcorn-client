@@ -179,7 +179,8 @@ export default function Navbar() {
   // bibliothèque locale). Demandes : `requests` + Indexers.
   // Capacités inconnues / serveur ancien → affichées (comportement historique).
   const searchUi = TORRENT_FEATURES_ENABLED;
-  const requestsUi = torrentUi && isRequestsAvailable();
+  // Demandes : capacité `requests` (module Indexers), indépendante du moteur torrent.
+  const requestsUi = isRequestsAvailable();
   const platformsUi = !isRouteBlockedInStoreBuild('/plateformes');
 
   // Page d'un module absent du serveur (lien direct, favori, module désinstallé) : plutôt qu'une page
