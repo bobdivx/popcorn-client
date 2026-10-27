@@ -7,14 +7,20 @@ import {
   createLocalUserInviteLink,
   getLocalUserInviteLinks,
   revokeLocalUserInviteLink,
+  getUserConfig,
   type LocalUser,
   type LocalUserInviteLink,
 } from '../../lib/api/popcorn-web';
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { Mail, Trash2, RefreshCw, UserPlus, Link2, Copy, Share2, Check } from 'lucide-preact';
+import { Mail, Trash2, RefreshCw, UserPlus, Link2, Copy, Share2, Check, AlertTriangle } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { syncLocalUsersToBackend, removeLocalUserFromBackend } from '../../lib/client/local-users-sync';
+import {
+  checkBackendUrlForGuests,
+  guestBackendIssueKey,
+  type GuestBackendCheck,
+} from '../../lib/local-users/guest-invite-readiness';
 
 export default function LocalUsersManager() {
   const { t } = useI18n();
@@ -29,6 +35,9 @@ export default function LocalUsersManager() {
   const [creatingLink, setCreatingLink] = useState(false);
   const [newLinkId, setNewLinkId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // URL du serveur enregistrée dans la config cloud (celle que reçoivent les invités) :
+  // null = inconnue (config illisible), on n'avertit pas.
+  const [serverCheck, setServerCheck] = useState<GuestBackendCheck | null>(null);
   const canShare = typeof navigator !== 'undefined' && typeof (navigator as Navigator & { share?: unknown }).share === 'function';
 
   const hasCloudToken = TokenManager.getCloudAccessToken() !== null;
@@ -46,12 +55,21 @@ export default function LocalUsersManager() {
     try {
       setLoading(true);
       setError(null);
-      const [localUsers, inviteLinks] = await Promise.all([getLocalUsers(), getLocalUserInviteLinks()]);
+      const [localUsers, inviteLinks, cloudConfig] = await Promise.all([
+        getLocalUsers(),
+        getLocalUserInviteLinks(),
+        getUserConfig().catch(() => null),
+      ]);
       if (inviteLinks) setLinks(inviteLinks);
+      setServerCheck(cloudConfig ? checkBackendUrlForGuests(cloudConfig.backendUrl) : null);
       if (localUsers) {
         setUsers(localUsers);
-        // Les invités activés doivent exister sur le serveur pour pouvoir s'y connecter.
-        void syncLocalUsersToBackend();
+        // Invités AVEC mot de passe : les créer à l'avance sur le serveur pour que la connexion par
+        // mot de passe y fonctionne. Ceux sans mot de passe sont créés par le serveur lui-même à
+        // leur première connexion (lien / Quick Connect) : rien à faire (voir local-users-sync).
+        if (localUsers.some((u) => u.isActive && u.hasPassword !== false)) {
+          void syncLocalUsersToBackend();
+        }
       } else {
         const token = TokenManager.getCloudAccessToken();
         const refreshToken = TokenManager.getCloudRefreshToken();
@@ -70,12 +88,26 @@ export default function LocalUsersManager() {
     }
   };
 
+  /**
+   * Serveur inutilisable par un invité (absent, HTTP, réseau local) : on prévient et on demande
+   * confirmation avant d'inviter (l'invitation reste possible, le serveur peut être corrigé ensuite).
+   */
+  const confirmServerReadyForGuests = async (): Promise<boolean> => {
+    if (!serverCheck || serverCheck.ok) return true;
+    return confirm({
+      title: t('settingsMenu.localUsers.serverWarningTitle'),
+      message: `${t(guestBackendIssueKey(serverCheck.issue), { url: serverCheck.url })} ${t('settingsMenu.localUsers.serverWarningConfirm')}`,
+      confirmLabel: t('settingsMenu.localUsers.inviteAnyway'),
+    });
+  };
+
   const handleInvite = async (e: Event) => {
     e.preventDefault();
     if (!email.trim()) {
       setError(t('common.required'));
       return;
     }
+    if (!(await confirmServerReadyForGuests())) return;
 
     try {
       setInviting(true);
@@ -106,10 +138,10 @@ export default function LocalUsersManager() {
     }
   };
 
-  const handleDelete = async (userId: string, userEmail: string) => {
+  const handleDelete = async (userId: string, userLabel: string) => {
     if (!(await confirm({
       title: t('common.delete') || 'Supprimer',
-      message: t('settingsMenu.localUsers.deleteConfirm', { email: userEmail }),
+      message: t('settingsMenu.localUsers.deleteConfirm', { name: userLabel }),
       danger: true,
       confirmLabel: t('common.delete') || 'Supprimer',
     }))) {
@@ -209,6 +241,7 @@ export default function LocalUsersManager() {
   };
 
   const handleCreateLink = async () => {
+    if (!(await confirmServerReadyForGuests())) return;
     try {
       setCreatingLink(true);
       setError(null);
@@ -282,6 +315,22 @@ export default function LocalUsersManager() {
       {success && (
         <div className="ds-status-badge ds-status-badge--success w-full" role="status">
           {success}
+        </div>
+      )}
+
+      {serverCheck && !serverCheck.ok && (
+        <div
+          className="flex items-start gap-3 rounded-[var(--ds-radius-lg)] border border-[var(--ds-border-error)] bg-[var(--ds-surface-error-muted)] p-4"
+          role="alert"
+        >
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-[var(--ds-accent-red)]" strokeWidth={1.8} aria-hidden />
+          <div className="min-w-0">
+            <p className="font-semibold text-[var(--ds-text-primary)] text-sm mb-1">{t('settingsMenu.localUsers.serverWarningTitle')}</p>
+            <p className="ds-text-secondary text-sm break-words">
+              {t(guestBackendIssueKey(serverCheck.issue), { url: serverCheck.url })}
+            </p>
+            <p className="ds-text-tertiary text-xs mt-1">{t('settingsMenu.localUsers.serverWarningHint')}</p>
+          </div>
         </div>
       )}
 
@@ -436,14 +485,19 @@ export default function LocalUsersManager() {
             <p className="ds-text-tertiary text-sm text-center py-8">{t('settingsMenu.localUsers.noLocalUsers')}</p>
           ) : (
             <div className="space-y-3">
-              {users.map((user) => (
+              {users.map((user) => {
+                // Nom de profil d'abord ; l'email (ou l'identifiant généré) en second.
+                const hasEmail = user.hasEmail !== false;
+                const title = user.displayName || (hasEmail ? user.email : t('settingsMenu.localUsers.noEmail'));
+                const showEmailBadge = user.isActive && user.inviteKind !== 'link' && hasEmail && !user.emailVerified;
+                return (
                 <div
                   key={user.id}
                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-[var(--ds-radius-sm)] bg-[var(--ds-surface)] border border-[var(--ds-border)]"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="font-semibold text-[var(--ds-text-primary)] truncate">{user.email}</span>
+                      <span className="font-semibold text-[var(--ds-text-primary)] truncate">{title}</span>
                       {user.isActive ? (
                         <span className="ds-status-badge ds-status-badge--success">{t('settingsMenu.localUsers.active')}</span>
                       ) : (
@@ -452,12 +506,14 @@ export default function LocalUsersManager() {
                       {user.inviteKind === 'link' && (
                         <span className="ds-status-badge">{t('settingsMenu.localUsers.viaLink')}</span>
                       )}
-                      {!user.emailVerified && (
+                      {showEmailBadge && (
                         <span className="ds-status-badge ds-status-badge--error">{t('settingsMenu.localUsers.emailNotVerified')}</span>
                       )}
                     </div>
-                    {user.displayName && (
-                      <p className="ds-text-secondary text-sm">{user.displayName}</p>
+                    {(user.displayName || !hasEmail) && (
+                      <p className="ds-text-secondary text-sm truncate">
+                        {hasEmail ? user.email : t('settingsMenu.localUsers.loginId', { id: user.email })}
+                      </p>
                     )}
                     <p className="ds-text-tertiary text-xs mt-1">
                       {t('settingsMenu.localUsers.createdOn', { date: new Date(user.createdAt).toLocaleDateString() })}
@@ -490,7 +546,7 @@ export default function LocalUsersManager() {
                     )}
                     <button
                       type="button"
-                      onClick={() => handleDelete(user.id, user.email)}
+                      onClick={() => handleDelete(user.id, user.displayName || user.email)}
                       className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--ds-radius-sm)] border border-[var(--ds-accent-red-muted)] bg-[var(--ds-surface-elevated)] text-[var(--ds-accent-red)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)]"
                       title={t('settingsMenu.localUsers.delete')}
                       aria-label={t('settingsMenu.localUsers.delete')}
@@ -499,7 +555,8 @@ export default function LocalUsersManager() {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

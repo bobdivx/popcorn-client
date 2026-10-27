@@ -5,6 +5,11 @@
  * se connecter au serveur du propriétaire, il doit aussi exister dans la base du serveur
  * (`local_users`), avec le MÊME id : c'est la clé du partage amis (`friend_access`) et de
  * l'identité de session (`X-User-ID`). Appelé par le compte principal (admin du serveur).
+ *
+ * Seuls les invités AVEC mot de passe sont poussés : ceux sans mot de passe (connexion par lien /
+ * Quick Connect) sont créés par le serveur lui-même à leur première connexion
+ * (POST /api/client/auth/local-session) ; les pousser à l'avance n'apporterait rien et échouerait
+ * (pas de hash à transmettre).
  */
 
 import { getLocalUsers, getLocalUserForSync } from '../api/popcorn-web';
@@ -29,6 +34,8 @@ async function runSync(): Promise<LocalUsersSyncResult> {
 
   for (const localUser of localUsers) {
     if (!localUser.isActive) continue;
+    // Sans mot de passe : rien à synchroniser (voir l'en-tête). `undefined` = ancienne API web.
+    if (localUser.hasPassword === false) continue;
     try {
       const existing = await serverApi.getLocalUser(localUser.id);
       if (existing.success && existing.data) continue;

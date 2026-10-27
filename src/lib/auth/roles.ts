@@ -1,4 +1,8 @@
-export type UserRole = 'admin' | 'dev' | 'guest';
+/**
+ * Rôles connus côté client. Un invité (profil du compte principal) a le rôle `'local'`,
+ * comme partout ailleurs (TokenManager, lib/permissions.ts getUserType, sessions `pls1.`).
+ */
+export type UserRole = 'admin' | 'dev' | 'local';
 
 // Cache pour les vérifications dev (1 heure)
 const devCheckCache = new Map<string, { isDev: boolean; timestamp: number }>();
