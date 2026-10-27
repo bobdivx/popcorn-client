@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { patchAndroidTvWebView } from './patch-android-tv-webview.js';
+import { patchAndroidFullscreen } from './patch-android-fullscreen.js';
 
 const projectRoot = process.cwd();
 
@@ -341,6 +342,15 @@ function main() {
   } catch (e) {
     console.error(`\n❌ Patch MainActivity (Android TV WebView) : ${e.message}`);
     process.exit(1);
+  }
+
+  // Plein écran natif (onShowCustomView réel, immersif, paysage) — APRÈS le patch TV
+  // (branché dans son onWebViewCreate). Non bloquant : sans lui, useFullscreen.ts garde
+  // son repli CSS (barres système visibles).
+  try {
+    patchAndroidFullscreen(projectRoot);
+  } catch (e) {
+    console.warn(`\n⚠️ Patch MainActivity (plein écran natif) ignoré : ${e.message}`);
   }
   
   if (success) {

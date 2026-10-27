@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
+import { onNativeFullscreenExit, setNativeFullscreen } from '../../../../lib/utils/native-fullscreen';
 
 let wakeLock: WakeLockSentinel | null = null;
 
@@ -214,7 +215,12 @@ export function useFullscreen() {
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     document.addEventListener(PSEUDO_EVENT, handleFullscreenChange);
     handleFullscreenChange();
+    // App Android : le bouton Retour a quitté le plein écran natif (repli CSS) → nettoyer l'état web.
+    const unsubscribeNativeExit = onNativeFullscreenExit(() => {
+      void exitFullscreen().finally(() => setIsFullscreen(isFullscreenActive()));
+    });
     return () => {
+      unsubscribeNativeExit();
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
@@ -247,6 +253,10 @@ export async function requestFullscreen(element: HTMLElement): Promise<void> {
     await lockLandscapeOrientation();
     setAndroidImmersiveStyle(true);
   }
+
+  // App Android (Tauri) : immersif + paysage natifs. Non attendu pour ne pas consommer
+  // l'activation utilisateur nécessaire à requestFullscreen ; sans effet ailleurs.
+  void setNativeFullscreen(true);
   const fullscreenOptions: FullscreenOptions = { navigationUI: 'hide' };
   fullscreenWanted = true;
   // TV / webOS : le layout est déjà plein écran ; pas de repli CSS (comportement inchangé).
@@ -298,6 +308,8 @@ export async function requestFullscreen(element: HTMLElement): Promise<void> {
 export async function exitFullscreen(): Promise<void> {
   if (typeof document === 'undefined') return Promise.reject(new Error('Fullscreen API not available'));
   fullscreenWanted = false;
+  // App Android (Tauri) : quitter aussi l'immersif natif, y compris en repli CSS.
+  void setNativeFullscreen(false);
   if (isPseudoFullscreenActive() || pseudoFullscreenElement) {
     exitPseudoFullscreen();
     if (!nativeFullscreenElement()) {

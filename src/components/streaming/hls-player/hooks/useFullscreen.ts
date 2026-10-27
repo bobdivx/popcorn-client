@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { onNativeFullscreenExit, setNativeFullscreen } from '../../../../lib/utils/native-fullscreen';
 
 // Variable globale pour stocker le WakeLock
 let wakeLock: WakeLockSentinel | null = null;
@@ -165,7 +166,13 @@ export function useFullscreen() {
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     handleFullscreenChange();
 
+    // App Android : le bouton Retour a quitté le plein écran natif (repli CSS) → nettoyer l'état web.
+    const unsubscribeNativeExit = onNativeFullscreenExit(() => {
+      void exitFullscreen().finally(() => setIsFullscreen(isFullscreenActive()));
+    });
+
     return () => {
+      unsubscribeNativeExit();
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
@@ -216,6 +223,10 @@ export async function requestFullscreen(element: HTMLElement): Promise<void> {
     setAndroidImmersiveStyle(true);
   }
 
+  // App Android (Tauri) : immersif + paysage natifs. Non attendu pour ne pas consommer
+  // l'activation utilisateur nécessaire à requestFullscreen ; sans effet ailleurs.
+  void setNativeFullscreen(true);
+
   // Options pour le plein écran - demander le mode de navigation masqué
   const fullscreenOptions: FullscreenOptions = {
     navigationUI: 'hide' // Demande de masquer les contrôles de navigation
@@ -260,6 +271,7 @@ export async function exitFullscreen(): Promise<void> {
     unlockOrientation();
     setAndroidImmersiveStyle(false);
   }
+  void setNativeFullscreen(false);
 
   try {
     if (document.exitFullscreen) {
