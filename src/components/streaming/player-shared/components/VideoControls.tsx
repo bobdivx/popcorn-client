@@ -838,7 +838,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onRestart();
                 }} 
-                class={`hidden sm:flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none`}
                 title={t('playback.restartFromBeginning')}
                 aria-label={t('playback.restartFromBeginning')}
               >

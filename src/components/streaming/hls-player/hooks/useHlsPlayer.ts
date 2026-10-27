@@ -159,6 +159,9 @@ export function useHlsPlayer({
   /** Reprendre la lecture après un reload seek si on était déjà en play. */
   const resumePlaybackAfterSeekRef = useRef(false);
   const reloadWithSeekRef = useRef<((seekSeconds: number) => void) | null>(null);
+  /** reloadWithSeek(0) en cours : au LEVEL_LOADED, repartir de 0 (et non du « live edge » EVENT). */
+  const restartFromZeroRef = useRef(false);
+  const restartPrevStartPositionRef = useRef<number | null>(null);
   /** URL du dernier reloadWithSeek (pour retry si 503) */
   const seekLoadUrlRef = useRef<string | null>(null);
   const seekLoadRetryCountRef = useRef<number>(0);
@@ -788,8 +791,22 @@ export function useHlsPlayer({
             }
             return;
           }
+          // Retour au début : si la playlist courante démarre déjà à 0 (pas de seek=), un seek
+          // natif suffit ; sinon (playlist régénérée à seek=N, segments < N absents) on recharge
+          // la playlist complète — un simple currentTime = 0 restait bloqué hors fenêtre.
+          if (seekSeconds <= 0 && !/[?&]seek(=|%3D)/i.test(currentSrcRef.current || '')) {
+            pendingSeekRef.current = 0;
+            setPendingSeekPosition(0);
+            video.currentTime = 0;
+            if (resumePlaybackAfterSeekRef.current && video.paused) {
+              video.play().catch(() => {});
+            }
+            return;
+          }
+          restartFromZeroRef.current = seekSeconds <= 0;
           const seekUrl = buildHlsUrl(true, seekSeconds);
           if (currentSrcRef.current === seekUrl) {
+            restartFromZeroRef.current = false;
             video.currentTime = seekSeconds;
             if (resumePlaybackAfterSeekRef.current && video.paused) {
               video.play().catch(() => {});
@@ -806,6 +823,13 @@ export function useHlsPlayer({
           setIsLoading(true);
           setPendingSeekPosition(seekSeconds);
           console.log(`[SEEK FLOW] 1️⃣ reloadWithSeek: demande seek à ${seekSeconds}s (${Math.floor(seekSeconds / 60)}:${Math.floor(seekSeconds % 60).toString().padStart(2, '0')}), currentTime actuel: ${video.currentTime}s, pendingSeekRef set à ${seekSeconds}s`);
+          if (restartFromZeroRef.current) {
+            // hls.js partirait du live edge (startPosition -1) si la playlist complète est EVENT.
+            try {
+              restartPrevStartPositionRef.current = hlsRef.current.config.startPosition;
+              hlsRef.current.config.startPosition = 0;
+            } catch (_) {}
+          }
           try {
             hlsRef.current.loadSource(seekUrl);
             console.log(`[SEEK FLOW] 2️⃣ loadSource: URL chargée avec seek=${seekSeconds}s`);
@@ -1230,6 +1254,43 @@ export function useHlsPlayer({
               }
             }, 2000);
             return;
+          }
+          if (restartFromZeroRef.current && pendingSeek <= 0) {
+            // Retour au début après une playlist seek=N : la playlist complète est souvent EVENT
+            // (transcodage en cours) → hls.js partirait du live edge. On force 0.
+            restartFromZeroRef.current = false;
+            seekLoadUrlRef.current = null;
+            if (restartPrevStartPositionRef.current != null) {
+              try {
+                hls.config.startPosition = restartPrevStartPositionRef.current;
+              } catch (_) {}
+              restartPrevStartPositionRef.current = null;
+            }
+            try {
+              hls.startLoad(0);
+            } catch (_) {}
+            video.currentTime = 0;
+            // Filet : si hls.js recale quand même au live edge juste après, revenir à 0
+            // (sauf si l'utilisateur a seeké ailleurs entre-temps).
+            [300, 1200].forEach((ms) =>
+              window.setTimeout(() => {
+                if (hlsRef.current !== hls || pendingSeekRef.current > 0) return;
+                const ct = video.currentTime;
+                if (ct > 2 && ct < 30 && !video.seeking) {
+                  try {
+                    video.currentTime = 0;
+                  } catch (_) {}
+                }
+              }, ms),
+            );
+            setPendingSeekPosition(0);
+            setLoadingStatusMessage(null);
+            setIsLoading(false);
+            onLoadingChangeRef.current?.(false);
+            if (resumePlaybackAfterSeekRef.current && video.paused) {
+              video.play().catch(() => {});
+            }
+            console.log('[SEEK FLOW] 4️⃣ LEVEL_LOADED: retour au début (playlist complète)');
           }
           if (pendingSeek > 0 && Number.isFinite(pendingSeek)) {
             seekNotCoveredRetryCountRef.current = 0;

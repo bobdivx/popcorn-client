@@ -423,8 +423,11 @@ export default function HLSPlayer({
   // Fonction pour redémarrer la vidéo depuis le début
   const handleRestart = () => {
     const video = videoRef.current;
-    if (video) {
-      video.currentTime = 0;
+    if (!video) return;
+    // Même chemin que « Reprendre depuis le début » : après une reprise / un seek lointain la
+    // playlist commence à seek=N, un currentTime = 0 seul ne pouvait pas revenir au début.
+    seekToTargetTime(0);
+    if (video.paused) {
       video.play().catch((err) => {
         console.warn('Impossible de démarrer la lecture:', err);
       });
