@@ -16,7 +16,9 @@ import { type IconName, type Notice, errorMessage, tileIcon } from './moduleUi';
  *   vérifie SHA-256 + minisign, installe puis démarre le module. Le suivi réutilise les opérations
  *   des modules process (`useProcessModules().startJob`).
  * - La tuile « + » ouvre ce catalogue (modules non installés / mises à jour) ; « Ajouter depuis
- *   GitHub (URL) » ouvre l'ajout par URL. Les indexers n'y figurent jamais (URL uniquement).
+ *   GitHub (URL) » ouvre l'ajout par URL (modules tiers). Tous les modules officiels y figurent :
+ *   torrent, indexers, définitions d'indexers (module de données `kind: data`, installé
+ *   directement, sans opération de suivi), partage.
  * - Serveur ancien (route 404 / 405, ou `modules.catalog: false`) : section masquée, l'installation
  *   par URL reste disponible.
  */
@@ -26,7 +28,7 @@ export const STORE_TEXT = {
     title: 'Ajouter un module',
     intro: 'Modules officiels Popcornn, signés et vérifiés par ton serveur avant installation.',
     fromGithub: 'Ajouter depuis GitHub (URL)',
-    githubHint: 'Module particulier (indexers…) absent du catalogue : colle l’URL de son dépôt GitHub.',
+    githubHint: 'Module tiers absent du catalogue : colle l’URL de son dépôt GitHub.',
     allInstalled: 'Tous les modules officiels sont déjà installés.',
     backToCatalog: 'Catalogue officiel',
     install: 'Installer',
@@ -44,12 +46,13 @@ export const STORE_TEXT = {
     error: 'Catalogue officiel indisponible pour le moment. L’installation par URL reste possible.',
     started: (name: string) => `${name} est déjà installé : module démarré.`,
     jobStarted: (name: string) => `Installation de ${name} lancée.`,
+    dataInstalled: (name: string) => `${name} installé (signature officielle vérifiée).`,
   },
   en: {
     title: 'Add a module',
     intro: 'Official Popcornn modules, signed and verified by your server before installation.',
     fromGithub: 'Add from GitHub (URL)',
-    githubHint: 'Special module (indexers…) not in the catalog: paste the URL of its GitHub repository.',
+    githubHint: 'Third-party module not in the catalog: paste the URL of its GitHub repository.',
     allInstalled: 'All official modules are already installed.',
     backToCatalog: 'Official catalog',
     install: 'Install',
@@ -67,6 +70,7 @@ export const STORE_TEXT = {
     error: 'Official catalog unavailable right now. Installing by URL still works.',
     started: (name: string) => `${name} is already installed: module started.`,
     jobStarted: (name: string) => `Installing ${name}.`,
+    dataInstalled: (name: string) => `${name} installed (official signature verified).`,
   },
 };
 
@@ -76,11 +80,10 @@ export function storeTx(language: string): StoreTx {
   return language === 'en' ? (STORE_TEXT.en as unknown as StoreTx) : STORE_TEXT.fr;
 }
 
-/** Les indexers ne passent jamais par le catalogue (défense en profondeur, le serveur les retire déjà). */
-export function isCatalogHidden(m: Pick<CatalogModule, 'id' | 'category' | 'scopes'>): boolean {
-  const id = (m.id || '').toLowerCase();
-  const cat = (m.category || '').toLowerCase();
-  return id.includes('indexer') || cat.includes('indexer') || (m.scopes || []).some((s) => s === 'indexers');
+/** Types de modules installables depuis le catalogue : binaires (`process`) et données (`data`). */
+export function isCatalogInstallable(m: Pick<CatalogModule, 'kind'>): boolean {
+  const kind = m.kind || 'process';
+  return kind === 'process' || kind === 'data';
 }
 
 export type CatalogAction = 'install' | 'update' | 'start' | null;
@@ -128,6 +131,9 @@ const ICONS: Record<string, IconName> = {
   compass: 'compass',
   sparkle: 'sparkle',
   list: 'list',
+  search: 'search',
+  indexers: 'search',
+  indexer: 'search',
 };
 
 /** Icône SVG locale d'un module du catalogue (jamais d'image distante). */
@@ -168,7 +174,7 @@ export function useModuleCatalog(
     if (!alive.current) return;
     setLoading(false);
     if (res.success && res.data) {
-      const modules = Array.isArray(res.data.modules) ? res.data.modules.filter((m) => !isCatalogHidden(m)) : [];
+      const modules = Array.isArray(res.data.modules) ? res.data.modules.filter(isCatalogInstallable) : [];
       setCatalog({ ...res.data, modules });
       setError(null);
     } else if (isRouteUnsupported(res)) {
@@ -211,6 +217,9 @@ export async function installFromCatalog(
     if (res.data.job_id) {
       deps.startJob(res.data.job_id, res.data.module_id || m.id);
       deps.setNotice({ kind: 'ok', text: deps.stx.jobStarted(m.name) });
+    } else if (res.data.kind === 'data' || m.kind === 'data') {
+      deps.setNotice({ kind: 'ok', text: deps.stx.dataInstalled(m.name) });
+      await deps.afterChange();
     } else {
       deps.setNotice({ kind: 'ok', text: deps.stx.started(m.name) });
       await deps.afterChange();

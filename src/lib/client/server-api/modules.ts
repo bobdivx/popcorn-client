@@ -220,8 +220,8 @@ export interface TrustKeys {
 }
 
 // ---------------------------------------------------------------------------
-// Catalogue officiel (« store ») : modules process signés par la clé officielle Popcornn,
-// installables en un clic. Les indexers n'y figurent jamais (installation par URL uniquement).
+// Catalogue officiel (« store ») : tous les modules officiels signés par la clé officielle Popcornn
+// (process : torrent, indexers, partage ; data : définitions d'indexers), installables en un clic.
 // Serveur ancien : 404 / 405 → le catalogue est masqué, l'installation par URL reste disponible.
 // ---------------------------------------------------------------------------
 
@@ -235,7 +235,10 @@ export interface CatalogModule {
   icon: string | null;
   category: string | null;
   version: string;
-  kind: 'process' | string;
+  kind: 'process' | 'data' | string;
+  /** Modules de données : sha256 et taille de l'archive signée. */
+  sha256?: string | null;
+  size?: number | null;
   scopes: string[];
   requires?: { server?: string; protocol?: number };
   platforms?: string[];
@@ -262,8 +265,11 @@ export interface ModuleCatalog {
 }
 
 export interface CatalogInstallResult {
+  /** null pour un module de données (installé directement) ou déjà installé. */
   job_id: string | null;
   module_id: string;
+  kind?: 'process' | 'data' | string;
+  installed?: boolean;
   version?: string;
   is_update?: boolean;
   already_installed?: boolean;
