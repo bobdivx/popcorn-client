@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "custom-commands"
-description = "Permissions pour les commandes personnalisées (native-fetch, get-platform, log-message, get-app-version)"
-commands.allow = ["native-fetch", "get-platform", "log-message", "get-app-version"]
+description = "Permissions pour les commandes personnalisées (native-fetch, get-platform, log-message, get-app-version, set-native-fullscreen)"
+commands.allow = ["native-fetch", "get-platform", "log-message", "get-app-version", "set-native-fullscreen"]

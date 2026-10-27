@@ -173,6 +173,61 @@ async fn native_fetch(
     })
 }
 
+/// Plein écran natif Android : mode immersif (barres système masquées), écran allumé et
+/// orientation paysage (hors TV), via `MainActivity.popcornnSetNativeFullscreen(Boolean)`
+/// ajoutée au build par `scripts/patch-android-fullscreen.js`.
+///
+/// Retour : `Ok(true)` si l'activité a appliqué la demande ; `Ok(false)` hors Android
+/// (desktop : le front garde l'API Fullscreen web) ; `Err` si la méthode Kotlin est absente
+/// (APK construite sans le patch) → le front garde son repli CSS.
+#[tauri::command(rename = "set-native-fullscreen")]
+async fn set_native_fullscreen(
+    window: tauri::WebviewWindow,
+    enabled: bool,
+) -> Result<bool, String> {
+    #[cfg(target_os = "android")]
+    {
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let (tx, rx) = mpsc::channel::<Result<(), String>>();
+        window
+            .with_webview(move |webview| {
+                webview.jni_handle().exec(move |env, activity, _webview| {
+                    let res = env.call_method(
+                        activity,
+                        "popcornnSetNativeFullscreen",
+                        "(Z)V",
+                        &[jni::objects::JValue::Bool(u8::from(enabled))],
+                    );
+                    let out = match res {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            // NoSuchMethodError (APK sans patch) : ne pas laisser l'exception Java en suspens.
+                            let _ = env.exception_clear();
+                            Err(format!("popcornnSetNativeFullscreen indisponible: {e}"))
+                        }
+                    };
+                    let _ = tx.send(out);
+                });
+            })
+            .map_err(|e| format!("with_webview: {e}"))?;
+
+        let res =
+            tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(2)))
+                .await
+                .map_err(|e| format!("join: {e}"))?
+                .map_err(|_| "set-native-fullscreen: délai dépassé".to_string())?;
+        println!("[popcorn-debug] set-native-fullscreen enabled={enabled} result={res:?}");
+        res.map(|_| true)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (window, enabled);
+        Ok(false)
+    }
+}
+
 // Entrée commune Desktop + Mobile.
 // Pour Android/iOS, Tauri requiert une target "lib" et une fonction annotée.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -192,7 +247,13 @@ pub fn run() {
         // (https://popcornn.app/app/auth/* ou popcornn://auth/*).
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .invoke_handler(tauri::generate_handler![get_platform, log_message, native_fetch, get_app_version])
+        .invoke_handler(tauri::generate_handler![
+            get_platform,
+            log_message,
+            native_fetch,
+            get_app_version,
+            set_native_fullscreen
+        ])
         .setup(|_app| {
             // #region agent log
             println!("[popcorn-debug] Tauri app setup complete, commands registered");
