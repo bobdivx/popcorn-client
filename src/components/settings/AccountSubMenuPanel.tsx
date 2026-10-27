@@ -16,12 +16,14 @@ import {
   BookOpen,
   CreditCard,
   LogOut,
+  KeyRound,
 } from 'lucide-preact';
 import AccountSettings from './AccountSettings';
 import ConnectivityAlertCard from './ConnectivityAlertCard';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersManager from './LocalUsersManager';
+import GuestPasswordSettings from './GuestPasswordSettings';
 import SubscriptionStatusPanel from './SubscriptionStatusPanel';
 import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import type { SubscriptionMe } from '../../lib/api/popcorn-web';
@@ -30,7 +32,7 @@ import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
 const BASE_URL_DEFAULT = '/settings/account/';
 
-const ACCOUNT_SUBS = ['subscription', 'profile', 'info', 'devices', '2fa', 'quick-connect', 'local-users'] as const;
+const ACCOUNT_SUBS = ['subscription', 'profile', 'password', 'info', 'devices', '2fa', 'quick-connect', 'local-users'] as const;
 type AccountSub = (typeof ACCOUNT_SUBS)[number];
 
 function getSubFromUrl(): AccountSub | null {
@@ -57,12 +59,15 @@ type AccountItem =
       descriptionKey: string;
       icon: typeof User;
       permission?: string;
+      /** Réservé aux invités (les comptes cloud ont `canAccess` vrai partout). */
+      guestOnly?: boolean;
       kind: 'sub';
     };
 
 const ACCOUNT_ITEMS: AccountItem[] = [
   { id: 'subscription', titleKey: 'settingsMenu.subscription.title', descriptionKey: 'settingsMenu.subscription.description', icon: CreditCard, permission: 'settings.account', kind: 'sub' },
   { id: 'profile', titleKey: 'account.profile', descriptionKey: 'account.avatar', icon: User, permission: 'settings.profile', kind: 'sub' },
+  { id: 'password', titleKey: 'settingsMenu.guestPassword.title', descriptionKey: 'settingsMenu.guestPassword.description', icon: KeyRound, permission: 'settings.profile', guestOnly: true, kind: 'sub' },
   { id: 'info', titleKey: 'account.subMenu.accountInfo', descriptionKey: 'account.subMenu.accountInfoDesc', icon: Info, permission: 'settings.account', kind: 'sub' },
   { id: 'devices', titleKey: 'account.devices.title', descriptionKey: 'account.devices.description', icon: Smartphone, permission: 'settings.account', kind: 'sub' },
   { id: 'interface', titleKey: 'account.interfaceSettings', descriptionKey: 'account.interfaceSettingsDescription', icon: Palette, permission: 'settings.ui_preferences', kind: 'link', href: '/settings/ui-preferences' },
@@ -117,8 +122,11 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
     };
   }, [subscriptionData]);
 
+  const guest = isLocalUser();
   const visible = ACCOUNT_ITEMS.filter(
-    (item) => !item.permission || canAccess(item.permission as any)
+    (item) =>
+      (!item.permission || canAccess(item.permission as any)) &&
+      !(item.kind === 'sub' && item.guestOnly && !guest)
   );
 
   const subParam = baseUrl.includes('?') ? '&sub=' : '?sub=';
@@ -191,6 +199,7 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
       )}
       {subItem && sub === 'subscription' && <SubPageFrame item={subItem} baseUrl={baseUrl}><SubscriptionStatusPanel /></SubPageFrame>}
       {subItem && sub === 'profile' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="profile" /></SubPageFrame>}
+      {subItem && sub === 'password' && guest && <SubPageFrame item={subItem} baseUrl={baseUrl}><GuestPasswordSettings /></SubPageFrame>}
       {subItem && sub === 'info' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="info" /></SubPageFrame>}
       {subItem && sub === 'devices' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="devices" /></SubPageFrame>}
       {subItem && sub === '2fa' && <SubPageFrame item={subItem} baseUrl={baseUrl}><TwoFactorSettings /></SubPageFrame>}
