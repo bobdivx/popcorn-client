@@ -227,8 +227,10 @@ export function VideoPlayerWrapper({
   const errorTrapRef = useRef<HTMLDivElement>(null);
   const confirmingDeleteEmptyRef = useRef(confirmingDeleteEmpty);
   confirmingDeleteEmptyRef.current = confirmingDeleteEmpty;
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Toujours fermer via handleClosePlayer : marque la garde d'historique (sinon l'entrée
+  // « lecteur » reste et le Retour suivant ne fait rien / revient en double) et coupe le buffer.
+  const onCloseRef = useRef(handleClosePlayer);
+  onCloseRef.current = handleClosePlayer;
   useRemoteFocusTrap(errorTrapRef, {
     active: !!displayError && visible !== false,
     onBack: () => {
@@ -545,7 +547,7 @@ export function VideoPlayerWrapper({
         <div ref={errorTrapRef} data-remote-trap className="contents">
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClosePlayer}
           aria-label={t('common.back') || 'Retour'}
           className="absolute top-4 left-4 flex items-center justify-center w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 text-white cursor-pointer pointer-events-auto"
         >
@@ -609,7 +611,7 @@ export function VideoPlayerWrapper({
             ) : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClosePlayer}
               data-autofocus={!(sparseOrEmpty && onDeleteEmptyFiles) || undefined}
               className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
             >

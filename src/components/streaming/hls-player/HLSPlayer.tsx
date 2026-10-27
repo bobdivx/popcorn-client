@@ -913,6 +913,9 @@ export default function HLSPlayer({
           </div>
         )}
         {displayError && (
+          // Au-dessus de VideoControls (z-40) et de la couche flottante (z-[45]) : sinon les taps
+          // sur « Retour » de l'écran d'erreur sont captés par la couche contrôles (mobile).
+          <div class="absolute inset-0 z-[60]" data-player-error-layer="true">
           <PlaybackStatusSurface
             variant="player"
             playStatus="error"
@@ -927,6 +930,7 @@ export default function HLSPlayer({
             onCancel={onClose}
             onRetry={() => window.location.reload()}
           />
+          </div>
         )}
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
