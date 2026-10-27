@@ -661,6 +661,8 @@
     "episodeWatched": "Déjà vu",
     "chooseEpisode": "Épisodes",
     "restartFromBeginning": "Redémarrer depuis le début",
+    "enterFullscreen": "Plein écran",
+    "exitFullscreen": "Quitter le plein écran",
     "playFromStartLabel": "Depuis le début",
     "positionSlider": "Position dans la vidéo",
     "seekToPosition": "Aller à {time}",

@@ -32,6 +32,10 @@ import {
   pickPreferredAudioTrackId,
   resolvePreferredAudioLanguage,
 } from '../../../streaming/player-shared/utils/pickPreferredAudioTrack';
+import { isVideoFilePath } from '../../../../lib/streaming/videoFilePath';
+
+/** Délai max d'attente des pistes audio (ffprobe serveur) avant de lancer le HLS sur la piste par défaut. */
+const AUDIO_PROBE_TIMEOUT_MS = 2500;
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
 export interface NextEpisodeInfo {
@@ -223,8 +227,10 @@ export function VideoPlayerWrapper({
   const errorTrapRef = useRef<HTMLDivElement>(null);
   const confirmingDeleteEmptyRef = useRef(confirmingDeleteEmpty);
   confirmingDeleteEmptyRef.current = confirmingDeleteEmpty;
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Toujours fermer via handleClosePlayer : marque la garde d'historique (sinon l'entrée
+  // « lecteur » reste et le Retour suivant ne fait rien / revient en double) et coupe le buffer.
+  const onCloseRef = useRef(handleClosePlayer);
+  onCloseRef.current = handleClosePlayer;
   useRemoteFocusTrap(errorTrapRef, {
     active: !!displayError && visible !== false,
     onBack: () => {
@@ -258,6 +264,15 @@ export function VideoPlayerWrapper({
   const [sourceAudioTracks, setSourceAudioTracks] = useState<
     Array<{ id: number; name: string; lang?: string; default?: boolean }>
   >([]);
+  /**
+   * Pistes audio connues (ou sondage abandonné) : on ne monte le lecteur HLS qu'après, pour
+   * construire l'URL avec la bonne piste dès le départ (sinon : 1er transcodage piste 0, puis
+   * bascule audio_index → 2 FFmpeg serveur et lecteur relancé à chaud).
+   */
+  const [audioProbeDone, setAudioProbeDone] = useState(false);
+  /** Lecteur déjà monté pour cette ouverture : ne plus le démonter (épisode suivant, plein écran). */
+  const playerMountedRef = useRef(false);
+  if (!visible) playerMountedRef.current = false;
   const {
     streamUrl,
     hlsFilePath,
@@ -285,24 +300,32 @@ export function VideoPlayerWrapper({
     hlsFilePath,
   });
 
+  const audioProbePath =
+    hlsFilePath && hlsFilePath !== 'direct' ? hlsFilePath : selectedFile?.path || selectedFile?.name || '';
   // Pistes audio du fichier source (ffprobe) — le HLS n'embarque qu'une seule piste.
   // Par défaut : langue de l'UX Popcornn (ex. fr), sauf préférence lecteur explicite.
   useEffect(() => {
-    if (!visible || effectiveDirectMode || useLucieForThisSource) {
+    if (!visible || effectiveDirectMode || useLucieForThisSource || useStreamTorrentMode) {
       setSourceAudioTracks([]);
       setAudioIndex(0);
+      setAudioProbeDone(true);
       return;
     }
-    const path = hlsFilePath && hlsFilePath !== 'direct'
-      ? hlsFilePath
-      : selectedFile?.path || selectedFile?.name || '';
+    const path = audioProbePath;
     // Sans chemin fichier, l'API renvoie 400 — ne pas appeler avec info_hash seul.
-    if (!path || !String(path).trim()) {
+    // Dossier (ex. downloadPath « media/films ») : ffprobe échouerait côté serveur → pas d'appel.
+    if (!path || !String(path).trim() || !isVideoFilePath(path)) {
       setSourceAudioTracks([]);
       setAudioIndex(0);
+      setAudioProbeDone(true);
       return;
     }
     let cancelled = false;
+    setAudioProbeDone(false);
+    // Serveur lent (NAS) : ne pas bloquer le démarrage au-delà de ce délai (piste par défaut).
+    const probeTimeout = window.setTimeout(() => {
+      if (!cancelled) setAudioProbeDone(true);
+    }, AUDIO_PROBE_TIMEOUT_MS);
     (async () => {
       try {
         const res = await serverApi.getLocalAudioStreams({
@@ -332,19 +355,22 @@ export function VideoPlayerWrapper({
           setSourceAudioTracks([]);
           setAudioIndex(0);
         }
+      } finally {
+        window.clearTimeout(probeTimeout);
+        if (!cancelled) setAudioProbeDone(true);
       }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(probeTimeout);
     };
   }, [
     visible,
     effectiveDirectMode,
     useLucieForThisSource,
+    useStreamTorrentMode,
     infoHash,
-    hlsFilePath,
-    selectedFile?.path,
-    selectedFile?.name,
+    audioProbePath,
     playerConfig.defaultAudioLanguage,
     uxLanguage,
   ]);
@@ -521,7 +547,7 @@ export function VideoPlayerWrapper({
         <div ref={errorTrapRef} data-remote-trap className="contents">
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClosePlayer}
           aria-label={t('common.back') || 'Retour'}
           className="absolute top-4 left-4 flex items-center justify-center w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 text-white cursor-pointer pointer-events-auto"
         >
@@ -585,7 +611,7 @@ export function VideoPlayerWrapper({
             ) : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClosePlayer}
               data-autofocus={!(sparseOrEmpty && onDeleteEmptyFiles) || undefined}
               className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
             >
@@ -625,6 +651,35 @@ export function VideoPlayerWrapper({
     );
   }
 
+  // Lecteur HLS : attendre les pistes audio (≤ AUDIO_PROBE_TIMEOUT_MS) avant de construire l'URL.
+  if (!audioProbeDone && !playerMountedRef.current && !directStreamUrl && !effectiveDirectMode && !useLucieForThisSource && !useStreamTorrentMode) {
+    return (
+      <div
+        ref={wrapperElementRef}
+        id="video-player-wrapper"
+        className="fixed inset-0 z-[400] bg-black w-full h-full"
+        style={{
+          ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
+          display: visible ? 'block' : 'none',
+        }}
+      >
+        <PlayerLoadingOverlay
+          message={t('playback.loadingVideo')}
+          title={torrentName}
+          loadingStep={loadingStep}
+          progressMessage={progressMessage}
+          torrentStats={torrentStats ?? undefined}
+          onCancel={handleClosePlayer}
+          onAbortDownload={onAbortDownload}
+          cancelLabel={t('common.cancel') || 'Annuler'}
+          isHlsPreparing
+          hasVideoFiles
+        />
+      </div>
+    );
+  }
+
+  playerMountedRef.current = true;
   return (
     <div 
       ref={wrapperElementRef}

@@ -378,6 +378,8 @@ export function useVideoControls({
     }
   };
 
+  /** Cible ≤ ce seuil = « depuis le début ». */
+  const RESTART_TARGET_EPSILON_SEC = 0.5;
   const seekToTargetTime = useCallback(
     (targetTime: number) => {
       const video = videoRef.current;
@@ -402,6 +404,14 @@ export function useVideoControls({
         emitPlaybackStep('seek_native', { position: clamped });
         video.currentTime = Math.min(clamped, mediaDuration > 0 ? mediaDuration : clamped);
         resumeIfNeeded();
+        return;
+      }
+      // « Reprendre depuis le début » : toujours via reloadWithSeek(0) (même pendant isLoading) —
+      // il fait un seek natif si la playlist démarre à 0, sinon recharge la playlist complète.
+      if (reloadWithSeek && clamped <= RESTART_TARGET_EPSILON_SEC) {
+        emitPlaybackStep('seek_reload', { position: 0 });
+        userPausedRef.current = false;
+        reloadWithSeek(0);
         return;
       }
       // Hors fenêtre bufferée → régénérer la playlist (seek=) pour déplacer le buffer.

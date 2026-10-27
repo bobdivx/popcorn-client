@@ -423,8 +423,11 @@ export default function HLSPlayer({
   // Fonction pour redémarrer la vidéo depuis le début
   const handleRestart = () => {
     const video = videoRef.current;
-    if (video) {
-      video.currentTime = 0;
+    if (!video) return;
+    // Même chemin que « Reprendre depuis le début » : après une reprise / un seek lointain la
+    // playlist commence à seek=N, un currentTime = 0 seul ne pouvait pas revenir au début.
+    seekToTargetTime(0);
+    if (video.paused) {
       video.play().catch((err) => {
         console.warn('Impossible de démarrer la lecture:', err);
       });
@@ -913,6 +916,9 @@ export default function HLSPlayer({
           </div>
         )}
         {displayError && (
+          // Au-dessus de VideoControls (z-40) et de la couche flottante (z-[45]) : sinon les taps
+          // sur « Retour » de l'écran d'erreur sont captés par la couche contrôles (mobile).
+          <div class="absolute inset-0 z-[60]" data-player-error-layer="true">
           <PlaybackStatusSurface
             variant="player"
             playStatus="error"
@@ -927,6 +933,7 @@ export default function HLSPlayer({
             onCancel={onClose}
             onRetry={() => window.location.reload()}
           />
+          </div>
         )}
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
