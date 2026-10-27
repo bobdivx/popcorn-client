@@ -1996,10 +1996,14 @@ export function useHlsPlayer({
 
         // Sauvegarde + arrêt du buffer (uniquement à la sortie / démontage)
         const savePositionAndStopBuffer = async () => {
+          // Capturer CETTE instance : après l'await, hlsRef.current peut déjà pointer vers le
+          // player recréé (changement de piste audio / qualité) — un stopLoad() dessus bloquait
+          // la nouvelle source (playlist jamais demandée, aucun segment, transcodage orphelin).
+          const ownHls = hls;
           await savePositionOnly();
-          if (hlsRef.current && hlsRef.current.media) {
+          if (ownHls && ownHls.media) {
             try {
-              hlsRef.current.stopLoad();
+              ownHls.stopLoad();
             } catch (e) {
               console.warn('[useHlsPlayer] Erreur lors de l\'arrêt du buffer:', e);
             }
@@ -2044,6 +2048,9 @@ export function useHlsPlayer({
           // Sauvegarder la position et arrêter le buffer lors du cleanup
           savePositionAndStopBuffer();
           void unregisterActiveVideo();
+          // Nouvelle URL (piste audio / qualité) = autre file_id côté serveur : le résoudre et
+          // l'enregistrer à nouveau, sinon le nouveau transcodage n'est jamais désenregistré.
+          hlsFileIdRef.current = null;
           if (fileIdPollTimeoutRef.current !== null) {
             clearTimeout(fileIdPollTimeoutRef.current);
             fileIdPollTimeoutRef.current = null;
