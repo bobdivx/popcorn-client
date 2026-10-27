@@ -17,11 +17,19 @@ interface ServerUrlStepProps {
   onStatusChange?: () => void | Promise<void>;
   /** Quand true (ex: premier lancement sans URL), afficher directement le formulaire URL sans écran de choix */
   skipInitialChoice?: boolean;
+  /**
+   * Quand true : si une URL serveur est déjà enregistrée (ex. récupérée par la connexion rapide
+   * QR / code provisoire), la vérifier en silence et passer l'étape sans clic si elle répond.
+   */
+  autoAdvanceIfConfigured?: boolean;
 }
+
+/** URL déjà validée automatiquement (une seule tentative auto par URL et par page). */
+let autoValidatedBackendUrl: string | null = null;
 
 export type InstallationChoice = 'firstTime' | 'alreadyConfigured' | 'localAccount';
 
-export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange, skipInitialChoice = false }: ServerUrlStepProps) {
+export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange, skipInitialChoice = false, autoAdvanceIfConfigured = false }: ServerUrlStepProps) {
   const { t } = useI18n();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   /** Choix explicite de l'utilisateur : première installation ou déjà configuré ailleurs (ignoré si skipInitialChoice) */
@@ -32,6 +40,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [autoValidating, setAutoValidating] = useState(false);
   
   // Détection de la plateforme
   const [isScannerMode, setIsScannerMode] = useState(false);
@@ -108,6 +117,38 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         clearInterval(pollingIntervalRef.current);
       }
       stopScanner();
+    };
+  }, []);
+
+  // URL déjà enregistrée par la connexion rapide (ou la connexion au compte) : le premier contrôle
+  // a pu échouer (réseau du téléphone pas encore prêt, délai court) → l'étape s'affichait avec
+  // l'URL préremplie et il fallait cliquer. On revérifie en silence (3 essais) et on enchaîne.
+  useEffect(() => {
+    if (!autoAdvanceIfConfigured || typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('backendUrl')) return;
+    if (!hasBackendUrl()) return;
+    const saved = getConfiguredBackendUrl()?.trim().replace(/\/$/, '');
+    if (!saved || autoValidatedBackendUrl === saved) return;
+    autoValidatedBackendUrl = saved;
+    let cancelled = false;
+    setAutoValidating(true);
+    (async () => {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const status = await serverApi.getSetupStatus();
+          if (status.success && status.data && status.data.backendReachable !== false) {
+            if (!cancelled) onNext();
+            return;
+          }
+        } catch {
+          // essai suivant
+        }
+      }
+      if (!cancelled) setAutoValidating(false);
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -629,6 +670,19 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
     .wz-root.is-tv .su-code { font-size: 3rem; }
     .wz-root.is-tv .su-qc__qr-box img { width: 300px; height: 300px; max-height: 42vh; max-width: 42vh; }
   `;
+
+  if (autoValidating) {
+    return (
+      <div>
+        <style>{SU_CSS}</style>
+        <StepHeader kicker="Serveur" title={t('wizard.serverUrl.connectClientTitle')} lead={backendUrl || getConfiguredBackendUrl() || ''} />
+        <div class="su-status">
+          <Spinner />
+          <span>{t('serverSettings.testing')}</span>
+        </div>
+      </div>
+    );
+  }
 
   // Écran de choix : première installation ou déjà configuré (sauf si skipInitialChoice = affichage direct du formulaire URL)
   if (installationChoice === null) {

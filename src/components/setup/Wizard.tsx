@@ -274,6 +274,7 @@ export default function Wizard() {
             buttonRefs={buttonRefs}
             onStatusChange={checkSetupStatus}
             skipInitialChoice={true}
+            autoAdvanceIfConfigured={!forceShowStepIds.includes('serverUrl')}
             onNext={async () => {
               // Rafraîchir le statut sans rediriger : l'utilisateur vient de saisir son URL
               // et doit passer par les étapes suivantes (bienvenue, indexers, TMDB, etc.)
