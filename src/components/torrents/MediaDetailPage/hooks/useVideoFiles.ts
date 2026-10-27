@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
 import { releaseMatchesTmdbEpisode } from '../../../../lib/utils/seasonOrder';
 import { findPackFileIndexForEpisode } from './usePackEpisodes';
+import { isVideoFilePath } from '../../../../lib/streaming/videoFilePath';
 
 export const SPARSE_OR_EMPTY_CODE = 'SPARSE_OR_EMPTY';
 /** Stream-torrent refusé (token / entitlement) — basculer vers téléchargement classique. */
@@ -368,7 +369,27 @@ export function useVideoFiles({
             );
           }
         } else {
-          libraryPathCandidate = fp || dp;
+          // Préférer un chemin qui désigne un fichier vidéo (downloadPath peut être un dossier).
+          libraryPathCandidate = fp && isVideoFilePath(fp) ? fp : dp && isVideoFilePath(dp) ? dp : fp || dp;
+        }
+
+        // Jamais de dossier (ex. « media/films ») comme chemin de lecture : le serveur ne peut ni
+        // sonder les pistes audio ni transcoder un répertoire. Si le torrent liste des fichiers
+        // vidéo, on passe par la liste (fichier choisi) ; sinon repli sur l'ancien comportement
+        // (le serveur résout alors via info_hash).
+        if (libraryPathCandidate && !isVideoFilePath(libraryPathCandidate)) {
+          try {
+            const listed = await clientApi.getTorrentFiles(infoHash);
+            if (Array.isArray(listed) && listed.some((f) => f?.is_video || isVideoFilePath(f?.path))) {
+              console.warn(
+                '[useVideoFiles] ⚠️ Chemin bibliothèque = dossier, utilisation de la liste de fichiers du torrent:',
+                libraryPathCandidate
+              );
+              libraryPathCandidate = '';
+            }
+          } catch {
+            /* torrent inconnu du client : garder le chemin bibliothèque */
+          }
         }
 
         if (libraryPathCandidate) {

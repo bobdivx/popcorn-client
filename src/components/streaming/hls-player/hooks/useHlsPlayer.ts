@@ -23,6 +23,7 @@ import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlay
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
 import { isUhdQualityAttempt } from '../../../../lib/streaming/uhdPlaybackFallback';
 import { isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
+import { isVideoFilePath } from '../../../../lib/streaming/videoFilePath';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -448,7 +449,9 @@ export function useHlsPlayer({
         // Ne pas appeler si : local_, stream-torrent (fichier pas sur disque), streamBackendUrl, ou chemin Windows.
         const isLocalMedia = (infoHash || '').startsWith('local_');
         const isWindowsAbsolutePath = /^[A-Za-z]:[/\\]/.test((filePath || '').replace(/\\/g, '/'));
-        const skipDurationApi = useStreamTorrentUrl || isLocalMedia || isRemoteStream || !!streamBackendUrl || isWindowsAbsolutePath;
+        // Dossier (pas de fichier vidéo) : ffprobe échouerait ; la durée vient de X-Video-Duration.
+        const isNotVideoFile = !!(filePath && filePath.trim()) && !isVideoFilePath(filePath);
+        const skipDurationApi = useStreamTorrentUrl || isLocalMedia || isRemoteStream || !!streamBackendUrl || isWindowsAbsolutePath || isNotVideoFile;
         if (!skipDurationApi) {
           const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
           const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
