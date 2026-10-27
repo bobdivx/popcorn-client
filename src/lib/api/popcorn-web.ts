@@ -1671,6 +1671,10 @@ export interface LocalUser {
   invitationExpiresAt?: number | null;
   /** 'link' : invité arrivé par un lien d'invitation à usage unique ; 'email' sinon. */
   inviteKind?: 'email' | 'link';
+  /** Mot de passe défini (sinon : connexion par lien / Quick Connect uniquement). */
+  hasPassword?: boolean;
+  /** false : identifiant de connexion généré (invité par lien sans email), aucun email possible. */
+  hasEmail?: boolean;
 }
 
 /** Lien d'invitation à usage unique (pas encore utilisé). */
@@ -2477,5 +2481,101 @@ export async function getFeedbackUnreadCount(): Promise<number | null> {
     return res.data?.data?.unreadCount ?? 0;
   } catch {
     return null;
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Invité (utilisateur local) : son propre profil sur popcorn-web
+// ---------------------------------------------------------------------------
+
+/** Profil de l'invité connecté (GET /api/v1/local-users/me, jeton popcorn-web d'invité). */
+export interface LocalUserMe {
+  id: string;
+  account_id?: string;
+  email: string;
+  display_name: string | null;
+  has_password?: boolean;
+}
+
+/** Lit le profil de l'invité avec son jeton popcorn-web (null si jeton invalide ou réseau). */
+export async function getLocalUserMe(guestToken: string): Promise<LocalUserMe | null> {
+  if (!guestToken) return null;
+  try {
+    const res = await fetchJsonWithTimeout(
+      `${getPopcornWebApiUrl()}/local-users/me`,
+      { method: 'GET', headers: { Authorization: `Bearer ${guestToken}` } },
+      8000
+    );
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    const d = json?.data;
+    return d && typeof d.id === 'string' ? (d as LocalUserMe) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Nom de profil d'un invité connecté par mot de passe (pas de jeton popcorn-web dans ce cas) :
+ * POST /api/v1/local-users/verify-credentials. Null si inconnu / erreur.
+ */
+export async function getLocalUserDisplayNameByCredentials(
+  email: string,
+  password: string,
+  userId?: string
+): Promise<string | null> {
+  if (!email || !password) return null;
+  try {
+    const res = await fetchJsonWithTimeout(
+      `${getPopcornWebApiUrl()}/local-users/verify-credentials`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) },
+      8000
+    );
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    const matches: Array<{ id?: string; display_name?: string | null }> = Array.isArray(json?.data) ? json.data : [];
+    const match = (userId ? matches.find((m) => m.id === userId) : undefined) ?? (matches.length === 1 ? matches[0] : undefined);
+    const name = match?.display_name;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface UpdateLocalUserPasswordInput {
+  newPassword: string;
+  /** Obligatoire si un mot de passe existe déjà (et sans jeton invité). */
+  currentPassword?: string;
+  /** Jeton popcorn-web de l'invité (connexion par lien / Quick Connect de moins d'une heure). */
+  guestToken?: string | null;
+  /** Sans jeton : identifiant (email) + mot de passe actuel. */
+  email?: string;
+  userId?: string;
+}
+
+/** Définit ou change le mot de passe de l'invité (PUT /api/v1/local-users/me). */
+export async function updateLocalUserPassword(
+  input: UpdateLocalUserPasswordInput
+): Promise<{ success: boolean; error?: string; message?: string; changed?: boolean }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (input.guestToken) headers.Authorization = `Bearer ${input.guestToken}`;
+  const body: Record<string, string> = { newPassword: input.newPassword };
+  if (input.currentPassword) body.currentPassword = input.currentPassword;
+  if (!input.guestToken && input.email) body.email = input.email;
+  if (input.userId) body.userId = input.userId;
+  try {
+    const res = await fetchJsonWithTimeout(
+      `${getPopcornWebApiUrl()}/local-users/me`,
+      { method: 'PUT', headers, body: JSON.stringify(body) },
+      10000
+    );
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json?.success !== false) {
+      return { success: true, changed: json?.data?.changed === true };
+    }
+    return { success: false, error: json?.error || `HTTP_${res.status}`, message: json?.message };
+  } catch (e) {
+    return { success: false, error: 'NetworkError', message: e instanceof Error ? e.message : undefined };
   }
 }

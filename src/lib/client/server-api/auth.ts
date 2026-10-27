@@ -5,7 +5,12 @@
 import type { ApiResponse } from './types.js';
 import type { AuthResponse } from './types.js';
 import { TokenManager } from '../storage.js';
-import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister, completeOidcTicket } from '../../api/popcorn-web.js';
+import {
+  loginCloud as popcornWebLogin,
+  registerCloud as popcornWebRegister,
+  completeOidcTicket,
+  getLocalUserDisplayNameByCredentials,
+} from '../../api/popcorn-web.js';
 import { hasBackendUrl, hasDeploymentBackend } from '../../backend-config.js';
 
 /**
@@ -173,7 +178,18 @@ export const authMethods = {
         applyServerSession(backendRes.data.access_token);
         const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
         this.saveTokens(accessToken, refreshToken);
-        this.saveUser({ id: userId, email: user.email || email, username, role: user.role });
+        // Invité : le serveur ne connaît que l'email ; le nom de profil vient de popcorn-web.
+        const displayName =
+          user.role === 'local'
+            ? await getLocalUserDisplayNameByCredentials(user.email || email, password, userId).catch(() => null)
+            : null;
+        this.saveUser({
+          id: userId,
+          email: user.email || email,
+          username,
+          role: user.role,
+          ...(displayName ? { display_name: displayName } : {}),
+        });
         console.log('[server-api] Connexion backend (compte local) réussie');
         return {
           success: true,
@@ -275,7 +291,12 @@ export const authMethods = {
     // Générer les tokens JWT côté client (comme en Tauri mais avec de vrais tokens)
     const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
     this.saveTokens(accessToken, refreshToken);
-    this.saveUser(user);
+    // Invité : nom de profil depuis popcorn-web (le serveur ne renvoie que l'email).
+    const guestDisplayName =
+      user?.role === 'local'
+        ? await getLocalUserDisplayNameByCredentials(userEmail, password, userId).catch(() => null)
+        : null;
+    this.saveUser(guestDisplayName ? { ...user, display_name: guestDisplayName } : user);
 
     return {
       success: true,
@@ -444,10 +465,20 @@ export const authMethods = {
    * Récupère les informations de l'utilisateur connecté
    * Unifié : lecture depuis localStorage pour tous les modes
    */
-  async getMe(this: ServerApiClientAuthAccess): Promise<ApiResponse<{ id: string; email: string }>> {
+  async getMe(
+    this: ServerApiClientAuthAccess
+  ): Promise<ApiResponse<{ id: string; email: string; display_name?: string | null }>> {
     const user = this.getUser();
     if (user?.id) {
-      return { success: true, data: { id: user.id, email: user.email || '' } };
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          email: user.email || '',
+          // Nom de profil d'un invité (popcorn-web), affiché à la place de l'email.
+          display_name: typeof user.display_name === 'string' && user.display_name ? user.display_name : null,
+        },
+      };
     }
     return { success: false, error: 'Unauthorized', message: 'Non authentifié' };
   },

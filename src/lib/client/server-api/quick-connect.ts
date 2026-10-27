@@ -3,7 +3,8 @@
  */
 
 import type { ApiResponse } from './types.js';
-import { getPopcornWebApiUrl } from '../../api/popcorn-web.js';
+import { getPopcornWebApiUrl, getLocalUserMe } from '../../api/popcorn-web.js';
+import { setGuestWebToken } from '../guest-web-session.js';
 import { TokenManager } from '../storage.js';
 import { setBackendUrl, hasBackendUrl, isUsableCloudBackendUrl } from '../../backend-config.js';
 
@@ -53,7 +54,12 @@ async function establishGuestServerSession(
   const username = res.data?.user?.username || email || 'user';
   const { accessToken, refreshToken } = await ctx.generateClientTokens(userId, username);
   ctx.saveTokens(accessToken, refreshToken);
-  ctx.saveUser({ id: userId, email, username, role: 'local' });
+  // Nom de profil choisi par l'invité (le serveur ne renvoie que l'email) : lu sur popcorn-web
+  // avec son jeton d'invité, conservé ~1 h pour l'écran « Mot de passe » (guest-web-session).
+  setGuestWebToken(guestAccessToken, userId);
+  const me = await getLocalUserMe(guestAccessToken).catch(() => null);
+  const displayName = me && me.id === userId && me.display_name ? me.display_name : undefined;
+  ctx.saveUser({ id: userId, email, username, role: 'local', ...(displayName ? { display_name: displayName } : {}) });
   return true;
 }
 

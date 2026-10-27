@@ -342,6 +342,8 @@ export class TokenManager {
     localStorage.removeItem(this.CLOUD_REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.JWT_SECRET_KEY);
     localStorage.removeItem(this.SERVER_SESSION_TOKEN_KEY);
+    // Jeton popcorn-web d'invité (lib/client/guest-web-session.ts).
+    localStorage.removeItem('popcornn_guest_web_session');
   }
 
   /**

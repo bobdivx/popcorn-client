@@ -36,7 +36,7 @@ export default function Navbar() {
   const { t, language, setLanguage, availableLanguages } = useI18n();
   const [isScrolled, setIsScrolled] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string; display_name?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(() => getLocalProfile());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -335,7 +335,7 @@ export default function Navbar() {
                       >
                         <Avatar
                           email={user.email}
-                          displayName={profile.displayName}
+                          displayName={profile.displayName || user.display_name || undefined}
                           profile={profile}
                           sizeClassName="w-10 h-10"
                           shape="circle"
@@ -349,8 +349,8 @@ export default function Navbar() {
                       tabIndex={0}
                       data-focusable
                     >
-                      <p className="font-semibold truncate">{profile.displayName || user.email}</p>
-                      {profile.displayName && user.email && (
+                      <p className="font-semibold truncate">{profile.displayName || user.display_name || user.email}</p>
+                      {(profile.displayName || user.display_name) && user.email && (
                         <p className="text-xs text-[var(--ds-text-tertiary)] truncate">{user.email}</p>
                       )}
                     </a>
@@ -529,7 +529,7 @@ export default function Navbar() {
                   >
                     <Avatar
                       email={user.email}
-                      displayName={profile.displayName}
+                      displayName={profile.displayName || user.display_name || undefined}
                       profile={profile}
                       sizeClassName="w-full h-full"
                       shape="circle"
