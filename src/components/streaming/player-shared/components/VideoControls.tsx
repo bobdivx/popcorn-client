@@ -956,6 +956,8 @@ export function VideoControls({
                 onToggleFullscreen();
               }} 
               class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all border border-white/25 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
+              aria-label={isFullscreen ? t('playback.exitFullscreen') : t('playback.enterFullscreen')}
+              title={isFullscreen ? t('playback.exitFullscreen') : t('playback.enterFullscreen')}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>
