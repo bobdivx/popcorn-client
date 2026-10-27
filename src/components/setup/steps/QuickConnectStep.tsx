@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
+import { hasBackendUrl } from '../../../lib/backend-config.js';
 import { TokenManager } from '../../../lib/client/storage';
 import { getUserConfig, getPopcornWebBaseUrl } from '../../../lib/api/popcorn-web';
 import { CloudImportManager } from '../../../lib/client/cloud-import';
@@ -154,6 +155,11 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
         return;
       }
 
+      // Statut serveur seulement si l'URL est connue (enregistrée par connectQuickConnect depuis le
+      // compte) : sans URL, le statut viserait l'URL par défaut (10.0.2.2:3000 sur Android, ~30 s
+      // d'écran de chargement) ; l'étape suivante (Serveur) permet alors de la renseigner.
+      const refreshStatus = () => (hasBackendUrl() ? onStatusChange?.() : undefined);
+
       // Après connexion rapide : récupérer la config cloud comme après login (AuthStep)
       const cloudToken = response.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
       if (cloudToken) {
@@ -175,7 +181,7 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
               });
             }
             CloudImportManager.startImport(savedConfig).finally(() => {
-              Promise.resolve(onStatusChange?.()).catch(() => {});
+              Promise.resolve(refreshStatus()).catch(() => {});
             });
           }
         } catch (configError) {
@@ -183,9 +189,7 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
         }
       }
 
-      if (onStatusChange) {
-        await onStatusChange();
-      }
+      await refreshStatus();
       onNext();
     } catch (err) {
       setError('Erreur lors de la connexion');

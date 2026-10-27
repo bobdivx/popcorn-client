@@ -9,7 +9,9 @@ import {
   loadRuntimeConfig,
   setBackendUrl,
   hasDeploymentBackend,
+  hasBackendUrl,
   isDemoLibraryBackendUrl,
+  isUsableCloudBackendUrl,
 } from '../lib/backend-config';
 import {
   EMBEDDED_DESKTOP_BACKEND_URL,
@@ -353,7 +355,14 @@ export default function IndexRedirect() {
                   setLoading(false);
                   return;
                 }
-                if (cloudHost === window.location.hostname) {
+                // Web : seulement si le serveur est sur le même domaine que la page. Apps natives
+                // (Tauri Android / desktop, webOS en file://) : l'origine (tauri.localhost, file://)
+                // n'est jamais celle du serveur → appliquer l'URL du compte si elle est utilisable ici.
+                const isNativeApp = isTauri() || window.location.protocol === 'file:';
+                if (
+                  cloudHost === window.location.hostname ||
+                  (isNativeApp && !hasBackendUrl() && isUsableCloudBackendUrl(url))
+                ) {
                   setBackendUrl(url);
                 }
               } catch {
@@ -362,6 +371,20 @@ export default function IndexRedirect() {
             }
           } catch {
             // ignore (utilisateur non connecté au cloud ou CORS)
+          }
+        }
+
+        // Premier lancement : aucune URL serveur sur l'appareil (ni config.json, ni déploiement, ni
+        // session) → assistant d'appairage (QR / code provisoire) tout de suite, sans aucun appel
+        // serveur. Sinon l'URL par défaut (10.0.2.2:3000 sur Android) était testée 10 fois (~1,5 à 4,5 min).
+        // Même règle que ServerConnectionCheck (qui laisse « / » à ce composant).
+        if (!hasBackendUrl() && !hasDeploymentBackend()) {
+          const hasCloudAuth = !!TokenManager.getCloudAccessToken?.();
+          if (!hasCloudAuth && !serverApi.isAuthenticated()) {
+            console.log('[IndexRedirect] Aucune URL serveur configurée → /setup (appairage)');
+            goTo('/setup');
+            setLoading(false);
+            return;
           }
         }
 

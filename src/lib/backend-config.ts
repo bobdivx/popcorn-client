@@ -549,6 +549,30 @@ export function getConfiguredBackendUrl(): string | null {
   }
 }
 
+/**
+ * URL serveur reçue du cloud (Quick Connect, config du compte) utilisable sur CET appareil ?
+ * Une adresse de bouclage (127.0.0.1 / localhost / ::1 / 0.0.0.0), enregistrée par ex. depuis le
+ * serveur embarqué d'un PC, ne désigne jamais le serveur de l'utilisateur sur Android (aucun
+ * serveur local sur le téléphone / la TV) : l'enregistrer ferait échouer toutes les requêtes.
+ */
+export function isUsableCloudBackendUrl(url: string | null | undefined): boolean {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return false;
+  let host = '';
+  try {
+    const u = new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  } catch {
+    return false;
+  }
+  const isLoopback =
+    host === 'localhost' || host.endsWith('.localhost') || host === '::1' || host === '0.0.0.0' || /^127\./.test(host);
+  if (!isLoopback) return true;
+  const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+  return !isAndroid;
+}
+
 const RUNTIME_BACKEND_FLAG = 'popcorn_backend_from_runtime';
 
 /**

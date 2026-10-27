@@ -5,7 +5,7 @@
 import type { ApiResponse } from './types.js';
 import { getPopcornWebApiUrl } from '../../api/popcorn-web.js';
 import { TokenManager } from '../storage.js';
-import { setBackendUrl } from '../../backend-config.js';
+import { setBackendUrl, hasBackendUrl, isUsableCloudBackendUrl } from '../../backend-config.js';
 
 /**
  * Interface pour accéder aux méthodes nécessaires pour quick-connect
@@ -203,7 +203,12 @@ export const quickConnectMethods = {
       }
       // URL du backend (serveur API) renvoyée par popcorn-web : toujours l'enregistrer côté client
       // pour que le device utilise le bon backend (ex. backup.briseteia.me) après Quick Connect
-      if (result.data.backendUrl && typeof result.data.backendUrl === 'string' && result.data.backendUrl.trim()) {
+      if (
+        result.data.backendUrl &&
+        typeof result.data.backendUrl === 'string' &&
+        result.data.backendUrl.trim() &&
+        isUsableCloudBackendUrl(result.data.backendUrl)
+      ) {
         try {
           setBackendUrl(result.data.backendUrl.trim().replace(/\/$/, ''));
         } catch {
@@ -219,6 +224,16 @@ export const quickConnectMethods = {
         }
       }
       if (isGuest) {
+        // Invité sans URL serveur exploitable (compte propriétaire sans serveur enregistré) : échec
+        // immédiat, sans viser l'URL par défaut (10.0.2.2:3000 sur Android → ~45 s d'attente).
+        if (!hasBackendUrl()) {
+          return {
+            success: false,
+            error: 'GuestSessionFailed',
+            message:
+              "Aucune adresse de serveur n'est enregistrée pour ce compte. Le propriétaire doit d'abord configurer son serveur Popcornn.",
+          };
+        }
         // Invité : le serveur du propriétaire n'accepte que sa propre session (pls1.).
         let ok = false;
         try {

@@ -11,7 +11,7 @@ import { CloudImportManager } from '../../../lib/client/cloud-import';
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 import { redirectTo } from '../../../lib/utils/navigation.js';
-import { setBackendUrl, hasDeploymentBackend } from '../../../lib/backend-config.js';
+import { setBackendUrl, hasDeploymentBackend, hasBackendUrl, isUsableCloudBackendUrl } from '../../../lib/backend-config.js';
 import { isTVPlatform, isTablet } from '../../../lib/utils/device-detection';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
@@ -39,8 +39,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [view, setView] = useState<AuthView>('login');
   const [showEmailFormExpanded, setShowEmailFormExpanded] = useState(false); // false = QR/code en premier, true = formulaire email
 
-  // Unifié (QR d'abord, puis email) sur TV, tablette et desktop
-  const useUnifiedAuthLayout = isTV || (typeof window !== 'undefined' && isTablet()) || isLargeScreen;
+  // Unifié (QR d'abord, puis email) sur TV, tablette et desktop — et sur téléphone au premier
+  // lancement (aucune URL serveur) : l'appairage par QR / code provisoire passe en premier.
+  // Évalué au montage (avant que l'assistant n'efface le stockage) : vrai premier lancement seulement.
+  const [firstLaunchPairing] = useState(
+    () => typeof window !== 'undefined' && !hasBackendUrl() && !hasDeploymentBackend()
+  );
+  const useUnifiedAuthLayout =
+    isTV || (typeof window !== 'undefined' && isTablet()) || isLargeScreen || firstLaunchPairing;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -145,7 +151,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
       dbg(`hasSomething:${hasSomething}`);
       if (savedConfig && hasSomething) {
-        if (savedConfig.backendUrl && !hasDeploymentBackend()) {
+        if (savedConfig.backendUrl && !hasDeploymentBackend() && isUsableCloudBackendUrl(savedConfig.backendUrl)) {
           try {
             setBackendUrl(savedConfig.backendUrl);
             dbg(`backendUrl set: ${savedConfig.backendUrl}`);
@@ -161,7 +167,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         CloudImportManager.startImport(savedConfig).catch((e) => console.warn('[AUTH] Import cloud (bg):', e));
         // Vérifier le statut immédiatement (sans attendre la fin de l'import)
         dbg('calling onStatusChange...');
-        const freshStatus = await Promise.resolve(onStatusChange?.()).catch(() => null);
+        // Sans URL serveur, pas de statut (il viserait l'URL par défaut, injoignable sur Android).
+        const freshStatus =
+          hasBackendUrl() || hasDeploymentBackend()
+            ? await Promise.resolve(onStatusChange?.()).catch(() => null)
+            : null;
         dbg(`freshStatus: needsSetup=${freshStatus?.needsSetup} hasUsers=${freshStatus?.hasUsers} reachable=${freshStatus?.backendReachable}`);
         dbg(`isAuthenticated:${serverApi.isAuthenticated()}`);
         if (freshStatus && freshStatus.needsSetup === false && freshStatus.hasUsers === true) {
