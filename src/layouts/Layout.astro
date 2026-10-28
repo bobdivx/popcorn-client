@@ -394,7 +394,9 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var tauriMeta = isTauri ? window.__TAURI_METADATA__ : null;
         var tauriPlatform = tauriMeta ? (tauriMeta.platform || tauriMeta.os || '') : '';
         var isTauriAndroidTV = isTauri && /android/i.test(tauriPlatform) && w >= 960 && h >= 540;
-        var isTauriFallback = isTauri && !tauriMeta && w >= 1280 && h >= 720;
+        // Tauri 2 n'expose plus __TAURI_METADATA__ : sans le filtre Android, l'app PC (Windows / macOS /
+        // Linux) en fenêtre ≥ 1280×720 passait en mode TV (gabarits TV, réglages étroits).
+        var isTauriFallback = isTauri && !tauriMeta && /Android/i.test(ua) && w >= 1280 && h >= 720;
         var isAndroidTVUA = /Android.*TV|TV.*Android|GoogleTV|FireTV|AFT[A-Z]|Chromecast|SHIELD/i.test(ua);
         var isTVGeneric = /\bTV\b/i.test(ua) && !/iPhone|iPad|Mobile/i.test(ua);
         var isOtherTV = /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua);

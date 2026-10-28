@@ -74,6 +74,45 @@ body:has(.settings-page) {
 }
 
 /*
+ * Grand écran (PC ≥ 1536 px) : les sous-pages de réglages (`.ds-container max-w-5xl`) restaient
+ * bloquées à 80rem et calées à gauche — sur 2560 px, plus de la moitié de l'écran restait vide alors
+ * que le hub, lui, occupe toute la largeur. On aligne les sous-pages sur le hub : pleine largeur
+ * (mêmes marges), avec un plafond très large pour les écrans géants. Les grilles de tuiles
+ * (`.hub-grid`, auto-fill) gagnent alors des colonnes à mesure que l'écran s'élargit.
+ * TV exclue : elle garde son gabarit dédié.
+ */
+@media (min-width: 1536px) {
+  html:not([data-tv-platform="true"]) .settings-content-area > .ds-container,
+  html:not([data-tv-platform="true"]) .settings-content-area > .ds-container.max-w-5xl {
+    max-width: 240rem;
+  }
+}
+
+/*
+ * Lisibilité grand écran (PC, souris) : le body applique un zoom fixe de 0.8 dès 1024 px
+ * (global.css) — sur un écran 1440p / 4K à 150 % (≈ 2560 px CSS), le texte des réglages tombait
+ * à ~11 px. On compense uniquement la zone de contenu des réglages, par paliers de résolution :
+ * 0.8 × 1.25 = 100 % à partir de 2400 × 1200, 0.8 × 1.5 = 120 % en 4K natif (≥ 3200 × 1700).
+ * La navbar, les autres pages, le mobile, la tablette et la TV (webOS / Android TV) ne changent pas.
+ */
+@media (min-width: 2400px) and (min-height: 1200px) and (hover: hover) and (pointer: fine) {
+  html:not([data-tv-platform="true"]) .settings-content-area {
+    zoom: 1.25;
+    /* Marges latérales inchangées à l'écran (5rem / 1.25) : le titre reste aligné sur le logo. */
+    padding-left: 4rem !important;
+    padding-right: 4rem !important;
+  }
+}
+
+@media (min-width: 3200px) and (min-height: 1700px) and (hover: hover) and (pointer: fine) {
+  html:not([data-tv-platform="true"]) .settings-content-area {
+    zoom: 1.5;
+    padding-left: 3.333rem !important;
+    padding-right: 3.333rem !important;
+  }
+}
+
+/*
  * Gabarit commun des pages de réglages (SettingsLayout > .settings-content-area > .ds-container) :
  * la zone de contenu porte déjà les marges latérales, le haut et le bas. Le `.ds-container
  * px-3 sm:px-6 py-4 sm:py-6` de chaque page les doublait : fort retrait à gauche sur téléphone et

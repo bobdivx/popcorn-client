@@ -227,8 +227,9 @@ export function isAndroidTV(): boolean {
         return true;
       }
     }
-    // Fallback Tauri sans metadata : si résolution TV-like (paysage large)
-    if (!meta && window.innerWidth >= 1280 && window.innerHeight >= 720) {
+    // Fallback Tauri sans metadata (Tauri 2 ne l'expose plus) : Android seulement, sinon l'app PC
+    // (Windows / macOS / Linux) en fenêtre ≥ 1280×720 était prise pour une TV.
+    if (!meta && /Android/i.test(userAgent) && window.innerWidth >= 1280 && window.innerHeight >= 720) {
       return true;
     }
   }
