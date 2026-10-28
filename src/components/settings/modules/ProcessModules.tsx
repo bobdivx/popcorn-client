@@ -39,6 +39,8 @@ import {
   subHeadingStyle,
   textareaClass,
 } from './moduleUi';
+import { checkAccessToken, checkModuleUrl, checkTrustKey } from './moduleCatalogModel';
+import { FieldHint } from './ModuleCatalog';
 
 /**
  * Paramètres > Modules — modules « process » : binaires signés (minisign + sha256) que le serveur
@@ -603,6 +605,12 @@ export function ProcessInstallForm({
     }
   };
 
+  const urlCheck = checkModuleUrl(releaseUrl, 'process');
+  const keyCheck = checkTrustKey(publicKey);
+  const tokenCheck = checkAccessToken(token);
+  const fieldsInvalid =
+    urlCheck.level === 'error' || urlCheck.level === 'empty' || keyCheck.level === 'error' || tokenCheck.level === 'error';
+
   const p = preview?.p;
   const needsKeyApproval = !!p && p.signed && !p.key_trusted;
   const keyChangeFrom = p?.key_change_from || null;
@@ -639,8 +647,11 @@ export function ProcessInstallForm({
             autoComplete="off"
             autoCapitalize="none"
             spellcheck={false}
+            aria-invalid={urlCheck.level === 'error'}
+            aria-describedby="process-url-hint"
             onInput={(e) => setReleaseUrl((e.currentTarget as HTMLInputElement).value)}
           />
+          <FieldHint check={urlCheck} id="process-url-hint" />
         </label>
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="grid gap-1.5">
@@ -655,11 +666,14 @@ export function ProcessInstallForm({
               autoComplete="off"
               autoCapitalize="none"
               spellcheck={false}
+              aria-invalid={keyCheck.level === 'error'}
+              aria-describedby="process-key-hint"
               onInput={(e) => setPublicKey((e.currentTarget as HTMLInputElement).value)}
             />
             <span class="text-xs tv:text-base" style={{ color: C.faint }}>
               {tx.publicKeyHelp}
             </span>
+            <FieldHint check={keyCheck} id="process-key-hint" />
           </label>
           <label class="grid gap-1.5 content-start">
             <span class="text-sm tv:text-lg">{tx.token}</span>
@@ -673,12 +687,21 @@ export function ProcessInstallForm({
               autoComplete="new-password"
               autoCapitalize="none"
               spellcheck={false}
+              aria-invalid={tokenCheck.level === 'error'}
+              aria-describedby="process-token-hint"
               onInput={(e) => setToken((e.currentTarget as HTMLInputElement).value)}
             />
+            <FieldHint check={tokenCheck} id="process-token-hint" />
           </label>
         </div>
         <div>
-          <button type="submit" data-focusable class={primaryBtn} style={primaryStyle} disabled={!!busy || pm.jobRunning}>
+          <button
+            type="submit"
+            data-focusable
+            class={primaryBtn}
+            style={primaryStyle}
+            disabled={!!busy || pm.jobRunning || fieldsInvalid}
+          >
             <Icon name="search" />
             {busy === 'preview' ? tx.checking : tx.check}
           </button>
