@@ -13,6 +13,7 @@ import WebOSBoot from '../components/webos/WebOSBoot.astro';
 import TvViewportScript from '../components/tv/TvViewportScript.astro';
 import {
   IS_STORE_BUILD,
+  DISTRIBUTION,
   STORE_BLOCKED_ROUTE_PREFIXES,
   TORRENT_API_PATTERN_SOURCES,
 } from '../lib/distribution';
@@ -32,11 +33,11 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     {IS_STORE_BUILD && (
       <script
         is:inline
-        define:vars={{ storeBlockedRoutes: STORE_BLOCKED_ROUTE_PREFIXES, storeApiPatterns: TORRENT_API_PATTERN_SOURCES }}
+        define:vars={{ storeBlockedRoutes: STORE_BLOCKED_ROUTE_PREFIXES, storeApiPatterns: TORRENT_API_PATTERN_SOURCES, storeDistribution: DISTRIBUTION }}
       >
         /* Version store (PUBLIC_DISTRIBUTION=play) : pas de routes ni d'appels réseau torrent. */
         (function () {
-          window.__POPCORN_DISTRIBUTION__ = 'play';
+          window.__POPCORN_DISTRIBUTION__ = storeDistribution;
           try {
             var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
             if (p === '/torrents' || p.indexOf('/torrents/') === 0) {

@@ -8,24 +8,36 @@
  * Elle se connecte au serveur de l'utilisateur et lit uniquement les fichiers déjà présents
  * dans sa bibliothèque.
  *
+ * `PUBLIC_DISTRIBUTION=msstore` produit l'édition Microsoft Store (Windows, MSIX) : mêmes retraits
+ * que `play` (pas de torrent dans l'application), mais la page Modules reste disponible : modules
+ * communautaires installés depuis le catalogue signé (URL configurable côté serveur), sans ajout
+ * depuis une URL directe (feature Cargo `store` de popcorn-server).
+ *
  * Sans la variable (web, webOS, desktop, APK GitHub), rien ne change.
  */
 
 import { getCachedCapabilities, isCapabilityAvailable } from './capabilities';
 
-export type Distribution = 'default' | 'play';
+export type Distribution = 'default' | 'play' | 'msstore';
 
 /**
  * Vrai pour la version Google Play (aucune fonctionnalité torrent).
  * Comparaison littérale sur import.meta.env (remplacé au build) pour que le bundler élimine
  * le code torrent mort de la version store.
  */
-export const IS_STORE_BUILD: boolean = import.meta.env.PUBLIC_DISTRIBUTION === 'play';
+export const IS_STORE_BUILD: boolean =
+  import.meta.env.PUBLIC_DISTRIBUTION === 'play' || import.meta.env.PUBLIC_DISTRIBUTION === 'msstore';
 
-export const DISTRIBUTION: Distribution = IS_STORE_BUILD ? 'play' : 'default';
+/**
+ * Édition Microsoft Store : version store AVEC la page Modules (catalogue signé, pas d'ajout
+ * depuis une URL directe).
+ */
+export const STORE_MODULES_ENABLED: boolean = import.meta.env.PUBLIC_DISTRIBUTION === 'msstore';
+
+export const DISTRIBUTION: Distribution = STORE_MODULES_ENABLED ? 'msstore' : IS_STORE_BUILD ? 'play' : 'default';
 
 /** Fonctionnalités torrent / indexers / téléchargements disponibles dans ce build. */
-export const TORRENT_FEATURES_ENABLED: boolean = import.meta.env.PUBLIC_DISTRIBUTION !== 'play';
+export const TORRENT_FEATURES_ENABLED: boolean = !IS_STORE_BUILD;
 
 /**
  * Module torrent utilisable : présent dans ce build ET annoncé par le serveur connecté
@@ -56,7 +68,7 @@ export const MEDIA_DETAIL_PATH: string = IS_STORE_BUILD ? '/media' : '/torrents'
  * Routes absentes de la version store (supprimées du build + redirigées si atteintes).
  * Partagé avec scripts/astro/store-distribution.mjs (garder les deux listes alignées).
  */
-export const STORE_BLOCKED_ROUTE_PREFIXES: readonly string[] = [
+const STORE_BLOCKED_ROUTE_PREFIXES_ALL: readonly string[] = [
   '/torrents',
   '/downloads',
   '/search',
@@ -84,6 +96,10 @@ export const STORE_BLOCKED_ROUTE_PREFIXES: readonly string[] = [
   '/settings/audit',
   '/settings/modules',
 ];
+
+export const STORE_BLOCKED_ROUTE_PREFIXES: readonly string[] = STORE_MODULES_ENABLED
+  ? STORE_BLOCKED_ROUTE_PREFIXES_ALL.filter((p) => p !== '/settings/modules')
+  : STORE_BLOCKED_ROUTE_PREFIXES_ALL;
 
 /** Fonctions retirées du produit (upload vers trackers / C411, outils de ratio) : jamais affichées. */
 export const RETIRED_ROUTE_PREFIXES: readonly string[] = ['/settings/uploads', '/settings/ratio'];
@@ -270,15 +286,12 @@ export function isModuleSettingsRoute(pathname: string): boolean {
  * Endpoints serveur liés aux torrents / indexers / téléchargements.
  * La version store ne les appelle jamais (voir src/lib/store/network-guard.ts).
  */
-const TORRENT_API_PATTERNS: readonly RegExp[] = [
+const TORRENT_API_PATTERNS_BASE: readonly RegExp[] = [
   /^\/api\/torrents(\/|$)/,
   /^\/api\/indexers(\/|$)/,
   /^\/api\/sync(\/|$)/,
   /^\/api\/client\/torrents(\/|$)/,
   /^\/api\/client\/admin\/indexers(\/|$)/,
-  /^\/api\/client\/admin\/modules(\/|$)/,
-  // Modules « process » : admin (/api/client/admin/modules/process, couvert ci-dessus) et proxy.
-  /^\/api\/modules(\/|$)/,
   /^\/api\/client\/stream-torrent(\/|$)/,
   /^\/api\/client\/librqbit(\/|$)/,
   /^\/api\/client\/uploader(\/|$)/,
@@ -306,6 +319,16 @@ const TORRENT_API_PATTERNS: readonly RegExp[] = [
   /^\/announce(\/|$)/,
   /^\/api\/v1\/indexer-definitions(\/|$)/,
 ];
+
+/**
+ * Administration des modules et proxy vers les modules « process » : bloqués dans la version
+ * Google Play, autorisés dans l'édition Microsoft Store (page Modules, catalogue signé).
+ */
+const MODULE_API_PATTERNS: readonly RegExp[] = [/^\/api\/client\/admin\/modules(\/|$)/, /^\/api\/modules(\/|$)/];
+
+const TORRENT_API_PATTERNS: readonly RegExp[] = STORE_MODULES_ENABLED
+  ? TORRENT_API_PATTERNS_BASE
+  : [...TORRENT_API_PATTERNS_BASE, ...MODULE_API_PATTERNS];
 
 /** Sources des regex (pour le garde réseau inline injecté dans Layout.astro). */
 export const TORRENT_API_PATTERN_SOURCES: string[] = TORRENT_API_PATTERNS.map((re) => re.source);

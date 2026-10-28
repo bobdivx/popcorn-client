@@ -17,7 +17,7 @@ import { TokenManager } from '../../lib/client/storage';
 import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import { isBackendUrlSameAsClientUrl, getBackendUrl } from '../../lib/backend-config';
 import { HubGrid, HubTile, type HubStatus } from './hub/HubTile';
-import { IS_STORE_BUILD, isHubSettingsCategory, isRouteBlockedInStoreBuild } from '../../lib/distribution';
+import { IS_STORE_BUILD, STORE_MODULES_ENABLED, isHubSettingsCategory, isRouteBlockedInStoreBuild } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type TileDef = {
@@ -49,7 +49,7 @@ function isVisible(item: TileDef): boolean {
   // Fonctions retirées, version store, module absent du serveur connecté, ou réglages d'un module
   // (indexers, téléchargements, découverte) : accessibles depuis la tuile Modules, pas ici.
   if (!isHubSettingsCategory(item.id) || isRouteBlockedInStoreBuild(item.href)) return false;
-  if (IS_STORE_BUILD && item.id === 'modules') return false;
+  if (IS_STORE_BUILD && !STORE_MODULES_ENABLED && item.id === 'modules') return false;
   if (item.permission) return canAccess(item.permission as any);
   if (item.permissions?.length) return item.permissions.some((p) => canAccess(p as any));
   return true;

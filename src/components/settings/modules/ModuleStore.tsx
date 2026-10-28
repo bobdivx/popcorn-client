@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import type { CatalogModule, ModuleCatalog } from '../../../lib/client/server-api/modules';
 import { isRouteUnsupported } from '../../../lib/module-errors';
-import { IS_STORE_BUILD } from '../../../lib/distribution';
+import { IS_STORE_BUILD, STORE_MODULES_ENABLED } from '../../../lib/distribution';
 import type { ServerCapabilities } from '../../../lib/capabilities';
 import type { HubStatus } from '../hub/HubTile';
 import { type IconName, type Notice, errorMessage, tileIcon } from './moduleUi';
@@ -148,7 +148,7 @@ export function useModuleCatalog(
   reloadKey: unknown,
 ) {
   const knownOff = !!caps && (caps.modules.processHost === false || caps.modules.catalog === false);
-  const enabled = !IS_STORE_BUILD && processSupported && !knownOff;
+  const enabled = (!IS_STORE_BUILD || STORE_MODULES_ENABLED) && processSupported && !knownOff;
   const [hidden, setHidden] = useState(false);
   const [catalog, setCatalog] = useState<ModuleCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);

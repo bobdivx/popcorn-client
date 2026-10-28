@@ -107,10 +107,13 @@ export function storeDistribution() {
     name: 'popcornn-store-distribution',
     hooks: {
       'astro:build:done': ({ dir, logger }) => {
-        if (getDistribution() !== 'play') return;
+        const distribution = getDistribution();
+        if (distribution !== 'play' && distribution !== 'msstore') return;
+        // Édition Microsoft Store : la page Modules reste (modules communautaires du catalogue signé).
+        const blocked = distribution === 'msstore' ? STORE_BLOCKED_ROUTES.filter((r) => r !== 'settings/modules') : STORE_BLOCKED_ROUTES;
         const outDir = fileURLToPath(dir);
         const removed = [];
-        for (const route of STORE_BLOCKED_ROUTES) {
+        for (const route of blocked) {
           for (const candidate of [join(outDir, route), join(outDir, `${route}.html`)]) {
             if (existsSync(candidate)) {
               rmSync(candidate, { recursive: true, force: true });
@@ -120,10 +123,10 @@ export function storeDistribution() {
         }
         mkdirSync(join(outDir, 'torrents'), { recursive: true });
         writeFileSync(join(outDir, 'torrents', 'index.html'), REDIRECT_TO_MEDIA);
-        logger.info(`PUBLIC_DISTRIBUTION=play : ${removed.length} routes torrent supprimées du build (${removed.join(', ')})`);
+        logger.info(`PUBLIC_DISTRIBUTION=${distribution} : ${removed.length} routes torrent supprimées du build (${removed.join(', ')})`);
         const prunedChunks = pruneUnreachableChunks(outDir);
         logger.info(
-          `PUBLIC_DISTRIBUTION=play : ${prunedChunks.length} chunks JS orphelins supprimés (${prunedChunks.join(', ')})`
+          `PUBLIC_DISTRIBUTION=${distribution} : ${prunedChunks.length} chunks JS orphelins supprimés (${prunedChunks.join(', ')})`
         );
       },
     },
