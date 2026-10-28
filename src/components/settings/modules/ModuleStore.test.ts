@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogModule } from '../../../lib/client/server-api/modules';
-import { catalogIconName, catalogTileState, isCatalogHidden, storeTx } from './ModuleStore';
+import { catalogIconName, catalogTileState, isCatalogInstallable, storeTx } from './ModuleStore';
 
 const tx = storeTx('fr');
 
@@ -46,10 +46,12 @@ describe('catalogue officiel des modules', () => {
     expect(s).toEqual({ status: 'disabled', label: 'Désactivé', action: 'start' });
   });
 
-  it('les indexers ne sont jamais proposés par le catalogue', () => {
-    expect(isCatalogHidden(mod({ id: 'app.popcornn.indexers', scopes: ['indexers'] }))).toBe(true);
-    expect(isCatalogHidden(mod({ id: 'x.y', category: 'indexers' }))).toBe(true);
-    expect(isCatalogHidden(mod())).toBe(false);
+  it('tous les modules officiels sont proposés (indexers et définitions compris)', () => {
+    expect(isCatalogInstallable(mod({ id: 'app.popcornn.indexers', scopes: ['indexers'] }))).toBe(true);
+    expect(isCatalogInstallable(mod({ id: 'app.popcornn.indexer-definitions', kind: 'data', scopes: [] }))).toBe(true);
+    expect(isCatalogInstallable(mod())).toBe(true);
+    expect(isCatalogInstallable(mod({ kind: 'http' }))).toBe(false);
+    expect(catalogIconName({ icon: 'search', category: 'indexers' })).toBe('search');
   });
 
   it('icônes : uniquement des SVG locaux', () => {
