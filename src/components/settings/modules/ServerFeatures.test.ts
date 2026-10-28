@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ServerCapabilities } from '../../../lib/capabilities';
 import type { ProcessModule } from '../../../lib/client/server-api/modules';
-import { buildServerFeatures, featureSource, featureTx, processModuleName } from './ServerFeatures';
+import { buildServerFeatures, featureSource, featureTx, processModuleName, visibleServerFeatures } from './ServerFeatures';
 
 const caps = (features: Record<string, boolean>) =>
   ({
@@ -45,4 +45,33 @@ describe('fonctions du serveur', () => {
     expect(processModuleName({ id: 'org.example.x', provides: ['sharing'] }, 'en')).toBe('Sharing');
     expect(processModuleName({ id: 'org.example.hello_world', provides: ['inconnu'] }, 'fr')).toBe('Hello world');
   });
+  it('édition core (1.4.30) : seules les fonctions actives sont listées', () => {
+    const core = caps({
+      player: true, library: true, library_sources: true, jellyfin: true, discover: true, transcoding: true,
+      requests: false, torrent: false, stream_torrent: false, indexers: false, sync: false, sharing: false,
+      ratio: false, ai: false, car_lab: false, webos_deployment: false, uploads: false, ratio_tools: false,
+    });
+    const keys = visibleServerFeatures(buildServerFeatures(core, [], [], 'fr')).map((f) => f.key);
+    expect(keys).toEqual(['player', 'library', 'library_sources', 'discover', 'transcoding']);
+  });
+  it('torrent : une seule tuile (téléchargement + lecture pendant le téléchargement)', () => {
+    const full = { ...caps({ player: true, torrent: true, stream_torrent: true }), edition: 'full', compiledFeatures: ['torrent'] } as unknown as ServerCapabilities;
+    const list = buildServerFeatures(full, [], [], 'fr');
+    expect(list.map((f) => f.key)).not.toContain('stream_torrent');
+    const t = byKey(list, 'torrent');
+    expect(t.state).toBe('active');
+    expect(t.name).toBe('Torrent');
+    expect(t.links.map((l) => l.href)).toContain('/settings/playback?sub=streamingDownloadFull');
+    const viaModule = buildServerFeatures(caps({ torrent: true, stream_torrent: true }), [], [proc('app.popcornn.torrent', ['torrent', 'stream_torrent'])], 'fr');
+    expect(viaModule.filter((f) => f.key === 'torrent' || f.key === 'stream_torrent')).toHaveLength(1);
+    expect(featureSource(byKey(viaModule, 'torrent'), tx, null)).toBe('Module · Torrent · 0.1.0');
+  });
+  it('Jellyfin rangé dans Sources de bibliothèque ; ratio visible seulement si le module privé tourne', () => {
+    const list = buildServerFeatures(caps({ library_sources: true, jellyfin: true, ratio: false }), [], [], 'fr');
+    expect(list.map((f) => f.key)).not.toContain('jellyfin');
+    expect(visibleServerFeatures(list).map((f) => f.key)).not.toContain('ratio');
+    const withRatio = buildServerFeatures(caps({ ratio: true }), [], [proc('app.popcornn.ratio', ['ratio'])], 'fr');
+    expect(visibleServerFeatures(withRatio).map((f) => f.key)).toContain('ratio');
+  });
 });
+

@@ -88,8 +88,10 @@ const META: Record<string, FeatureMeta> = {
     links: [{ href: '/settings/downloads', fr: 'Téléchargements', en: 'Downloads' }],
     compiled: 'torrent',
     torrent: true,
-    fr: { name: 'Téléchargement torrent', desc: 'Moteur torrent intégré : ajout, suivi et gestion des téléchargements.' },
-    en: { name: 'Torrent downloads', desc: 'Built-in torrent engine: add, track and manage downloads.' },
+    // Une seule tuile pour le module torrent : téléchargement + lecture pendant le téléchargement
+    // (`stream_torrent` y est fusionnée, voir `mergeFeatures`).
+    fr: { name: 'Torrent', desc: 'Téléchargement torrent (ajout, suivi, gestion) et lecture pendant le téléchargement.' },
+    en: { name: 'Torrent', desc: 'Torrent downloads (add, track, manage) and streaming while downloading.' },
   },
   stream_torrent: {
     icon: 'stream',
@@ -154,8 +156,8 @@ const META: Record<string, FeatureMeta> = {
   webos_deployment: {
     icon: 'tv',
     href: '/settings/webos-deployment',
-    fr: { name: 'Déploiement webOS', desc: 'Installation de l’application sur les téléviseurs LG webOS.' },
-    en: { name: 'webOS deployment', desc: 'Installs the app on LG webOS TVs.' },
+    fr: { name: 'Déploiement webOS', desc: 'Module : installation de l’application sur les téléviseurs LG webOS.' },
+    en: { name: 'webOS deployment', desc: 'Module: installs the app on LG webOS TVs.' },
   },
 };
 META.car = META.car_lab;
@@ -163,6 +165,14 @@ META.webos = META.webos_deployment;
 
 /** Fonctions sans feature Cargo propre, apportées par un module (Indexers → demandes, Partage). */
 const MODULE_ONLY = new Set(['requests', 'sharing', 'friends', 'indexer_definitions']);
+
+/**
+ * Capacités rangées dans la tuile d'une autre (une seule entrée par module / fonction) :
+ * - `stream_torrent` → `torrent` : le module torrent = téléchargement + lecture pendant le téléchargement ;
+ * - `jellyfin` → `library_sources` : Jellyfin est une source de bibliothèque optionnelle, pas une
+ *   fonction à part (la capacité reste annoncée par le serveur, contrat inchangé).
+ */
+const MERGED_INTO: Record<string, string> = { stream_torrent: 'torrent', jellyfin: 'library_sources' };
 
 /** Capacités retirées du produit (toujours `false`) : pas de tuile. */
 const RETIRED = new Set(['uploads', 'ratio_tools']);
@@ -315,7 +325,7 @@ export function buildServerFeatures(
   for (const k of providers.keys()) push(k);
 
   const compiled = caps?.compiledFeatures;
-  return keys.map((key) => {
+  const list = keys.map((key) => {
     const meta = META[key];
     const label = meta?.[lang];
     const provs = providers.get(key) ?? [];
@@ -347,8 +357,47 @@ export function buildServerFeatures(
       builtin,
       providers: provs,
       state,
-    };
+    } as ServerFeature;
   });
+  return mergeFeatures(list);
+}
+
+const STATE_RANK: Record<FeatureState, number> = { active: 2, disabled: 1, not_installed: 0 };
+
+/** Range les capacités de `MERGED_INTO` dans la tuile cible (état le plus favorable, modules réunis). */
+function mergeFeatures(list: ServerFeature[]): ServerFeature[] {
+  const byKey = new Map(list.map((f) => [f.key, f]));
+  const out: ServerFeature[] = [];
+  for (const f of list) {
+    const target = MERGED_INTO[f.key];
+    if (!target) {
+      out.push(f);
+      continue;
+    }
+    const t = byKey.get(target);
+    if (!t) {
+      // Cible absente : la capacité garde sa tuile, sous le nom de la cible.
+      out.push(f);
+      continue;
+    }
+    if (STATE_RANK[f.state] > STATE_RANK[t.state]) t.state = f.state;
+    t.builtin = t.state === 'active' && (t.builtin || f.builtin) && !t.providers.some((p) => p.active);
+    for (const p of f.providers) {
+      if (!t.providers.some((q) => q.type === p.type && q.id === p.id)) t.providers.push(p);
+    }
+    if (f.href && f.href !== t.href && !t.links.some((l) => l.href === f.href)) t.links.push({ href: f.href, label: f.name });
+    for (const l of f.links) if (!t.links.some((x) => x.href === l.href)) t.links.push(l);
+  }
+  return out;
+}
+
+/**
+ * Tuiles affichées dans « Fonctions intégrées » : seulement ce qui est réellement actif. Les
+ * fonctions non installées / désactivées n'encombrent pas l'écran (elles s'obtiennent par
+ * « Ajouter un module ») ; un module privé (ex. ratio) n'apparaît que s'il est installé et actif.
+ */
+export function visibleServerFeatures(features: ServerFeature[]): ServerFeature[] {
+  return features.filter((f) => f.state === 'active');
 }
 
 /**
