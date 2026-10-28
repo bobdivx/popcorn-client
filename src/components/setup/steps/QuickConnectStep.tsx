@@ -66,9 +66,11 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
 
       if (!response.success) {
         setError(
-          response.message?.includes('Failed to fetch')
-            ? 'Impossible de joindre popcorn-web. Vérifiez votre connexion internet.'
-            : (response.message || 'Erreur lors de l\'initialisation de la connexion rapide')
+          response.error === 'CloudTimeout'
+            ? response.message || 'Le service cloud met trop de temps à répondre. Réessayez.'
+            : response.message?.includes('Failed to fetch')
+              ? 'Impossible de joindre popcorn-web. Vérifiez votre connexion internet.'
+              : (response.message || 'Erreur lors de l\'initialisation de la connexion rapide')
         );
         setLoading(false);
         return;

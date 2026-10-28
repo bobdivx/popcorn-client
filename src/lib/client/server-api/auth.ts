@@ -10,6 +10,8 @@ import {
   registerCloud as popcornWebRegister,
   completeOidcTicket,
   getLocalUserDisplayNameByCredentials,
+  isCloudTimeoutError,
+  CLOUD_TIMEOUT_MESSAGE,
 } from '../../api/popcorn-web.js';
 import { hasBackendUrl, hasDeploymentBackend } from '../../backend-config.js';
 
@@ -102,6 +104,11 @@ async function persistCloudLogin(
       cloudRefreshToken: result.refreshToken,
     },
   };
+}
+
+/** Réponse « le cloud a mis trop de temps » (distincte de CloudUnavailable). */
+function cloudTimeoutResponse<T>(): ApiResponse<T> {
+  return { success: false, error: 'CloudTimeout', message: CLOUD_TIMEOUT_MESSAGE };
 }
 
 export const authMethods = {
@@ -273,8 +280,8 @@ export const authMethods = {
         }
       }
 
-      // Un compte cloud lié à Pocket ID doit primer sur l’erreur locale (mot de passe).
-      if (cloudResponse.error === 'SsoRequired') {
+      // Un compte cloud lié à Pocket ID (ou un cloud trop lent) doit primer sur l’erreur locale.
+      if (cloudResponse.error === 'SsoRequired' || cloudResponse.error === 'CloudTimeout') {
         return cloudResponse;
       }
       
@@ -337,6 +344,9 @@ export const authMethods = {
 
       return persistCloudLogin(this, result);
     } catch (e) {
+      if (isCloudTimeoutError(e)) {
+        return cloudTimeoutResponse<AuthResponse>();
+      }
       // Log détaillé pour le diagnostic
       const errorMessage = e instanceof Error ? e.message : String(e);
       const errorName = e instanceof Error ? e.name : 'UnknownError';
@@ -390,6 +400,9 @@ export const authMethods = {
       }
       return persistCloudLogin(this, result);
     } catch (e) {
+      if (isCloudTimeoutError(e)) {
+        return cloudTimeoutResponse<AuthResponse>();
+      }
       const errorMessage = e instanceof Error ? e.message : String(e);
       return {
         success: false,
@@ -444,6 +457,9 @@ export const authMethods = {
         },
       };
     } catch (e) {
+      if (isCloudTimeoutError(e)) {
+        return cloudTimeoutResponse<AuthResponse>();
+      }
       return {
         success: false,
         error: 'CloudRegisterError',
