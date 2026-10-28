@@ -21,6 +21,9 @@ import { type IconName, type Notice, errorMessage, tileIcon } from './moduleUi';
  *   directement, sans opération de suivi), partage.
  * - Serveur ancien (route 404 / 405, ou `modules.catalog: false`) : section masquée, l'installation
  *   par URL reste disponible.
+ * - Visibilité (`visible`, absent = visible) : un module masqué par l'administrateur Popcornn
+ *   n'est pas listé dans le store tant qu'il n'est pas installé ; installé, il continue de
+ *   fonctionner (mises à jour comprises). Même catalogue signé pour toutes les éditions.
  */
 
 export const STORE_TEXT = {
@@ -84,6 +87,14 @@ export function storeTx(language: string): StoreTx {
 export function isCatalogInstallable(m: Pick<CatalogModule, 'kind'>): boolean {
   const kind = m.kind || 'process';
   return kind === 'process' || kind === 'data';
+}
+
+/**
+ * Module listé dans le store : `visible` absent ou vrai (rétrocompatible), ou module déjà installé
+ * (un module masqué installé reste géré : démarrage, mises à jour).
+ */
+export function isCatalogListed(m: Pick<CatalogModule, 'visible' | 'installed'>): boolean {
+  return m.visible !== false || m.installed === true;
 }
 
 export type CatalogAction = 'install' | 'update' | 'start' | null;
@@ -174,7 +185,7 @@ export function useModuleCatalog(
     if (!alive.current) return;
     setLoading(false);
     if (res.success && res.data) {
-      const modules = Array.isArray(res.data.modules) ? res.data.modules.filter(isCatalogInstallable) : [];
+      const modules = Array.isArray(res.data.modules) ? res.data.modules.filter((m) => isCatalogInstallable(m) && isCatalogListed(m)) : [];
       setCatalog({ ...res.data, modules });
       setError(null);
     } else if (isRouteUnsupported(res)) {

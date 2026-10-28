@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogModule } from '../../../lib/client/server-api/modules';
-import { catalogIconName, catalogTileState, isCatalogInstallable, storeTx } from './ModuleStore';
+import { catalogIconName, catalogTileState, isCatalogInstallable, isCatalogListed, storeTx } from './ModuleStore';
 
 const tx = storeTx('fr');
 
@@ -52,6 +52,13 @@ describe('catalogue officiel des modules', () => {
     expect(isCatalogInstallable(mod())).toBe(true);
     expect(isCatalogInstallable(mod({ kind: 'http' }))).toBe(false);
     expect(catalogIconName({ icon: 'search', category: 'indexers' })).toBe('search');
+  });
+
+  it('visibilité : absent = listé, masqué non installé = non listé, masqué installé = listé', () => {
+    expect(isCatalogListed(mod())).toBe(true);
+    expect(isCatalogListed(mod({ visible: true }))).toBe(true);
+    expect(isCatalogListed(mod({ visible: false }))).toBe(false);
+    expect(isCatalogListed(mod({ visible: false, installed: true, installed_version: '0.1.0', status: 'active' }))).toBe(true);
   });
 
   it('icônes : uniquement des SVG locaux', () => {
