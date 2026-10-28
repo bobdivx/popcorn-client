@@ -11,6 +11,11 @@ import { TokenManager } from '../storage.js';
 import { clientIdentityHeaders } from '../../client-identity.js';
 import { getCachedCapabilities, loadCapabilities } from '../../capabilities.js';
 import { blockedModuleCapability } from '../../module-errors.js';
+import {
+  indexerOriginHeaders,
+  serverAcceptsIndexerOrigin,
+  type IndexerOrigin,
+} from '../../torrents/indexerOrigin.js';
 
 /**
  * Module torrent absent (serveur à modules, `features.torrent === false`) : la liste est vide
@@ -381,7 +386,8 @@ export class TorrentsService {
     forStreaming: boolean = false,
     downloadType?: string,
     customDownloadPath?: string,
-    onlyFiles?: number[]
+    onlyFiles?: number[],
+    origin?: IndexerOrigin | null
   ): Promise<AddTorrentResponse> {
     try {
       const fileBuffer = await file.arrayBuffer();
@@ -404,6 +410,11 @@ export class TorrentsService {
       }
       if (onlyFiles != null && onlyFiles.length > 0) {
         headers['X-Only-Files'] = onlyFiles.join(',');
+      }
+      // Indexer d'origine (module ratio côté serveur) : seulement si le serveur annonce un module
+      // ratio actif (sinon ses règles CORS refuseraient ces en-têtes) et si l'indexer est connu.
+      if (serverAcceptsIndexerOrigin(getCachedCapabilities())) {
+        Object.assign(headers, indexerOriginHeaders(origin));
       }
       
       // Créer un AbortController avec un timeout plus long pour l'ajout de torrent
@@ -491,7 +502,8 @@ export class TorrentsService {
     forStreaming: boolean = false,
     downloadType?: string,
     customDownloadPath?: string,
-    onlyFiles?: number[]
+    onlyFiles?: number[],
+    origin?: IndexerOrigin | null
   ): Promise<AddTorrentResponse> {
     try {
       const request: AddMagnetRequest = {
@@ -516,6 +528,11 @@ export class TorrentsService {
         if (customDownloadPath) {
           headers['X-Custom-Download-Path'] = customDownloadPath;
         }
+      }
+      // Indexer d'origine (module ratio côté serveur) : seulement si le serveur annonce un module
+      // ratio actif (sinon ses règles CORS refuseraient ces en-têtes) et si l'indexer est connu.
+      if (serverAcceptsIndexerOrigin(getCachedCapabilities())) {
+        Object.assign(headers, indexerOriginHeaders(origin));
       }
 
       const controller = new AbortController();

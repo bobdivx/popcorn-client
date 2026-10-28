@@ -2,6 +2,7 @@ import { getBaseUrl } from './utils.js';
 import { HealthService } from './health.js';
 import { TorrentsService } from './torrents.js';
 import type { ClientTorrentStats, AddTorrentResponse } from '../types.js';
+import type { IndexerOrigin } from '../../torrents/indexerOrigin.js';
 import { isDemoMode } from '../../backend-config.js';
 import { getDemoClientApi } from './demo-client.js';
 
@@ -142,9 +143,10 @@ export class ClientApi {
     forStreaming: boolean = false,
     downloadType?: string,
     customDownloadPath?: string,
-    onlyFiles?: number[]
+    onlyFiles?: number[],
+    origin?: IndexerOrigin | null
   ): Promise<AddTorrentResponse> {
-    return this._torrents.addTorrentFile(file, forStreaming, downloadType, customDownloadPath, onlyFiles);
+    return this._torrents.addTorrentFile(file, forStreaming, downloadType, customDownloadPath, onlyFiles, origin);
   }
 
   /**
@@ -156,9 +158,10 @@ export class ClientApi {
     forStreaming: boolean = false,
     downloadType?: string,
     customDownloadPath?: string,
-    onlyFiles?: number[]
+    onlyFiles?: number[],
+    origin?: IndexerOrigin | null
   ): Promise<AddTorrentResponse> {
-    return this._torrents.addMagnetLink(magnetUri, name, forStreaming, downloadType, customDownloadPath, onlyFiles);
+    return this._torrents.addMagnetLink(magnetUri, name, forStreaming, downloadType, customDownloadPath, onlyFiles, origin);
   }
 
   /**
