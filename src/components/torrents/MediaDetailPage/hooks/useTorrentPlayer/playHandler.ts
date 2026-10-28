@@ -12,6 +12,7 @@ import { redirectToCarPlayerIfNeeded } from '../../../../streaming/car-player/ca
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
+import { buildIndexerOrigin } from '../../../../../lib/torrents/indexerOrigin';
 
 function isTorrentCheckingState(state: string | null | undefined): boolean {
   const s = (state || '').toLowerCase();
@@ -665,7 +666,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               addDebugLog('info', '📥 Fichier .torrent indisponible sur l\'indexeur, ajout via magnet (données de la recherche)', { hasMagnet: true });
               const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
               const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
-              const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri!, torrent.name, forStreaming, downloadType);
+              const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri!, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
               if (addResult.info_hash) {
                 if (forStreaming) setStreamingInfoHash(addResult.info_hash);
                 if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -758,7 +759,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
               const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
               const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
-              const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType);
+              const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
               if (addResult.info_hash) {
                 if (forStreaming) setStreamingInfoHash(addResult.info_hash);
                 if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -899,7 +900,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           
           const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
           const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
-          const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType);
+          const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
           if (addResult.info_hash) {
             if (forStreaming) setStreamingInfoHash(addResult.info_hash);
             if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -980,7 +981,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         try {
           const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
           const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
-          const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType);
+          const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
           if (addResult.info_hash) {
             if (forStreaming) setStreamingInfoHash(addResult.info_hash);
             if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -1297,7 +1298,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
       try {
         const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
         const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
-        const addResult = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
+        const addResult = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
         if (addResult.info_hash) {
           if (forStreaming) setStreamingInfoHash(addResult.info_hash);
           if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {

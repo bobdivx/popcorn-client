@@ -84,6 +84,7 @@ import {
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 import { isLocalMedia as isLocalMediaHash } from './actions/delete';
 import { getNextEpisodeInfo, getPreviousEpisodeInfo } from './utils/episodeNavigation';
+import { buildIndexerOrigin } from '../../../lib/torrents/indexerOrigin';
 
 /**
  * Épisode à mettre en avant à l'ouverture d'une série déjà commencée : le DERNIER épisode
@@ -1203,7 +1204,7 @@ export default function MediaDetailPage({
         let infoHash: string;
         if (magnet) {
           const downloadType = resolveDownloadTypeHeader(torrent);
-          const result = await clientApi.addMagnetLink(magnet, torrent.name, false, downloadType, undefined, [fileIndex]);
+          const result = await clientApi.addMagnetLink(magnet, torrent.name, false, downloadType, undefined, [fileIndex], buildIndexerOrigin(torrent));
           infoHash = result?.info_hash ?? '';
           if (infoHash) {
             saveDownloadMeta(infoHash, { ...torrent, imageUrl: torrent.imageUrl ?? undefined, heroImageUrl: torrent.heroImageUrl ?? undefined, cleanTitle: torrent.cleanTitle ?? torrent.name ?? undefined });
@@ -1245,7 +1246,7 @@ export default function MediaDetailPage({
           }
           const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
           const downloadType = resolveDownloadTypeHeader(torrent);
-          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [fileIndex]);
+          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [fileIndex], buildIndexerOrigin(torrent));
           infoHash = result?.info_hash ?? '';
           if (infoHash) {
             saveDownloadMeta(infoHash, { ...torrent, imageUrl: torrent.imageUrl ?? undefined, heroImageUrl: torrent.heroImageUrl ?? undefined, cleanTitle: torrent.cleanTitle ?? torrent.name ?? undefined });
@@ -1292,7 +1293,7 @@ export default function MediaDetailPage({
       try {
         let infoHash: string;
         if (magnet) {
-          const result = await clientApi.addMagnetLink(magnet, torrent.name, true, undefined, undefined, [fileIndex]);
+          const result = await clientApi.addMagnetLink(magnet, torrent.name, true, undefined, undefined, [fileIndex], buildIndexerOrigin(torrent));
           infoHash = result?.info_hash ?? '';
           if (infoHash) scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
         } else if (externalLink) {
@@ -1327,7 +1328,7 @@ export default function MediaDetailPage({
             throw new Error('La réponse n\'est pas un fichier .torrent (souvent page HTML C411). Vérifiez la clé API Torznab.');
           }
           const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
-          const result = await clientApi.addTorrentFile(file, true, undefined, undefined, [fileIndex]);
+          const result = await clientApi.addTorrentFile(file, true, undefined, undefined, [fileIndex], buildIndexerOrigin(torrent));
           infoHash = result?.info_hash ?? '';
           if (infoHash) scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
         } else {
@@ -3320,6 +3321,7 @@ export default function MediaDetailPage({
             downloadType,
             undefined,
             [nextFileIndex],
+            buildIndexerOrigin(expected),
           );
           const ih = result?.info_hash ?? '';
           if (ih) {
@@ -3362,7 +3364,7 @@ export default function MediaDetailPage({
           const buf = new Uint8Array(await res.arrayBuffer());
           if (!looksLikeBencodedTorrent(buf)) return;
           const file = new File([buf], `${expected.name}.torrent`, { type: 'application/x-bittorrent' });
-          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [nextFileIndex]);
+          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [nextFileIndex], buildIndexerOrigin(expected));
           const ih = result?.info_hash ?? '';
           if (ih) {
             saveDownloadMeta(ih, {
@@ -3383,7 +3385,7 @@ export default function MediaDetailPage({
       // Mono-fichier / épisode dédié : ajout silencieux en arrière-plan.
       const downloadType = resolveDownloadTypeHeader(expected);
       if (magnet) {
-        const result = await clientApi.addMagnetLink(magnet, expected.name, false, downloadType);
+        const result = await clientApi.addMagnetLink(magnet, expected.name, false, downloadType, undefined, undefined, buildIndexerOrigin(expected));
         const ih = result?.info_hash ?? '';
         if (ih) {
           saveDownloadMeta(ih, {
@@ -3423,7 +3425,7 @@ export default function MediaDetailPage({
         const buf = new Uint8Array(await res.arrayBuffer());
         if (!looksLikeBencodedTorrent(buf)) return;
         const file = new File([buf], `${expected.name}.torrent`, { type: 'application/x-bittorrent' });
-        const result = await clientApi.addTorrentFile(file, false, downloadType);
+        const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, undefined, buildIndexerOrigin(expected));
         const ih = result?.info_hash ?? '';
         if (ih) {
           saveDownloadMeta(ih, {

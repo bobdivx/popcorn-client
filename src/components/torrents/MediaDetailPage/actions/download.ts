@@ -6,6 +6,7 @@ import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDo
 import type { MediaDetailPageProps } from '../types';
 import { startProgressPolling, type ProgressPollingOptions } from './progressPolling';
 import { resolveDownloadTypeHeader } from '../utils/resolveDownloadTypeHeader';
+import { buildIndexerOrigin } from '../../../../lib/torrents/indexerOrigin';
 
 /** Stats initiales pour afficher la barre de progression dès le clic sur "Télécharger" */
 function createInitialTorrentStats(infoHash: string, name: string): ClientTorrentStats {
@@ -242,7 +243,7 @@ async function downloadFromExternalIndexerOnce(options: {
       const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
       const forStreaming = false;
       const downloadType = resolveDownloadTypeHeader(torrent);
-      const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
+      const result = await clientApi.addTorrentFile(file, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
       addNotification('success', 'Torrent ajouté depuis la copie locale du serveur (sans appel à l’indexer).');
       const infoHash = result?.info_hash ?? torrent.infoHash ?? '';
       if (infoHash) {
@@ -322,7 +323,7 @@ async function downloadFromExternalIndexerOnce(options: {
     const forStreaming = false;
     const downloadType = resolveDownloadTypeHeader(torrent);
 
-    const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
+    const result = await clientApi.addTorrentFile(file, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
     addNotification('success', 'Torrent ajouté au client avec succès depuis la DB locale !');
     const infoHash = result?.info_hash ?? torrent.infoHash ?? '';
     if (infoHash) {
@@ -362,7 +363,7 @@ async function downloadFromExternalIndexerOnce(options: {
   if (magnetUri) {
     const forStreaming = false;
     const downloadType = resolveDownloadTypeHeader(torrent);
-    const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
+    const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
     addNotification('success', 'Torrent ajouté au client avec succès !');
     const infoHashMagnet = result?.info_hash ?? torrent.infoHash ?? '';
     if (infoHashMagnet) {
@@ -564,7 +565,7 @@ async function downloadFromExternalIndexer(options: {
       // Cas spécial : l'endpoint retourne un magnet link
       const forStreaming = false;
       const downloadType = resolveDownloadTypeHeader(torrent);
-      const result = await clientApi.addMagnetLink(jsonResponse.magnetUri, torrent.name, forStreaming, downloadType);
+      const result = await clientApi.addMagnetLink(jsonResponse.magnetUri, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
       addNotification('success', 'Torrent ajouté au client via magnet link !');
       const infoHashMagnet2 = result?.info_hash ?? torrent.infoHash ?? '';
       if (infoHashMagnet2) {
@@ -603,7 +604,7 @@ async function downloadFromExternalIndexer(options: {
     const forStreaming = false;
     const downloadType = resolveDownloadTypeHeader(torrent);
     
-    const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
+    const result = await clientApi.addTorrentFile(file, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
     addNotification('success', 'Torrent téléchargé depuis l\'indexer externe et ajouté au client avec succès !');
     const infoHashFile = result?.info_hash ?? torrent.infoHash ?? '';
     if (infoHashFile) {
@@ -658,7 +659,7 @@ async function handleMagnetResponse(options: {
 
   const forStreaming = false;
   const downloadType = resolveDownloadTypeHeader(torrent);
-  const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
+  const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashMagnet3 = result?.info_hash ?? torrent.infoHash ?? '';
   if (infoHashMagnet3) {
@@ -721,7 +722,7 @@ async function handleLocalDownload(options: {
   const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
   const forStreaming = false;
   const downloadType = resolveDownloadTypeHeader(torrent);
-  const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
+  const result = await clientApi.addTorrentFile(file, forStreaming, downloadType, undefined, undefined, buildIndexerOrigin(torrent));
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashLocal = result?.info_hash ?? torrent.infoHash ?? '';
   if (infoHashLocal) {
