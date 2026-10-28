@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogModule } from '../../../lib/client/server-api/modules';
-import { catalogIconName, catalogTileState, isCatalogInstallable, isCatalogListed, storeTx } from './ModuleStore';
+import { bundledParentOf, catalogIconName, catalogTileState, foldBundledCatalog, isCatalogInstallable, isCatalogListed, isFoldedIntoParent, storeTx } from './ModuleStore';
 
 const tx = storeTx('fr');
 
@@ -65,5 +65,26 @@ describe('catalogue officiel des modules', () => {
     expect(catalogIconName({ icon: 'sharing', category: null })).toBe('users');
     expect(catalogIconName({ icon: 'https://exemple.test/x.png', category: 'car' })).toBe('car');
     expect(catalogIconName({ icon: null, category: null })).toBe('module');
+  });
+});
+
+describe('définitions d’indexers incluses dans Indexers', () => {
+  const defs = (over: Partial<CatalogModule> = {}) =>
+    mod({ id: 'app.popcornn.indexer-definitions', kind: 'data', visible: false, ...over });
+  const idx = mod({ id: 'app.popcornn.indexers' });
+
+  it('module séparé plié dans Indexers (tuiles installées)', () => {
+    expect(isFoldedIntoParent('app.popcornn.indexer-definitions', ['app.popcornn.indexers'])).toBe(true);
+    expect(isFoldedIntoParent('app.popcornn.indexer-definitions', ['app.popcornn.torrent'])).toBe(false);
+    expect(isFoldedIntoParent('app.popcornn.torrent', ['app.popcornn.indexers'])).toBe(false);
+    expect(bundledParentOf('app.popcornn.indexer-definitions')).toBe('app.popcornn.indexers');
+  });
+
+  it('store : un seul module Indexers, sauf mise à jour de l’ancien module installé', () => {
+    const installed = defs({ installed: true, status: 'active' });
+    expect(foldBundledCatalog([idx, installed]).map((m) => m.id)).toEqual(['app.popcornn.indexers']);
+    expect(foldBundledCatalog([installed]).map((m) => m.id)).toEqual(['app.popcornn.indexer-definitions']);
+    const upd = defs({ installed: true, update_available: true });
+    expect(foldBundledCatalog([idx, upd]).map((m) => m.id)).toEqual(['app.popcornn.indexers', 'app.popcornn.indexer-definitions']);
   });
 });

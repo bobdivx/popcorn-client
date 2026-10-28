@@ -97,6 +97,38 @@ export function isCatalogListed(m: Pick<CatalogModule, 'visible' | 'installed'>)
   return m.visible !== false || m.installed === true;
 }
 
+/**
+ * Modules de données inclus dans un module process : `app.popcornn.indexer-definitions` est
+ * intégré au module Indexers (0.2.0 et plus). Un serveur qui avait installé l'ancien module
+ * séparé le garde (toujours pris en compte, désinstallable) ; le client ne l'affiche plus comme
+ * un module à part quand son module parent est présent, mais dans la fiche de celui-ci.
+ */
+export const BUNDLED_DATA_MODULES: Record<string, string> = {
+  'app.popcornn.indexer-definitions': 'app.popcornn.indexers',
+};
+
+/** Module parent qui inclut ce module de données (`null` : module autonome). */
+export function bundledParentOf(id: string): string | null {
+  return BUNDLED_DATA_MODULES[id] ?? null;
+}
+
+/** Vrai si ce module de données est présenté dans la fiche de son parent (parent présent). */
+export function isFoldedIntoParent(id: string, parentIds: Iterable<string>): boolean {
+  const parent = bundledParentOf(id);
+  if (!parent) return false;
+  for (const p of parentIds) if (p === parent) return true;
+  return false;
+}
+
+/**
+ * Store : retire un module inclus dans un module parent listé, sauf s'il est installé avec une
+ * mise à jour à appliquer (l'ancien module séparé reste ainsi maintenable).
+ */
+export function foldBundledCatalog<T extends Pick<CatalogModule, 'id' | 'installed' | 'update_available'>>(list: T[]): T[] {
+  const ids = list.map((m) => m.id);
+  return list.filter((m) => !isFoldedIntoParent(m.id, ids) || (m.installed === true && m.update_available === true));
+}
+
 export type CatalogAction = 'install' | 'update' | 'start' | null;
 
 export interface CatalogTileState {
@@ -185,7 +217,7 @@ export function useModuleCatalog(
     if (!alive.current) return;
     setLoading(false);
     if (res.success && res.data) {
-      const modules = Array.isArray(res.data.modules) ? res.data.modules.filter((m) => isCatalogInstallable(m) && isCatalogListed(m)) : [];
+      const modules = Array.isArray(res.data.modules) ? foldBundledCatalog(res.data.modules.filter((m) => isCatalogInstallable(m) && isCatalogListed(m))) : [];
       setCatalog({ ...res.data, modules });
       setError(null);
     } else if (isRouteUnsupported(res)) {
