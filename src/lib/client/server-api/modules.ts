@@ -243,6 +243,11 @@ export interface CatalogModule {
   requires?: { server?: string; protocol?: number };
   platforms?: string[];
   homepage?: string | null;
+  /**
+   * Proposé dans le store (absent = visible : serveur / catalogue antérieurs). `false` : masqué par
+   * l'administrateur Popcornn, non listé sauf s'il est déjà installé.
+   */
+  visible?: boolean;
   status: CatalogModuleStatus;
   installed: boolean;
   installed_version: string | null;
