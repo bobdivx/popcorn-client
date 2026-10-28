@@ -43,6 +43,7 @@ import type { CatalogModule } from '../../lib/client/server-api/modules';
 import {
   ServerFeatureDetail,
   buildServerFeatures,
+  visibleServerFeatures,
   featureSource,
   featureStatus,
   featureStatusLabel,
@@ -70,7 +71,7 @@ const TEXT = {
   fr: {
     title: 'Modules',
     intro:
-      "Popcornn est d'abord un lecteur : il lit ta bibliothèque (dossiers locaux, NAS, Jellyfin) sans rien d'autre. Les fonctions optionnelles sont des modules : aucun n'est installé ni proposé par défaut.",
+      "Popcornn est d'abord un lecteur : il lit ta bibliothèque (dossiers locaux, NAS) sans rien d'autre. Les fonctions optionnelles sont des modules : aucun n'est installé par défaut, ajoute ceux dont tu as besoin avec « Ajouter un module ».",
     installedSection: 'Modules installés',
     securitySection: 'Serveur et sécurité',
     server: 'Serveur connecté',
@@ -150,7 +151,7 @@ const TEXT = {
   en: {
     title: 'Modules',
     intro:
-      'Popcornn is a player first: it plays your library (local folders, NAS, Jellyfin) with nothing else. Optional features are modules: none is installed or suggested by default.',
+      'Popcornn is a player first: it plays your library (local folders, NAS) with nothing else. Optional features are modules: none is installed by default, add the ones you need with “Add a module”.',
     installedSection: 'Installed modules',
     securitySection: 'Server and security',
     server: 'Connected server',
@@ -549,7 +550,7 @@ export default function ModulesSettingsPanel() {
   const storeModules = (store.catalog?.modules ?? []).filter((m) => !m.installed || (m.update_available && m.compatible));
 
   const ftx = featureTx(language);
-  const features = caps ? buildServerFeatures(caps, modules, processModules, language) : [];
+  const features = caps ? visibleServerFeatures(buildServerFeatures(caps, modules, processModules, language)) : [];
   const feature = view?.type === 'feature' ? features.find((f) => f.key === view.key) ?? null : null;
 
   const dataModule = view?.type === 'data' ? modules?.find((m) => m.id === view.id) ?? null : null;
