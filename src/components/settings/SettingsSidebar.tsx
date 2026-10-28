@@ -13,7 +13,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
 import { isTVPlatform } from '../../lib/utils/device-detection';
-import { IS_STORE_BUILD, isHubSettingsCategory, isModuleSettingsRoute, isRouteBlockedInStoreBuild } from '../../lib/distribution';
+import { IS_STORE_BUILD, STORE_MODULES_ENABLED, isHubSettingsCategory, isModuleSettingsRoute, isRouteBlockedInStoreBuild } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
 
 type NavItem = {
@@ -417,8 +417,8 @@ export default function SettingsSidebar() {
         (item) =>
           isHubSettingsCategory(item.id) &&
           !isRouteBlockedInStoreBuild(item.href) &&
-          // Version store : pas de système de modules.
-          !(IS_STORE_BUILD && item.id === 'modules')
+          // Version Google Play : pas de système de modules (l'édition Microsoft Store le garde).
+          !(IS_STORE_BUILD && !STORE_MODULES_ENABLED && item.id === 'modules')
       );
       if (typeof window !== 'undefined' && isTVPlatform()) {
         return items.filter((item) => item.id !== 'webos' && item.id !== 'uploads');

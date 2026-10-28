@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { refreshCapabilitiesNow, supportsModuleToggle, useServerCapabilities } from '../../lib/capabilities';
 import { isRouteUnsupported } from '../../lib/module-errors';
-import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
+import { STORE_MODULES_ENABLED, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 import { serverApi } from '../../lib/client/server-api';
 import type { InstalledModule } from '../../lib/client/server-api/modules';
 import { HubAddTile, HubGrid, HubSkeleton, HubTile } from './hub/HubTile';
@@ -76,6 +76,7 @@ const TEXT = {
     server: 'Serveur connecté',
     edition: 'Édition',
     editionCore: 'Lecteur seul',
+    editionStore: 'Édition Microsoft Store',
     editionFull: 'Lecteur + modules intégrés',
     editionLegacy: 'Version antérieure aux modules',
     version: 'Version',
@@ -155,6 +156,7 @@ const TEXT = {
     server: 'Connected server',
     edition: 'Edition',
     editionCore: 'Player only',
+    editionStore: 'Microsoft Store edition',
     editionFull: 'Player + built-in modules',
     editionLegacy: 'Version older than modules',
     version: 'Version',
@@ -514,9 +516,11 @@ export default function ModulesSettingsPanel() {
     ? '—'
     : caps.legacy || caps.edition === 'legacy'
       ? tx.editionLegacy
-      : caps.edition === 'core'
-        ? tx.editionCore
-        : tx.editionFull;
+      : caps.edition === 'store'
+        ? tx.editionStore
+        : caps.edition === 'core'
+          ? tx.editionCore
+          : tx.editionFull;
 
   const kindLabel = (kind: string) => tx.kinds[kind] ?? kind;
   const processModules = pm.ready ? pm.list?.modules ?? [] : [];
@@ -527,9 +531,14 @@ export default function ModulesSettingsPanel() {
   const processChoice = pm.ready && !unsupported;
   const effectiveAddType: 'data' | 'process' = processChoice ? addType : pm.ready && unsupported ? 'process' : 'data';
   const canAdd = !unsupported || pm.ready;
+  /**
+   * Édition Microsoft Store (build `msstore` ou serveur `catalog_only`) : modules du catalogue
+   * signé seulement, pas d'ajout depuis une URL directe.
+   */
+  const catalogOnly = STORE_MODULES_ENABLED || caps?.modules.catalogOnly === true;
   /** « + » : d'abord le catalogue officiel ; serveur sans catalogue → ajout par URL directement. */
   const openAdd = () => {
-    if (store.supported) {
+    if (store.supported || catalogOnly) {
       void store.reload();
       open({ type: 'store' });
     } else {
@@ -831,6 +840,7 @@ export default function ModulesSettingsPanel() {
                 })}
               </ul>
             )}
+            {!catalogOnly && (
             <div class="border-t border-white/10 pt-5 tv:pt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-sm tv:text-lg max-w-xl" style={{ color: C.muted }}>
                 {stx.githubHint}
@@ -846,12 +856,13 @@ export default function ModulesSettingsPanel() {
                 {stx.fromGithub}
               </button>
             </div>
+            )}
           </div>
         </HubModal>
       )}
 
       {/* Ajouter un module */}
-      {view?.type === 'add' && (
+      {view?.type === 'add' && !catalogOnly && (
         <HubModal open title={tx.addTitle} description={tx.addDesc} onClose={close} size="xl" className={MODAL_CLASS}>
           <div class="grid gap-5 tv:gap-7">
             {store.supported && (

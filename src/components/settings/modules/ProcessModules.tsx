@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { refreshCapabilitiesNow, useServerCapabilities } from '../../../lib/capabilities';
-import { IS_STORE_BUILD } from '../../../lib/distribution';
+import { IS_STORE_BUILD, STORE_MODULES_ENABLED } from '../../../lib/distribution';
+
+/** Modules « process » gérables dans ce build (pas dans la version Google Play). */
+const PROCESS_UI_BUILD = !IS_STORE_BUILD || STORE_MODULES_ENABLED;
 import { serverApi } from '../../../lib/client/server-api';
 import type { HubStatus } from '../hub/HubTile';
 import { processModuleName } from './ServerFeatures';
@@ -366,7 +369,7 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
   noticeRef.current = setNotice;
 
   const refresh = async () => {
-    if (IS_STORE_BUILD || knownUnsupported) return;
+    if (!PROCESS_UI_BUILD || knownUnsupported) return;
     const res = await serverApi.listProcessModules();
     if (!alive.current) return;
     if (res.success && res.data) {
@@ -390,7 +393,7 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
   };
 
   useEffect(() => {
-    if (IS_STORE_BUILD || knownUnsupported) return;
+    if (!PROCESS_UI_BUILD || knownUnsupported) return;
     void refresh();
   }, [knownUnsupported]);
 
@@ -447,7 +450,7 @@ export function useProcessModules(tx: ProcessTx, setNotice: (n: Notice) => void)
     return () => clearTimeout(timer);
   }, [starting, list]);
 
-  const supported = !IS_STORE_BUILD && !knownUnsupported && !hidden;
+  const supported = PROCESS_UI_BUILD && !knownUnsupported && !hidden;
   return {
     supported,
     /** Liste chargée au moins une fois (fonctions process affichables). */

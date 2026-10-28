@@ -54,7 +54,7 @@ export interface ProcessModuleSummary {
 export interface ServerCapabilities {
   apiVersion: number;
   serverVersion: string | null;
-  edition: 'core' | 'full' | 'legacy';
+  edition: 'core' | 'full' | 'store' | 'legacy';
   /**
    * Toutes les capacités annoncées par le serveur (`features`), y compris celles que le client ne
    * connaît pas encore : les clés booléennes inconnues sont conservées telles quelles.
@@ -88,6 +88,8 @@ export interface ServerCapabilities {
      * serveur plus ancien → boutons masqués (une réponse 404 / 405 les masque aussi).
      */
     toggleRoutes?: boolean;
+    /** Édition Microsoft Store : catalogue officiel seul, pas d'ajout par URL (`modules.catalog_only`). */
+    catalogOnly?: boolean;
   };
   /** Serveur antérieur à la route capabilities (comportement historique). */
   legacy: boolean;
@@ -216,7 +218,7 @@ export function parseCapabilities(json: any, backendUrl: string): ServerCapabili
   return {
     apiVersion: typeof d.api_version === 'number' ? d.api_version : 1,
     serverVersion: typeof d.server_version === 'string' ? d.server_version : null,
-    edition: d.edition === 'core' ? 'core' : 'full',
+    edition: d.edition === 'core' ? 'core' : d.edition === 'store' ? 'store' : 'full',
     features,
     compiledFeatures: Array.isArray(d.compiled_features)
       ? d.compiled_features.filter((x: unknown): x is string => typeof x === 'string')
@@ -231,6 +233,7 @@ export function parseCapabilities(json: any, backendUrl: string): ServerCapabili
       catalog: typeof m.catalog === 'boolean' ? m.catalog : undefined,
       process: parseProcess(m.process),
       toggleRoutes: detectToggleRoutes(f, m),
+      catalogOnly: m.catalog_only === true,
     },
     legacy: false,
     backendUrl,
