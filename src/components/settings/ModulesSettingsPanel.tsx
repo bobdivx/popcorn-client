@@ -38,7 +38,7 @@ import {
   processTx,
   useProcessModules,
 } from './modules/ProcessModules';
-import { installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
+import { BUNDLED_DATA_MODULES, installFromCatalog, isFoldedIntoParent, storeTx, useModuleCatalog } from './modules/ModuleStore';
 import { FieldHint, ModuleCatalogView, catalogTx } from './modules/ModuleCatalog';
 import { checkAccessToken, checkModuleUrl } from './modules/moduleCatalogModel';
 import type { CatalogModule } from '../../lib/client/server-api/modules';
@@ -115,6 +115,10 @@ const TEXT = {
     definitions: (n: number) => `${n} définition${n > 1 ? 's' : ''} d'indexers`,
     active: 'Actif',
     inactive: 'Inactif sur ce serveur',
+    includedDefinitions: "Définitions d'indexers officielles incluses dans ce module.",
+    legacyDefinitions: (v: string, n: number | null | undefined) =>
+      `Ancien module « Définitions d'indexers » ${v} encore installé${typeof n === 'number' ? ` (${n} définitions)` : ''} : toujours pris en compte, prioritaire sur les définitions incluses. Tu peux le garder ou le désinstaller.`,
+    legacyDetails: 'Gérer l’ancien module',
     update: 'Mettre à jour',
     updating: 'Mise à jour…',
     remove: 'Désinstaller',
@@ -195,6 +199,10 @@ const TEXT = {
     definitions: (n: number) => `${n} indexer definition${n > 1 ? 's' : ''}`,
     active: 'Active',
     inactive: 'Inactive on this server',
+    includedDefinitions: 'Official indexer definitions are included in this module.',
+    legacyDefinitions: (v: string, n: number | null | undefined) =>
+      `Former “Indexer definitions” module ${v} still installed${typeof n === 'number' ? ` (${n} definitions)` : ''}: still used, and takes precedence over the included definitions. You can keep or uninstall it.`,
+    legacyDetails: 'Manage the former module',
     update: 'Update',
     updating: 'Updating…',
     remove: 'Uninstall',
@@ -527,6 +535,7 @@ export default function ModulesSettingsPanel() {
 
   const kindLabel = (kind: string) => tx.kinds[kind] ?? kind;
   const processModules = pm.ready ? pm.list?.modules ?? [] : [];
+  const processIds = processModules.map((m) => m.id);
   const trustCount = pm.trust?.keys.length ?? 0;
   const loading = modules === null;
   const empty = !loading && modules.length === 0 && processModules.length === 0;
@@ -756,6 +765,27 @@ export default function ModulesSettingsPanel() {
     );
   };
 
+  /** Fiche d'un module process qui inclut un module de données (Indexers ← définitions). */
+  const bundledSection = (parentId: string) => {
+    const bundled = Object.keys(BUNDLED_DATA_MODULES).filter((id) => BUNDLED_DATA_MODULES[id] === parentId);
+    if (bundled.length === 0) return null;
+    const legacy = (modules ?? []).filter((m) => bundled.includes(m.id));
+    return (
+      <div class="grid gap-2 text-sm tv:text-lg" style={{ color: C.muted }}>
+        <p>{tx.includedDefinitions}</p>
+        {legacy.map((m) => (
+          <div key={m.id} class="flex flex-wrap items-center gap-2">
+            <span>{tx.legacyDefinitions(m.version, m.definitions_count)}</span>
+            <button type="button" data-focusable class={secondaryBtn} style={secondaryStyle} onClick={() => open({ type: 'data', id: m.id })}>
+              <Icon name="settings" />
+              {tx.legacyDetails}
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const sectionTitle = (id: string, label: string) => (
     <h2 id={id} class="modules-hub-section-title text-base tv:text-xl" style={subHeadingStyle}>
       {label}
@@ -814,7 +844,7 @@ export default function ModulesSettingsPanel() {
           <HubSkeleton count={3} />
         ) : (
           <HubGrid>
-            {modules.map((m) => {
+            {modules.filter((m) => !isFoldedIntoParent(m.id, processIds)).map((m) => {
               const enabled = m.enabled !== false;
               const ref: ModuleRef = { type: 'data', id: m.id, name: m.name };
               return (
@@ -1079,6 +1109,7 @@ export default function ModulesSettingsPanel() {
           <div class="grid gap-5 tv:gap-7">
             <NoticeBanner notice={notice} />
             {settingsSection({ type: 'process', id: processModule.id, name: processModuleName(processModule, language) })}
+            {bundledSection(processModule.id)}
             <ProcessModuleDetail
               key={processModule.id}
               m={processModule}
