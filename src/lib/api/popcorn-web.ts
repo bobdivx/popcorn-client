@@ -228,6 +228,83 @@ async function requestJson(
   }
 }
 
+/** Délai des appels d'authentification cloud (popcornn.app peut mettre > 10 s à répondre). */
+export const CLOUD_AUTH_TIMEOUT_MS = 25000;
+/** Pause avant l'unique nouvelle tentative (timeout / 5xx). */
+const CLOUD_AUTH_RETRY_DELAY_MS = 1000;
+export const CLOUD_TIMEOUT_MESSAGE = 'Le service cloud met trop de temps à répondre. Réessayez.';
+
+/** Le service cloud n'a pas répondu à temps, même après la nouvelle tentative. */
+export class CloudTimeoutError extends Error {
+  readonly code = 'CloudTimeout';
+  constructor(message: string = CLOUD_TIMEOUT_MESSAGE) {
+    super(message);
+    this.name = 'CloudTimeoutError';
+  }
+}
+
+export function isCloudTimeoutError(error: unknown): error is CloudTimeoutError {
+  return (
+    error instanceof CloudTimeoutError ||
+    (error instanceof Error && (error as Error & { code?: string }).code === 'CloudTimeout')
+  );
+}
+
+/** Abandon par AbortController (timeout) : `AbortError` / `TimeoutError`, ou « Fetch is aborted » (WebView). */
+export function isAbortLikeError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { name?: string; message?: string };
+  if (e.name === 'AbortError' || e.name === 'TimeoutError') return true;
+  const msg = typeof e.message === 'string' ? e.message : '';
+  return /\babort(ed)?\b/i.test(msg);
+}
+
+function isTimeoutResult(res: JsonResult): boolean {
+  return !res.ok && res.status === 0 && res.rawText === 'timeout';
+}
+
+function isRetryableServerStatus(status: number): boolean {
+  return status >= 500 && status <= 599;
+}
+
+/**
+ * `requestJson` pour l'authentification cloud : délai long et UNE nouvelle tentative
+ * sur timeout (AbortError) ou réponse 5xx. Après la 2e tentative :
+ * - timeout → `CloudTimeoutError` (message distinct de « service indisponible ») ;
+ * - 5xx → la réponse est renvoyée telle quelle (l'appelant la traite comme indisponible).
+ * Les autres erreurs (4xx, réseau, CORS) ne sont pas réessayées.
+ */
+export async function requestCloudAuthJson(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = CLOUD_AUTH_TIMEOUT_MS,
+  retries: number = 1
+): Promise<JsonResult> {
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt >= retries;
+    let timedOut = false;
+    try {
+      const res = await requestJson(url, init, timeoutMs);
+      if (isTimeoutResult(res)) {
+        timedOut = true;
+      } else if (!res.ok && isRetryableServerStatus(res.status) && !last) {
+        console.warn(`[POPCORN-WEB] ${res.status} sur ${url}, nouvelle tentative…`);
+      } else {
+        return res;
+      }
+    } catch (error) {
+      if (!isAbortLikeError(error)) throw error;
+      timedOut = true;
+    }
+    if (last) {
+      if (timedOut) throw new CloudTimeoutError();
+    } else if (timedOut) {
+      console.warn(`[POPCORN-WEB] Pas de réponse après ${timeoutMs} ms sur ${url}, nouvelle tentative…`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, CLOUD_AUTH_RETRY_DELAY_MS));
+  }
+}
+
 /**
  * Connecte un utilisateur via l'API popcorn-web
  * @param email Email de l'utilisateur
@@ -251,7 +328,7 @@ export async function loginCloud(email: string, password: string): Promise<{
   const fullUrl = `${apiUrl}/auth/login`;
   
   try {
-    const res = await requestJson(
+    const res = await requestCloudAuthJson(
       fullUrl,
       {
       method: 'POST',
@@ -260,7 +337,7 @@ export async function loginCloud(email: string, password: string): Promise<{
       },
       body: JSON.stringify({ email, password }),
       },
-      10000
+      CLOUD_AUTH_TIMEOUT_MS
     );
 
     if (!res.ok) {
@@ -320,13 +397,13 @@ export async function loginCloud(email: string, password: string): Promise<{
     });
     throw new Error('Réponse invalide de l\'API');
   } catch (error) {
-    // Si c'est un timeout
-    if (error instanceof Error && error.name === 'AbortError') {
+    // Pas de réponse à temps (après la nouvelle tentative) : message distinct de « indisponible »
+    if (isCloudTimeoutError(error)) {
       console.error('[POPCORN-WEB] Timeout lors de la connexion:', {
         url: fullUrl,
-        timeout: '10s',
+        timeout: `${CLOUD_AUTH_TIMEOUT_MS / 1000}s x2`,
       });
-      return null;
+      throw error;
     }
     
     // Si c'est une erreur réseau (fetch failed), retourner null
@@ -404,14 +481,14 @@ export async function completeOidcTicket(ticket: string): Promise<{
   refreshToken: string;
   jwtSecret?: string;
 } | null> {
-  const res = await requestJson(
+  const res = await requestCloudAuthJson(
     `${getPopcornWebApiUrl()}/auth/oidc/complete`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket }),
     },
-    15000
+    CLOUD_AUTH_TIMEOUT_MS
   );
   if (!res.ok || !res.data?.success || !res.data?.data) {
     const message = res.data?.message || 'Connexion Pocket ID échouée';
@@ -503,14 +580,14 @@ export async function registerCloud(email: string, password: string): Promise<{
   try {
     const apiUrl = getPopcornWebApiUrl();
     const fullUrl = `${apiUrl}/auth/register`;
-    const res = await requestJson(
+    const res = await requestCloudAuthJson(
       fullUrl,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       },
-      10000
+      CLOUD_AUTH_TIMEOUT_MS
     );
 
     if (!res.ok) {
@@ -537,6 +614,10 @@ export async function registerCloud(email: string, password: string): Promise<{
 
     throw new Error('Réponse invalide de l\'API');
   } catch (error) {
+    if (isCloudTimeoutError(error)) {
+      console.warn('[POPCORN-WEB] Timeout lors de l\'inscription cloud');
+      throw error;
+    }
     console.warn('[POPCORN-WEB] Impossible de contacter l\'API popcorn-web:', error);
     if (error instanceof Error && error.message.includes('Erreur')) {
       throw error;
@@ -1851,7 +1932,7 @@ async function doRefreshCloudToken(): Promise<boolean> {
     }
 
     const apiUrl = `${getPopcornWebApiUrl()}/auth/refresh`;
-    const res = await requestJson(
+    const res = await requestCloudAuthJson(
       apiUrl,
       {
         method: 'POST',
@@ -1860,7 +1941,7 @@ async function doRefreshCloudToken(): Promise<boolean> {
         },
         body: JSON.stringify({ refreshToken }),
       },
-      10000
+      CLOUD_AUTH_TIMEOUT_MS
     );
 
     if (!res.ok || !res.data?.success) {

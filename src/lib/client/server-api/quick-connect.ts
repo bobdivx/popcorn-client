@@ -3,7 +3,14 @@
  */
 
 import type { ApiResponse } from './types.js';
-import { getPopcornWebApiUrl, getLocalUserMe } from '../../api/popcorn-web.js';
+import {
+  getPopcornWebApiUrl,
+  getLocalUserMe,
+  requestCloudAuthJson,
+  isCloudTimeoutError,
+  CLOUD_AUTH_TIMEOUT_MS,
+  CLOUD_TIMEOUT_MESSAGE,
+} from '../../api/popcorn-web.js';
 import { setGuestWebToken } from '../guest-web-session.js';
 import { TokenManager } from '../storage.js';
 import { setBackendUrl, hasBackendUrl, isUsableCloudBackendUrl } from '../../backend-config.js';
@@ -63,16 +70,21 @@ async function establishGuestServerSession(
   return true;
 }
 
-// Fonction helper pour faire des requêtes à popcorn-web
+/** Interrogation du statut (toutes les 2 s) : délai court et pas de nouvelle tentative, le polling réessaie. */
+const QUICK_CONNECT_POLL_TIMEOUT_MS = 10000;
+
+// Fonction helper pour faire des requêtes à popcorn-web.
+// Par défaut : délai d'authentification cloud (25 s) et une nouvelle tentative sur timeout / 5xx.
 async function requestPopcornWeb<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  { timeoutMs = CLOUD_AUTH_TIMEOUT_MS, retries = 1 }: { timeoutMs?: number; retries?: number } = {}
 ): Promise<ApiResponse<T>> {
   const apiUrl = getPopcornWebApiUrl();
   const fullUrl = `${apiUrl}${endpoint}`;
 
   const cloudToken = TokenManager.getCloudAccessToken();
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as any),
   };
@@ -81,27 +93,21 @@ async function requestPopcornWeb<T>(
   }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const rawText = await response.text().catch(() => '');
-    const data = rawText ? JSON.parse(rawText) : {};
-    if (response.ok) {
+    const res = await requestCloudAuthJson(fullUrl, { ...options, headers }, timeoutMs, retries);
+    const data = res.data || {};
+    if (res.ok) {
       return { success: true, data: data.data ?? data };
     }
     return {
       success: false,
       error: data.error || 'UnknownError',
-      message: data.message || `Erreur ${response.status}`,
+      message: data.message || `Erreur ${res.status}`,
       details: typeof data.details === 'string' ? data.details : undefined,
     };
   } catch (error) {
+    if (isCloudTimeoutError(error)) {
+      return { success: false, error: 'CloudTimeout', message: CLOUD_TIMEOUT_MESSAGE };
+    }
     return {
       success: false,
       error: 'NetworkError',
@@ -161,10 +167,14 @@ export const quickConnectMethods = {
       status: 'pending' | 'authorized' | 'used' | 'expired';
       authorized: boolean;
       userId?: string;
-    }>('/auth/quick-connect/status', {
-      method: 'POST',
-      body: JSON.stringify({ secret }),
-    });
+    }>(
+      '/auth/quick-connect/status',
+      {
+        method: 'POST',
+        body: JSON.stringify({ secret }),
+      },
+      { timeoutMs: QUICK_CONNECT_POLL_TIMEOUT_MS, retries: 0 }
+    );
   },
 
   /**

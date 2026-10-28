@@ -3,7 +3,7 @@
  */
 
 import type { ApiResponse } from './types.js';
-import { getPopcornWebApiUrl } from '../../api/popcorn-web.js';
+import { getPopcornWebApiUrl, CLOUD_AUTH_TIMEOUT_MS } from '../../api/popcorn-web.js';
 import { TokenManager } from '../storage.js';
 import { isTauri } from '../../utils/tauri.js';
 
@@ -28,7 +28,7 @@ async function requestPopcornWeb<T>(
   try {
     // Utiliser fetch standard
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), CLOUD_AUTH_TIMEOUT_MS);
     
     let response: Response;
     try {
@@ -56,7 +56,7 @@ async function requestPopcornWeb<T>(
               method,
               headers: headerPairs,
               body,
-              timeoutMs: 10000,
+              timeoutMs: CLOUD_AUTH_TIMEOUT_MS,
             } as any)) as { body?: string; status?: number; headers?: Array<[string, string]> };
             
             const response = new Response(nativeRes?.body ?? '', {

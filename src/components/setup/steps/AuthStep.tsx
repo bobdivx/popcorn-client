@@ -235,6 +235,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         if (response.error === 'SsoRequired' || (response.message || '').includes('Pocket ID')) {
           setSsoRequired(true);
           errorMessage = t('loginForm.sso.required');
+        } else if (response.error === 'CloudTimeout') {
+          errorMessage = response.message || 'Le service cloud met trop de temps à répondre. Réessayez.';
         } else if (response.error === 'CloudUnavailable') {
           errorMessage = 'Le service cloud est indisponible. Vérifiez votre connexion internet.';
         } else if (response.error === 'CloudLoginError') {
@@ -327,7 +329,15 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     setLoading(true);
     try {
       const response = await serverApi.registerCloud(registerEmail, registerPassword);
-      if (!response.success) { setError(response.message || "Erreur lors de l'inscription"); setLoading(false); return; }
+      if (!response.success) {
+        const message =
+          response.error === 'CloudUnavailable'
+            ? 'Le service cloud est indisponible. Vérifiez votre connexion internet.'
+            : response.message || "Erreur lors de l'inscription";
+        setError(message);
+        setLoading(false);
+        return;
+      }
       onNext();
     } catch (err) {
       setError("Erreur d'inscription. Vérifiez votre connexion réseau.");
