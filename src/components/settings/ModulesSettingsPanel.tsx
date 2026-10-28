@@ -38,7 +38,9 @@ import {
   processTx,
   useProcessModules,
 } from './modules/ProcessModules';
-import { catalogIconName, catalogTileState, installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
+import { installFromCatalog, storeTx, useModuleCatalog } from './modules/ModuleStore';
+import { FieldHint, ModuleCatalogView, catalogTx } from './modules/ModuleCatalog';
+import { checkAccessToken, checkModuleUrl } from './modules/moduleCatalogModel';
 import type { CatalogModule } from '../../lib/client/server-api/modules';
 import {
   ServerFeatureDetail,
@@ -546,8 +548,127 @@ export default function ModulesSettingsPanel() {
       open({ type: 'add' });
     }
   };
-  /** Modules proposés par le store : non installés, ou installés avec une mise à jour. */
-  const storeModules = (store.catalog?.modules ?? []).filter((m) => !m.installed || (m.update_available && m.compatible));
+  const ctx = catalogTx(language);
+  const dataUrlCheck = checkModuleUrl(url, 'data');
+  const dataTokenCheck = checkAccessToken(token);
+  /** Formulaires d'ajout par URL (module de données / exécutable), partagés par le catalogue et la modale « add ». */
+  const urlForms = (
+    <div class="grid gap-5 tv:gap-7">
+      {processChoice && (
+        <div role="radiogroup" aria-label={tx.typeLabel} class="grid gap-3 sm:grid-cols-2" data-tv-list>
+          {(['data', 'process'] as const).map((type) => {
+            const selected = effectiveAddType === type;
+            return (
+              <button
+                key={type}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                data-focusable
+                data-tv-list-item
+                class={`modules-type-choice flex items-center gap-3 rounded-xl border px-4 py-3 tv:px-6 tv:py-5 text-left ${selected ? 'is-selected' : ''}`}
+                onClick={() => {
+                  setNotice(null);
+                  setAddType(type);
+                }}
+              >
+                <span class="shrink-0" style={{ color: C.accent }}>
+                  <Icon name={type === 'data' ? 'module' : 'chip'} size={22} />
+                </span>
+                <span class="min-w-0">
+                  <span class="block text-sm tv:text-lg" style={subHeadingStyle}>
+                    {type === 'data' ? tx.typeData : tx.typeProcess}
+                  </span>
+                  <span class="block text-xs tv:text-base" style={{ color: C.muted }}>
+                    {type === 'data' ? tx.typeDataHint : tx.typeProcessHint}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {effectiveAddType === 'data' ? (
+        <div class="grid gap-5 tv:gap-7">
+          <p class="text-sm tv:text-lg max-w-2xl" style={{ color: C.muted }}>
+            {tx.addHelp}
+          </p>
+          <form class="grid gap-4 tv:gap-6" onSubmit={onInstall} autoComplete="off">
+            <label class="grid gap-1.5">
+              <span class="text-sm tv:text-lg">{tx.url}</span>
+              <input
+                type="url"
+                inputMode="url"
+                data-focusable
+                required
+                class={inputClass}
+                style={inputStyle}
+                placeholder={tx.urlPlaceholder}
+                value={url}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellcheck={false}
+                aria-invalid={dataUrlCheck.level === 'error'}
+                aria-describedby="data-url-hint"
+                onInput={(e) => setUrl((e.currentTarget as HTMLInputElement).value)}
+              />
+              <FieldHint check={dataUrlCheck} id="data-url-hint" />
+            </label>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="grid gap-1.5">
+                <span class="text-sm tv:text-lg">{tx.token}</span>
+                <input
+                  type="password"
+                  data-focusable
+                  class={inputClass}
+                  style={inputStyle}
+                  placeholder={tx.tokenPlaceholder}
+                  value={token}
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  spellcheck={false}
+                  aria-invalid={dataTokenCheck.level === 'error'}
+                  aria-describedby="data-token-hint"
+                  onInput={(e) => setToken((e.currentTarget as HTMLInputElement).value)}
+                />
+                <FieldHint check={dataTokenCheck} id="data-token-hint" />
+              </label>
+              <label class="grid gap-1.5">
+                <span class="text-sm tv:text-lg">{tx.ref}</span>
+                <input
+                  type="text"
+                  data-focusable
+                  class={inputClass}
+                  style={inputStyle}
+                  placeholder={tx.refPlaceholder}
+                  value={gitRef}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellcheck={false}
+                  onInput={(e) => setGitRef((e.currentTarget as HTMLInputElement).value)}
+                />
+              </label>
+            </div>
+            <div>
+              <button
+                type="submit"
+                data-focusable
+                class={primaryBtn}
+                style={primaryStyle}
+                disabled={!!busy || unsupported || dataUrlCheck.level === 'error' || dataTokenCheck.level === 'error'}
+              >
+                <Icon name="plus" />
+                {busy === 'install' ? tx.installing : tx.install}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <ProcessInstallForm pm={pm} tx={ptx} setNotice={setNotice} />
+      )}
+    </div>
+  );
 
   const ftx = featureTx(language);
   const features = caps ? visibleServerFeatures(buildServerFeatures(caps, modules, processModules, language)) : [];
@@ -777,94 +898,29 @@ export default function ModulesSettingsPanel() {
         </HubGrid>
       </section>
 
-      {/* Ajouter un module : catalogue officiel (store) d'abord */}
+      {/* Ajouter un module : catalogue de modules (cartes, recherche, filtres) + module particulier par URL */}
       {view?.type === 'store' && (
-        <HubModal open title={stx.title} description={stx.intro} onClose={close} size="xl" className={MODAL_CLASS}>
-          <div class="grid gap-5 tv:gap-7">
-            <NoticeBanner notice={notice} detailsLabel={tx.warnings} />
-            {pm.jobRunning && <ProcessJobProgress job={pm.job} tx={ptx} />}
-            {!store.catalog && store.loading && <HubSkeleton count={2} />}
-            {store.error && !store.catalog && (
-              <p role="alert" class="text-sm tv:text-lg" style={{ color: C.accent }}>
-                {stx.error}
-              </p>
-            )}
-            {store.catalog && storeModules.length === 0 && (
-              <p class="text-sm tv:text-lg" style={{ color: C.muted }}>
-                {store.catalog.modules.length === 0 ? stx.empty : stx.allInstalled}
-              </p>
-            )}
-            {storeModules.length > 0 && (
-              <ul class="divide-y divide-white/10" data-tv-list>
-                {storeModules.map((m) => {
-                  const st = catalogTileState(m, stx);
-                  const installing = busy === `catalog:${m.id}` || (pm.jobRunning && pm.job?.moduleId === m.id);
-                  const label = st.action === 'update' ? stx.update : st.action === 'start' ? stx.start : stx.install;
-                  const version =
-                    m.installed_version && m.update_available ? `${m.installed_version} → ${m.version}` : m.version;
-                  return (
-                    <li key={m.id} class="py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-tv-list-item>
-                      <div class="flex gap-4 min-w-0">
-                        <span class="mt-0.5 shrink-0" style={{ color: C.accent }}>
-                          <Icon name={catalogIconName(m)} size={28} />
-                        </span>
-                        <div class="min-w-0">
-                          <p class="text-base tv:text-xl" style={subHeadingStyle}>
-                            {m.name}
-                          </p>
-                          {m.description && (
-                            <p class="mt-1 text-sm tv:text-lg" style={{ color: C.muted }}>
-                              {m.description}
-                            </p>
-                          )}
-                          <p class="mt-1 text-xs tv:text-base" style={{ color: C.faint }}>
-                            {ptx.kind} · {version}
-                            {!m.compatible && m.incompatible_reason ? ` · ${stx.incompatible} : ${m.incompatible_reason}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      {st.action && (
-                        <button
-                          type="button"
-                          data-focusable
-                          class={`${primaryBtn} shrink-0`}
-                          style={primaryStyle}
-                          disabled={!!busy || pm.jobRunning}
-                          onClick={() => void onCatalogInstall(m)}
-                        >
-                          <Icon name={st.action === 'start' ? 'play' : 'download'} />
-                          {installing ? stx.installing : label}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {!catalogOnly && (
-            <div class="border-t border-white/10 pt-5 tv:pt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-sm tv:text-lg max-w-xl" style={{ color: C.muted }}>
-                {stx.githubHint}
-              </p>
-              <button
-                type="button"
-                data-focusable
-                class={`${secondaryBtn} shrink-0`}
-                style={secondaryStyle}
-                onClick={() => open({ type: 'add' })}
-              >
-                <Icon name="link" />
-                {stx.fromGithub}
-              </button>
-            </div>
-            )}
-          </div>
+        <HubModal open animated title={ctx.title} description={stx.intro} onClose={close} size="xl" className={`${MODAL_CLASS} modules-catalog-overlay`}>
+          <ModuleCatalogView
+            modules={store.catalog?.modules ?? []}
+            loading={store.loading}
+            error={store.error}
+            stx={stx}
+            ctx={ctx}
+            job={pm.job}
+            jobRunning={pm.jobRunning}
+            busy={busy}
+            onInstall={(m) => void onCatalogInstall(m)}
+            onRefresh={() => void store.refresh()}
+            notice={<NoticeBanner notice={notice} detailsLabel={tx.warnings} />}
+            urlSection={catalogOnly ? undefined : urlForms}
+          />
         </HubModal>
       )}
 
-      {/* Ajouter un module */}
+      {/* Ajouter un module par URL (serveur sans catalogue) */}
       {view?.type === 'add' && !catalogOnly && (
-        <HubModal open title={tx.addTitle} description={tx.addDesc} onClose={close} size="xl" className={MODAL_CLASS}>
+        <HubModal open animated title={tx.addTitle} description={tx.addDesc} onClose={close} size="xl" className={MODAL_CLASS}>
           <div class="grid gap-5 tv:gap-7">
             {store.supported && (
               <button
@@ -879,113 +935,7 @@ export default function ModulesSettingsPanel() {
               </button>
             )}
             <NoticeBanner notice={notice} detailsLabel={tx.warnings} />
-            {processChoice && (
-              <div role="radiogroup" aria-label={tx.typeLabel} class="grid gap-3 sm:grid-cols-2" data-tv-list>
-                {(['data', 'process'] as const).map((type) => {
-                  const selected = effectiveAddType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      data-focusable
-                      data-tv-list-item
-                      class={`modules-type-choice flex items-center gap-3 rounded-xl border px-4 py-3 tv:px-6 tv:py-5 text-left ${selected ? 'is-selected' : ''}`}
-                      onClick={() => {
-                        setNotice(null);
-                        setAddType(type);
-                      }}
-                    >
-                      <span class="shrink-0" style={{ color: C.accent }}>
-                        <Icon name={type === 'data' ? 'module' : 'chip'} size={22} />
-                      </span>
-                      <span class="min-w-0">
-                        <span class="block text-sm tv:text-lg" style={subHeadingStyle}>
-                          {type === 'data' ? tx.typeData : tx.typeProcess}
-                        </span>
-                        <span class="block text-xs tv:text-base" style={{ color: C.muted }}>
-                          {type === 'data' ? tx.typeDataHint : tx.typeProcessHint}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {effectiveAddType === 'data' ? (
-              <div class="grid gap-5 tv:gap-7">
-                <p class="text-sm tv:text-lg max-w-2xl" style={{ color: C.muted }}>
-                  {tx.addHelp}
-                </p>
-                <form class="grid gap-4 tv:gap-6" onSubmit={onInstall} autoComplete="off">
-                  <label class="grid gap-1.5">
-                    <span class="text-sm tv:text-lg">{tx.url}</span>
-                    <input
-                      type="url"
-                      inputMode="url"
-                      data-focusable
-                      required
-                      class={inputClass}
-                      style={inputStyle}
-                      placeholder={tx.urlPlaceholder}
-                      value={url}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      spellcheck={false}
-                      onInput={(e) => setUrl((e.currentTarget as HTMLInputElement).value)}
-                    />
-                  </label>
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <label class="grid gap-1.5">
-                      <span class="text-sm tv:text-lg">{tx.token}</span>
-                      <input
-                        type="password"
-                        data-focusable
-                        class={inputClass}
-                        style={inputStyle}
-                        placeholder={tx.tokenPlaceholder}
-                        value={token}
-                        autoComplete="new-password"
-                        autoCapitalize="none"
-                        spellcheck={false}
-                        onInput={(e) => setToken((e.currentTarget as HTMLInputElement).value)}
-                      />
-                    </label>
-                    <label class="grid gap-1.5">
-                      <span class="text-sm tv:text-lg">{tx.ref}</span>
-                      <input
-                        type="text"
-                        data-focusable
-                        class={inputClass}
-                        style={inputStyle}
-                        placeholder={tx.refPlaceholder}
-                        value={gitRef}
-                        autoComplete="off"
-                        autoCapitalize="none"
-                        spellcheck={false}
-                        onInput={(e) => setGitRef((e.currentTarget as HTMLInputElement).value)}
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <button
-                      type="submit"
-                      data-focusable
-                      class={primaryBtn}
-                      style={primaryStyle}
-                      disabled={!!busy || unsupported}
-                    >
-                      <Icon name="plus" />
-                      {busy === 'install' ? tx.installing : tx.install}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <ProcessInstallForm pm={pm} tx={ptx} setNotice={setNotice} />
-            )}
+            {urlForms}
           </div>
         </HubModal>
       )}

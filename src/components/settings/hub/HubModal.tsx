@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../../lib/i18n/useI18n';
@@ -13,7 +13,18 @@ type HubModalProps = {
   footer?: ComponentChildren;
   /** Classe ajoutée au voile (thème propre à une page, ex. `modules-hub-overlay`). */
   className?: string;
+  /**
+   * Ouverture / fermeture animées (fondu + léger zoom, glissement depuis le bas sur mobile).
+   * Fermeture différée le temps de l'animation ; immédiate si `prefers-reduced-motion: reduce`.
+   */
+  animated?: boolean;
 };
+
+const CLOSE_ANIMATION_MS = 180;
+
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
 
 export function HubModal({
   open,
@@ -24,11 +35,37 @@ export function HubModal({
   children,
   footer,
   className,
+  animated = false,
 }: HubModalProps) {
   const { t } = useI18n();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const requestClose = () => {
+    if (!animated || reducedMotion()) {
+      onCloseRef.current();
+      return;
+    }
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setClosing(true);
+    timerRef.current = setTimeout(() => {
+      closingRef.current = false;
+      setClosing(false);
+      onCloseRef.current();
+    }, CLOSE_ANIMATION_MS);
+  };
+  const requestCloseRef = useRef(requestClose);
+  requestCloseRef.current = requestClose;
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +76,7 @@ export function HubModal({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onCloseRef.current();
+        requestCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !dialogRef.current) return;
@@ -61,7 +98,7 @@ export function HubModal({
     const dialog = dialogRef.current;
     const onTvBack = (e: Event) => {
       e.preventDefault();
-      onCloseRef.current();
+      requestCloseRef.current();
     };
     dialog?.addEventListener('tv-back-button', onTvBack);
     const focusable = dialog?.querySelector<HTMLElement>(
@@ -80,9 +117,11 @@ export function HubModal({
 
   return createPortal(
     <div
-      class={className ? `hub-overlay ${className}` : 'hub-overlay'}
+      class={['hub-overlay', className, animated ? 'hub-overlay--animated' : '', closing ? 'is-closing' : '']
+        .filter(Boolean)
+        .join(' ')}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       <div
@@ -104,7 +143,7 @@ export function HubModal({
             class="hub-modal-x"
             data-close
             data-focusable
-            onClick={onClose}
+            onClick={requestClose}
             aria-label={t('common.close')}
           >
             ✕
@@ -113,7 +152,7 @@ export function HubModal({
         <div class="hub-modal-body">{children}</div>
         <footer class="hub-modal-foot">
           {footer ?? (
-            <button type="button" class="hub-btn hub-btn-secondary" data-focusable onClick={onClose}>
+            <button type="button" class="hub-btn hub-btn-secondary" data-focusable onClick={requestClose}>
               {t('common.close')}
             </button>
           )}
