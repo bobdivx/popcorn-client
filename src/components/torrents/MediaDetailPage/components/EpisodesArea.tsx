@@ -44,6 +44,9 @@ export function EpisodesArea(props: {
   savedPlaybackPosition: number | null;
   downloadedEpisodesSet?: Set<string>;
   downloadingEpisodesMap?: Record<string, number>;
+  /** Après « autre release » réussi. */
+  onEpisodeSourceChanged?: () => void;
+  notify?: (type: 'success' | 'error' | 'info', message: string) => void;
 
   isPackSelected: boolean;
   videoFilesCount: number;
@@ -156,6 +159,8 @@ export function EpisodesArea(props: {
           downloadProgress={downloadProgress}
           statusMessage={statusMessage}
           downloadingEpisodesMap={downloadingEpisodesMap}
+          onEpisodeSourceChanged={props.onEpisodeSourceChanged}
+          notify={props.notify}
         />
       ) : null}
 

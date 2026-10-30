@@ -4027,6 +4027,8 @@ export default function MediaDetailPage({
                   savedPlaybackPosition={savedPlaybackPosition}
                   downloadedEpisodesSet={downloadedEpisodesSet}
                   downloadingEpisodesMap={downloadingEpisodesMap}
+                  onEpisodeSourceChanged={reloadMediaDetail}
+                  notify={addNotification}
                   isPackSelected={isPackSelected}
                   videoFilesCount={videoFiles.length}
                   hasInfoHash={hasInfoHash}

@@ -1470,7 +1470,14 @@
     "torrentNetworkLabel": "Torrent network",
     "peerStatsHint": "Seeders / leechers from the indexer (useful before downloading).",
     "markWatched": "Mark as watched",
-    "markUnwatched": "Mark as unwatched"
+    "markUnwatched": "Mark as unwatched",
+    "redownloadOtherRelease": "Re-download / other release",
+    "redownloadOtherReleaseHint": "Replace the stuck release (0 bytes received) with another source for this episode",
+    "redownloadOtherReleaseConfirm": "Look for another release of {label}?\n\nThe current release is removed and blacklisted only if it received no data. Nothing is deleted otherwise.",
+    "redownloadOtherReleaseRunning": "Looking for another release…",
+    "redownloadOtherReleaseDone": "New release: {name} ({seeders} seeders)",
+    "redownloadOtherReleaseNone": "No other compatible release found",
+    "redownloadOtherReleaseError": "Could not switch release"
   },
   "torrentStats": {
     "downloading": "Downloading",

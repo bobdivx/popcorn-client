@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
-import { ChevronLeft, ChevronRight, CircleCheck, Play, Download, CloudDownload, HardDrive } from 'lucide-preact';
+import { ChevronLeft, ChevronRight, CircleCheck, Play, Download, CloudDownload, HardDrive, RefreshCw } from 'lucide-preact';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { PlaybackStatusSurface } from '../../../streaming/player-shared/components/PlaybackStatusSurface';
 import { DsLoader } from '../../../ui/DsLoader';
@@ -34,6 +34,13 @@ export interface EpisodeCarouselItem {
   isSelected: boolean;
   onSelect: () => void;
   isTV?: boolean;
+  /** Action secondaire sur la carte (ex. « Retélécharger / autre release », admin). */
+  secondaryAction?: {
+    label: string;
+    title?: string;
+    busy?: boolean;
+    onActivate: () => void;
+  };
 }
 
 export function EpisodeCardsCarousel({
@@ -305,6 +312,37 @@ export function EpisodeCardsCarousel({
                         </span>
                       ) : null}
                     </div>
+                  ) : null}
+                  {it.secondaryAction ? (
+                    // span[role=button] : la carte est déjà un <button> (pas de bouton imbriqué).
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      data-focusable={it.isTV ? true : undefined}
+                      data-episode-secondary-action
+                      aria-disabled={it.secondaryAction.busy ? 'true' : undefined}
+                      title={it.secondaryAction.title ?? it.secondaryAction.label}
+                      className={`ed-ep-card__secondary mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-white/15 bg-black/40 text-[11px] text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] ${
+                        it.secondaryAction.busy ? 'opacity-60 cursor-wait' : 'cursor-pointer'
+                      }`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!it.secondaryAction?.busy) it.secondaryAction?.onActivate();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!it.secondaryAction?.busy) it.secondaryAction?.onActivate();
+                      }}
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${it.secondaryAction.busy ? 'animate-spin' : ''}`}
+                        strokeWidth={1.75}
+                      />
+                      {it.secondaryAction.label}
+                    </span>
                   ) : null}
                 </div>
               </button>
