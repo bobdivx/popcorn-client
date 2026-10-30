@@ -15,6 +15,7 @@ import { reanchorBrowseSlot } from './browseCarouselAnchor';
 import { cardBackdropUrl, cardPosterUrl } from '../../lib/utils/tmdb-images';
 import { useMovieWatchState } from '../../lib/watchedMovies';
 import { useI18n } from '../../lib/i18n';
+import { STORE_MODULES_ENABLED } from '../../lib/distribution';
 import {
   ensureBrowseInputModalityTracking,
   isBrowseKeyboardFocus,
@@ -294,7 +295,10 @@ function TitlePreviewCardImpl({
     return () => cancelAnimationFrame(id);
   }, [expanded, tileW]);
 
-  if (!poster) return null;
+  // Microsoft Store edition: the TMDB key is optional, so a video of the local library may have no
+  // artwork at all — show a title tile instead of hiding it.
+  const textPlaceholder = !poster && STORE_MODULES_ENABLED;
+  if (!poster && !textPlaceholder) return null;
 
   // Cadrage : format paysage (TV ou focus télécommande) = backdrop 16:9 ; portrait = affiche 2:3.
   // Si l'image du bon format manque, l'autre est affichée entière (contain) sur un fond flouté.
@@ -392,7 +396,16 @@ function TitlePreviewCardImpl({
           </span>
         ) : null}
 
-        <div className="absolute inset-0" aria-hidden>
+        {textPlaceholder ? (
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#2a2d36] to-[#121317] p-3 text-center"
+            aria-hidden
+            data-text-placeholder
+          >
+            <span className="line-clamp-4 break-words text-sm tv:text-lg font-semibold text-white/90">{title}</span>
+          </div>
+        ) : null}
+        <div className="absolute inset-0" aria-hidden hidden={textPlaceholder}>
           {imgFit === 'contain' ? (
             <img
               src={imgSrc ?? poster}

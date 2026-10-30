@@ -36,6 +36,13 @@ export function getUserType(): UserType | null {
   return 'cloud';
 }
 
+/** Microsoft Store edition: user is the admin of the local (bundled) server, signed in without a cloud account. */
+export function isMsStoreLocalServerAdmin(): boolean {
+  if (import.meta.env.PUBLIC_DISTRIBUTION !== 'msstore') return false;
+  const user = TokenManager.getUser();
+  return !!user && user.role === 'admin';
+}
+
 /**
  * Vérifie si l'utilisateur actuel est le compte principal (cloud)
  */
@@ -61,6 +68,12 @@ export function canAccess(feature: Permission): boolean {
 
   // Les comptes cloud ont accès à tout
   if (userType === 'cloud') {
+    return true;
+  }
+
+  // Microsoft Store edition: the administrator of the server bundled in the app (account created on
+  // this PC at first launch, no online account) manages that server — full access.
+  if (isMsStoreLocalServerAdmin()) {
     return true;
   }
 
