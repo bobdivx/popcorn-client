@@ -3,6 +3,11 @@ import { CloudImportManager } from '../../../lib/client/cloud-import';
 import type { CloudImportStatus } from '../../../lib/client/cloud-import';
 import { useI18n } from '../../../lib/i18n';
 import { serverApi } from '../../../lib/client/server-api';
+import { STORE_MODULES_ENABLED } from '../../../lib/distribution';
+
+/** Microsoft Store edition: localized notice matching what this edition actually does (no torrent). */
+const MS_STORE_NOTICE = STORE_MODULES_ENABLED;
+const MS_STORE_NOTICE_SECTIONS = ['1', '2', '3', '4'] as const;
 
 const DISCLAIMER_SECTIONS = [
   { num: '1', title: "Nature de l'Application", content: "Popcornn est un outil technique permettant de se connecter à un serveur distant pour la recherche, le téléchargement et la lecture de contenu multimédia via le protocole BitTorrent. Cette application est fournie \"en l'état\" à des fins éducatives et techniques uniquement." },
@@ -183,7 +188,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
 
       {/* Bloc Disclaimer (fusionné) */}
       <section style="margin-bottom:32px;">
-        <span class="wz-section-label">Avertissement</span>
+        <span class="wz-section-label">{MS_STORE_NOTICE ? t('wizard.welcome.store.noticeLabel') : 'Avertissement'}</span>
         <div style="position:relative;">
           <div
             class="wz-panel wz-scroll"
@@ -197,10 +202,17 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.5} aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94 2.4 17.25A1.95 1.95 0 0 0 4.06 20.2h15.88a1.95 1.95 0 0 0 1.66-2.95L13.66 3.94a1.95 1.95 0 0 0-3.32 0z" />
               </svg>
-              <div class="wz-alert__body">Usage personnel légal uniquement. Vous êtes seul responsable de votre utilisation.</div>
+              <div class="wz-alert__body">{MS_STORE_NOTICE ? t('wizard.welcome.store.noticeBanner') : 'Usage personnel légal uniquement. Vous êtes seul responsable de votre utilisation.'}</div>
             </div>
             <ol class="wz-list wz-list--lines">
-              {DISCLAIMER_SECTIONS.map((section) => (
+              {(MS_STORE_NOTICE
+                ? MS_STORE_NOTICE_SECTIONS.map((num) => ({
+                    num,
+                    title: t(`wizard.welcome.store.s${num}Title`),
+                    content: t(`wizard.welcome.store.s${num}Content`),
+                  }))
+                : DISCLAIMER_SECTIONS
+              ).map((section) => (
                 <li key={section.num} style="padding:16px 0;">
                   <span class="wz-num">{section.num.length < 2 ? `0${section.num}` : section.num}</span>
                   <div style="flex:1;min-width:0;">
@@ -213,7 +225,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
           </div>
           {!disclaimerScrolledToBottom && (
             <div style="position:absolute;bottom:1px;left:1px;right:1px;height:44px;background:linear-gradient(to top, rgba(12,13,16,0.96), rgba(12,13,16,0));pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;">
-              <span class="wz-section-label" style="margin:0;color:var(--wz-accent);">Défiler pour lire</span>
+              <span class="wz-section-label" style="margin:0;color:var(--wz-accent);">{MS_STORE_NOTICE ? t('wizard.welcome.store.scrollToRead') : 'Défiler pour lire'}</span>
             </div>
           )}
         </div>
@@ -233,25 +245,30 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
               </svg>
             )}
           </span>
-          <span style="user-select:none;">J'ai lu et j'accepte les termes ci-dessus. Je suis entièrement responsable de mon utilisation.</span>
+          <span style="user-select:none;">{MS_STORE_NOTICE ? t('wizard.welcome.store.accept') : "J'ai lu et j'accepte les termes ci-dessus. Je suis entièrement responsable de mon utilisation."}</span>
         </button>
-        <div style="margin-top:14px;">
-          <a href="/disclaimer" target="_blank" class="wz-link" onClick={(e) => e.stopPropagation()}>
-            Lire la version complète ↗
-          </a>
-        </div>
+        {!MS_STORE_NOTICE && (
+          <div style="margin-top:14px;">
+            <a href="/disclaimer" target="_blank" class="wz-link" onClick={(e) => e.stopPropagation()}>
+              Lire la version complète ↗
+            </a>
+          </div>
+        )}
       </section>
 
       {/* Ce qui sera configuré (si pas d'import) */}
       {importStatus.phase === 'idle' && (
         <section style="margin-bottom:8px;">
-          <span class="wz-section-label">À configurer</span>
+          <span class="wz-section-label">{MS_STORE_NOTICE ? t('wizard.welcome.store.toConfigure') : 'À configurer'}</span>
           <ol class="wz-list wz-list--lines" style="border-top:1px solid var(--wz-line);">
-            {[
-              'Un indexer pour récupérer les torrents (facultatif)',
-              'Une clé API TMDB pour les métadonnées',
-              'L\'emplacement de téléchargement',
-            ].map((text, i) => (
+            {(MS_STORE_NOTICE
+              ? [t('wizard.welcome.store.configureTmdb'), t('wizard.welcome.store.configureFolders')]
+              : [
+                  'Un indexer pour récupérer les torrents (facultatif)',
+                  'Une clé API TMDB pour les métadonnées',
+                  'L\'emplacement de téléchargement',
+                ]
+            ).map((text, i) => (
               <li key={i} style="align-items:center;padding:14px 0;">
                 <span class="wz-num">{`0${i + 1}`}</span>
                 <span class="wz-text">{text}</span>
@@ -327,7 +344,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigate
             </>
           ) : (
             <>
-              Commencer la configuration
+              {MS_STORE_NOTICE ? t('wizard.welcome.store.start') : 'Commencer la configuration'}
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.5} aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>

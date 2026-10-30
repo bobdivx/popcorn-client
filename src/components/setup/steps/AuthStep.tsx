@@ -16,7 +16,9 @@ import { isTVPlatform, isTablet } from '../../../lib/utils/device-detection';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
 import { dbgLog } from '../../../lib/debug/debug-store';
-import { StepHeader, Alert, Spinner, IconArrowLeft, IconArrowRight } from '../wizardUi';
+import { StepHeader, StepLoading, Alert, Spinner, IconArrowLeft, IconArrowRight } from '../wizardUi';
+import { LocalAccountSetup } from './LocalAccountSetup';
+import { isLocalAccountSetupEnabled, shouldOfferLocalAccount } from '../../../lib/setup/local-account-setup';
 
 interface AuthStepProps {
   focusedButtonIndex: number;
@@ -58,6 +60,38 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
+
+  // Microsoft Store edition: on a fresh embedded server, offer a local account first
+  // (no popcornn.app account needed — certification policy 10.3.1).
+  const [localAccountAvailable, setLocalAccountAvailable] = useState(false);
+  const [showOnlineAccountOptions, setShowOnlineAccountOptions] = useState(false);
+  const [localAccountProbeDone, setLocalAccountProbeDone] = useState(() => !isLocalAccountSetupEnabled());
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isLocalAccountSetupEnabled()) return;
+    let cancelled = false;
+    // The embedded server may still be starting: retry a few times before giving up.
+    const probe = async () => {
+      for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
+        try {
+          const res = await serverApi.getSetupStatus();
+          if (cancelled) return;
+          if (res.success && res.data?.backendReachable !== false) {
+            if (shouldOfferLocalAccount(res.data)) setLocalAccountAvailable(true);
+            return;
+          }
+        } catch { /* backend not ready yet */ }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    };
+    void probe().finally(() => { if (!cancelled) setLocalAccountProbeDone(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleLocalAccountCreated = async () => {
+    dbg('local account created on the embedded server');
+    if (onStatusChange) await onStatusChange();
+    onNext();
+  };
   const [restoringConfig, setRestoringConfig] = useState(false);
 
   // Login form
@@ -547,8 +581,32 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     </div>
   );
 
+  if (!localAccountProbeDone) return <StepLoading />;
+
+  if (localAccountAvailable && !showOnlineAccountOptions && !hasSavedConfig && view !== '2fa') {
+    return (
+      <LocalAccountSetup
+        buttonRefs={buttonRefs}
+        onCreated={handleLocalAccountCreated}
+        onUseOnlineAccount={() => setShowOnlineAccountOptions(true)}
+      />
+    );
+  }
+
   return (
     <div class={`auth-step-desktop-compact ${useUnifiedAuthLayout ? 'auth-step--unified' : ''}`}>
+      {localAccountAvailable && showOnlineAccountOptions && (
+        <div style="margin-bottom:16px;">
+          <button
+            type="button"
+            class="wz-link"
+            data-focusable
+            onClick={() => { setShowOnlineAccountOptions(false); setError(null); }}
+          >
+            ← {t('wizard.localAccount.backToLocal')}
+          </button>
+        </div>
+      )}
       <style>{`
         .auth-two-col {
           display: grid;

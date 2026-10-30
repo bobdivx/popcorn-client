@@ -5,6 +5,10 @@ import type { SetupStatus } from '../../../lib/client/types';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 import { useI18n } from '../../../lib/i18n';
 import { StepHeader, StepLoading, Alert, Spinner, IconArrowLeft, IconArrowRight } from '../wizardUi';
+import { isLocalAccountSetupEnabled } from '../../../lib/setup/local-account-setup';
+
+/** Microsoft Store edition: the TMDB key is optional (it can be added later in Settings → Library). */
+const TMDB_KEY_OPTIONAL = isLocalAccountSetupEnabled();
 
 interface TmdbStepProps {
   setupStatus: SetupStatus | null;
@@ -241,16 +245,24 @@ export function TmdbStep({
   return (
     <div>
       <StepHeader
-        kicker="Métadonnées"
-        title="Configuration de la clé API TMDB"
-        lead="Le token TMDB permet d'enrichir automatiquement les torrents avec des métadonnées (synopsis, date de sortie, genres, note, etc.)."
+        kicker={TMDB_KEY_OPTIONAL ? t('wizard.tmdb.storeKicker') : "Métadonnées"}
+        title={TMDB_KEY_OPTIONAL ? t('wizard.tmdb.storeTitle') : "Configuration de la clé API TMDB"}
+        lead={
+          TMDB_KEY_OPTIONAL
+            ? t('wizard.tmdb.storeLead')
+            : "Le token TMDB permet d'enrichir automatiquement les torrents avec des métadonnées (synopsis, date de sortie, genres, note, etc.)."
+        }
       />
 
       <div class="wz-stack">
       {hasExistingKey ? (
         <Alert tone="success">Clé API TMDB configurée</Alert>
       ) : (
-        <Alert tone="warning">Clé API TMDB obligatoire — configurez-en une pour continuer.</Alert>
+        TMDB_KEY_OPTIONAL ? (
+          <Alert tone="info">{t('wizard.tmdb.storeOptionalHint')}</Alert>
+        ) : (
+          <Alert tone="warning">Clé API TMDB obligatoire — configurez-en une pour continuer.</Alert>
+        )
       )}
 
       <div>
@@ -355,10 +367,10 @@ export function TmdbStep({
           class="wz-btn wz-btn--primary"
           data-focusable
           onClick={onNext}
-          disabled={!hasExistingKey}
-          title={!hasExistingKey ? 'Configurez une clé TMDB pour continuer' : undefined}
+          disabled={!hasExistingKey && !TMDB_KEY_OPTIONAL}
+          title={!hasExistingKey && !TMDB_KEY_OPTIONAL ? 'Configurez une clé TMDB pour continuer' : undefined}
         >
-          Suivant
+          {!hasExistingKey && TMDB_KEY_OPTIONAL ? t('wizard.tmdb.skipForNow') : 'Suivant'}
           <IconArrowRight />
         </button>
       </div>

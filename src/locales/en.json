@@ -372,7 +372,25 @@
       "importLabelSyncSettings": "Sync settings",
       "importLabelLanguage": "Language",
       "modify": "Modify",
-      "importOnlyIndexersHint": "Only indexers were present in the cloud. To also import the TMDB key, download location and sync settings, check “Sync configuration to the cloud” at the end of the wizard on an already-configured device."
+      "importOnlyIndexersHint": "Only indexers were present in the cloud. To also import the TMDB key, download location and sync settings, check “Sync configuration to the cloud” at the end of the wizard on an already-configured device.",
+      "store": {
+        "noticeLabel": "Before you start",
+        "noticeBanner": "Popcornn plays the videos stored on your own devices and folders.",
+        "scrollToRead": "Scroll to read",
+        "s1Title": "What Popcornn does",
+        "s1Content": "Popcornn organises and plays the video files you already own: folders on this PC, external drives or network shares that you add in Settings → Library.",
+        "s2Title": "Your content, your responsibility",
+        "s2Content": "Popcornn does not provide any films or series. You are responsible for the files you add and for respecting the rights attached to them.",
+        "s3Title": "Your data stays on this PC",
+        "s3Content": "Your account, library and settings are stored locally by the Popcornn server running on this computer. An online Popcornn account is optional and only used if you choose to sign in with one.",
+        "s4Title": "Optional modules",
+        "s4Content": "Extra features are optional modules you can install later from Settings → Modules; they are downloaded from Popcornn’s signed catalog.",
+        "accept": "I have read and accept the terms above.",
+        "toConfigure": "Next steps",
+        "configureTmdb": "A TMDB API key for posters and synopses (optional)",
+        "configureFolders": "Your video folders (Settings → Library)",
+        "start": "Continue"
+      }
     },
     "indexers": {
       "title": "Indexers Configuration",
@@ -393,7 +411,12 @@
       "testKey": "Test key",
       "getKey": "Get an API key",
       "keyValid": "API key valid",
-      "keyInvalid": "API key invalid"
+      "keyInvalid": "API key invalid",
+      "skipForNow": "Skip for now",
+      "storeKicker": "Optional",
+      "storeTitle": "Movie & series information (TMDB)",
+      "storeLead": "A free TMDB API key adds posters, synopses and ratings to your videos. It is optional: your videos can be played without it, and you can add the key later in Settings → Library → TMDB.",
+      "storeOptionalHint": "Optional — you can skip this step and add a key later."
     },
     "downloadLocation": {
       "title": "Download Location",
@@ -436,6 +459,25 @@
       "savingConfig": "Saving configuration...",
       "configSaved": "Configuration saved successfully",
       "startSync": "Start initial synchronization"
+    },
+    "localAccount": {
+      "kicker": "Popcornn on this PC",
+      "title": "Create your local account",
+      "description": "Popcornn runs its own server on this PC. Create the account that protects it: it is stored on this computer only — no internet account and no subscription needed.",
+      "email": "Email (used as your login)",
+      "emailPlaceholder": "you@example.com",
+      "emailHint": "Any address works: it is only used to sign in to this PC and is never sent online.",
+      "create": "Create local account",
+      "creating": "Creating account…",
+      "or": "or",
+      "useOnlineAccount": "I already have a Popcornn account (QR code, Pocket ID, email)",
+      "backToLocal": "Use Popcornn on this PC only (local account)",
+      "errors": {
+        "invalidEmail": "Enter a valid email address (for example you@example.com).",
+        "passwordTooShort": "The password must contain at least {min} characters.",
+        "passwordMismatch": "The passwords do not match.",
+        "failed": "Could not create the local account: {message}"
+      }
     }
   },
   "account": {

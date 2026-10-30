@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { isLocalUser } from '../../lib/permissions';
+import { isLocalUser, isMsStoreLocalServerAdmin } from '../../lib/permissions';
 
 /**
  * Invités (profils du compte principal) : seules les pages de réglages personnelles sont
@@ -32,7 +32,7 @@ export function isSettingsPathAllowedForGuest(pathname: string, search: string):
 export default function GuestSettingsGuard() {
   useEffect(() => {
     const check = () => {
-      if (typeof window === 'undefined' || !isLocalUser()) return;
+      if (typeof window === 'undefined' || !isLocalUser() || isMsStoreLocalServerAdmin()) return;
       const { pathname, search } = window.location;
       if (!isSettingsPathAllowedForGuest(pathname, search)) {
         window.location.replace('/settings');
