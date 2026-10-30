@@ -5,6 +5,8 @@ import { serverApi } from '../../../../lib/client/server-api';
 import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
 import { getEpisodeResumePercent, type EpisodeProgressEntry } from '../../../../lib/watchedEpisodes';
 import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
+import { isServerAdmin, isServerAdminSync } from '../../../../lib/streaming/mediaToken';
+import { notificationService } from '../../../../lib/services/notification-service';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 
 function extractTmdbStillsAndNames(
@@ -67,6 +69,10 @@ export interface SeriesEpisodesSectionProps {
   downloadProgress?: number;
   statusMessage?: string | null;
   downloadingEpisodesMap?: Record<string, number>;
+  /** Appelé après un changement de release réussi (rafraîchir la liste des épisodes). */
+  onEpisodeSourceChanged?: () => void;
+  /** Toast de la page (sinon notification système). */
+  notify?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 /**
@@ -86,8 +92,59 @@ export function SeriesEpisodesSection({
   downloadProgress,
   statusMessage,
   downloadingEpisodesMap,
+  onEpisodeSourceChanged,
+  notify,
 }: SeriesEpisodesSectionProps) {
   const { t, language } = useI18n();
+  /** Bouton « autre release » : propriétaire / admin du serveur uniquement (le serveur revérifie). */
+  const [canSwitchRelease, setCanSwitchRelease] = useState<boolean>(() => isServerAdminSync() === true);
+  const [switchingKey, setSwitchingKey] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    isServerAdmin()
+      .then((ok) => {
+        if (!cancelled) setCanSwitchRelease(ok);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const switchRelease = async (season: number, episode: number, infoHash: string | null) => {
+    if (typeof tmdbId !== 'number' || switchingKey) return;
+    const key = `${season}:${episode}`;
+    const label = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+    if (typeof window !== 'undefined' && !window.confirm(t('mediaDetail.redownloadOtherReleaseConfirm', { label }))) {
+      return;
+    }
+    setSwitchingKey(key);
+    const title = `${t('mediaDetail.redownloadOtherRelease')} — ${label}`;
+    const report = (type: 'success' | 'error' | 'info', message: string) => {
+      if (notify) notify(type, `${label} : ${message}`);
+      else if (type === 'success') void notificationService.notifySuccess(title, message);
+      else if (type === 'error') void notificationService.notifyError(title, message);
+    };
+    report('info', t('mediaDetail.redownloadOtherReleaseRunning'));
+    try {
+      const res = await serverApi.redownloadEpisodeOtherRelease(tmdbId, season, episode, { infoHash });
+      if (res.success && res.data?.status === 'replaced') {
+        report(
+          'success',
+          t('mediaDetail.redownloadOtherReleaseDone', { name: res.data.new_name, seeders: res.data.seeders }),
+        );
+        onEpisodeSourceChanged?.();
+      } else if (res.success && res.data?.status === 'no_candidate') {
+        report('error', t('mediaDetail.redownloadOtherReleaseNone'));
+      } else {
+        report('error', res.message || res.error || t('mediaDetail.redownloadOtherReleaseError'));
+      }
+    } catch (e) {
+      report('error', e instanceof Error ? e.message : t('mediaDetail.redownloadOtherReleaseError'));
+    } finally {
+      setSwitchingKey(null);
+    }
+  };
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
   /** Clés : `${season}:${episodeNumber}` (TMDB par saison ; numéros d'épisode peuvent se répéter entre saisons). */
   const [tmdbStillBySeasonEpisode, setTmdbStillBySeasonEpisode] = useState<Record<string, string>>({});
@@ -378,6 +435,22 @@ export function SeriesEpisodesSection({
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,
+                  // Épisode lancé mais pas (encore) en bibliothèque : proposer une autre source.
+                  secondaryAction:
+                    canSwitchRelease &&
+                    typeof tmdbId === 'number' &&
+                    ep.episode > 0 &&
+                    !finalIsDownloaded &&
+                    (currentlyDownloading || (isSelected && !!isDownloading))
+                      ? {
+                          label: t('mediaDetail.redownloadOtherRelease'),
+                          title: t('mediaDetail.redownloadOtherReleaseHint'),
+                          busy: switchingKey === epKey,
+                          onActivate: () => {
+                            void switchRelease(ep.season, ep.episode, null);
+                          },
+                        }
+                      : undefined,
                 };
               });
               })()}

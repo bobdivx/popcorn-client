@@ -65,6 +65,18 @@ function toTmdbLanguage(lang?: string): string {
   return lang === 'fr' ? 'fr-FR' : lang === 'en' ? 'en-US' : `${lang}-${lang.toUpperCase()}`;
 }
 
+/** Résultat de `redownloadEpisodeOtherRelease` (champ `status`). */
+export type RedownloadOtherReleaseResult =
+  | {
+      status: 'replaced';
+      old_info_hash: string | null;
+      new_info_hash: string;
+      new_name: string;
+      seeders: number;
+      old_files_deleted: boolean;
+    }
+  | { status: 'no_candidate'; detail: string };
+
 export const mediaMethods = {
   /**
    * Recherche de contenu
@@ -221,6 +233,28 @@ export const mediaMethods = {
     return this.backendRequest(`/api/torrents/series/by-tmdb/${tmdbId}/refresh-from-indexers${suffix}`, {
       method: 'POST',
     });
+  },
+
+  /**
+   * « Retélécharger / autre release » (admin) : le serveur cherche une autre release du même
+   * épisode (même langue, qualité proche, meilleurs seeders), l'ajoute, puis retire la release
+   * bloquée **uniquement si elle n'a reçu aucune donnée** et la blackliste.
+   * 409 = le torrent actuel a déjà des données (rien n'est supprimé).
+   */
+  async redownloadEpisodeOtherRelease(
+    this: ServerApiClientMediaAccess,
+    tmdbId: number,
+    season: number,
+    episode: number,
+    opts?: { infoHash?: string | null },
+  ): Promise<ApiResponse<RedownloadOtherReleaseResult>> {
+    return this.backendRequest(
+      `/api/torrents/series/by-tmdb/${tmdbId}/episodes/${season}/${episode}/redownload`,
+      {
+        method: 'POST',
+        body: JSON.stringify(opts?.infoHash ? { info_hash: opts.infoHash } : {}),
+      },
+    );
   },
 
   /**

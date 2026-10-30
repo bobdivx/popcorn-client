@@ -281,6 +281,12 @@ interface IServerApiClientPublic {
     tmdbId: number,
     opts?: { q?: string; lang?: string },
   ): Promise<ApiResponse<{ tmdb_id: number; query_used: string; scanned: number; imported: number }>>;
+  redownloadEpisodeOtherRelease(
+    tmdbId: number,
+    season: number,
+    episode: number,
+    opts?: { infoHash?: string | null },
+  ): Promise<ApiResponse<import('./server-api/media.js').RedownloadOtherReleaseResult>>;
   getTmdbTvSeasonDetail(tmdbId: number, seasonNumber: number, language?: string): Promise<ApiResponse<any>>;
   getScrubThumbnailsMeta(localMediaId: string, opts?: { torrentRelativePath?: string | null }): Promise<any>;
   generateScrubThumbnails(localMediaId: string, opts?: { force?: boolean; torrentRelativePath?: string | null; durationHintSeconds?: number | null }): Promise<any>;

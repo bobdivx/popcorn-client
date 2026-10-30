@@ -1471,7 +1471,14 @@
     "torrentNetworkLabel": "Réseau torrent",
     "peerStatsHint": "Seeders / leechers issus de l’indexeur (utiles avant téléchargement).",
     "markWatched": "Marquer comme vu",
-    "markUnwatched": "Marquer comme non vu"
+    "markUnwatched": "Marquer comme non vu",
+    "redownloadOtherRelease": "Retélécharger / autre release",
+    "redownloadOtherReleaseHint": "Remplace la release bloquée (0 octet reçu) par une autre source du même épisode",
+    "redownloadOtherReleaseConfirm": "Chercher une autre release pour {label} ?\n\nLa release actuelle est retirée et écartée uniquement si elle n'a reçu aucune donnée. Rien n'est supprimé sinon.",
+    "redownloadOtherReleaseRunning": "Recherche d'une autre release…",
+    "redownloadOtherReleaseDone": "Nouvelle release : {name} ({seeders} seeders)",
+    "redownloadOtherReleaseNone": "Aucune autre release compatible trouvée",
+    "redownloadOtherReleaseError": "Impossible de changer de release"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",
