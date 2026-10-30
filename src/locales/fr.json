@@ -372,7 +372,25 @@
       "importLabelDownloadLocation": "Emplacement de téléchargement",
       "importLabelSyncSettings": "Paramètres de synchronisation",
       "importLabelLanguage": "Langue",
-      "modify": "Modifier"
+      "modify": "Modifier",
+      "store": {
+        "noticeLabel": "Avant de commencer",
+        "noticeBanner": "Popcornn lit les vidéos stockées sur vos propres appareils et dossiers.",
+        "scrollToRead": "Défiler pour lire",
+        "s1Title": "Ce que fait Popcornn",
+        "s1Content": "Popcornn organise et lit les fichiers vidéo que vous possédez déjà : dossiers de ce PC, disques externes ou partages réseau ajoutés dans Paramètres → Bibliothèque.",
+        "s2Title": "Votre contenu, votre responsabilité",
+        "s2Content": "Popcornn ne fournit aucun film ni série. Vous êtes responsable des fichiers que vous ajoutez et du respect des droits qui y sont attachés.",
+        "s3Title": "Vos données restent sur ce PC",
+        "s3Content": "Votre compte, votre bibliothèque et vos réglages sont stockés localement par le serveur Popcornn qui tourne sur cet ordinateur. Un compte Popcornn en ligne est facultatif et n’est utilisé que si vous choisissez de vous y connecter.",
+        "s4Title": "Modules facultatifs",
+        "s4Content": "Les fonctions supplémentaires sont des modules facultatifs installables plus tard depuis Paramètres → Modules ; ils sont téléchargés depuis le catalogue signé de Popcornn.",
+        "accept": "J’ai lu et j’accepte les conditions ci-dessus.",
+        "toConfigure": "Étapes suivantes",
+        "configureTmdb": "Une clé API TMDB pour les affiches et synopsis (facultatif)",
+        "configureFolders": "Vos dossiers vidéo (Paramètres → Bibliothèque)",
+        "start": "Continuer"
+      }
     },
     "indexers": {
       "title": "Configuration des indexers",
@@ -393,7 +411,12 @@
       "testKey": "Tester la clé",
       "getKey": "Obtenir une clé API",
       "keyValid": "Clé API valide",
-      "keyInvalid": "Clé API invalide"
+      "keyInvalid": "Clé API invalide",
+      "skipForNow": "Passer pour l’instant",
+      "storeKicker": "Facultatif",
+      "storeTitle": "Informations films et séries (TMDB)",
+      "storeLead": "Une clé API TMDB gratuite ajoute affiches, synopsis et notes à vos vidéos. Elle est facultative : vos vidéos sont lisibles sans elle, et vous pourrez l’ajouter plus tard dans Paramètres → Bibliothèque → TMDB.",
+      "storeOptionalHint": "Facultatif — vous pouvez passer cette étape et ajouter une clé plus tard."
     },
     "downloadLocation": {
       "title": "Emplacement des téléchargements",
@@ -436,6 +459,25 @@
       "savingConfig": "Sauvegarde de la configuration...",
       "configSaved": "Configuration sauvegardée avec succès",
       "startSync": "Démarrer la synchronisation initiale"
+    },
+    "localAccount": {
+      "kicker": "Popcornn sur ce PC",
+      "title": "Créez votre compte local",
+      "description": "Popcornn fait tourner son propre serveur sur ce PC. Créez le compte qui le protège : il est stocké uniquement sur cet ordinateur — aucun compte en ligne ni abonnement nécessaire.",
+      "email": "E-mail (sert d’identifiant)",
+      "emailPlaceholder": "vous@exemple.com",
+      "emailHint": "N’importe quelle adresse convient : elle sert uniquement à vous connecter sur ce PC et n’est jamais envoyée en ligne.",
+      "create": "Créer le compte local",
+      "creating": "Création du compte…",
+      "or": "ou",
+      "useOnlineAccount": "J’ai déjà un compte Popcornn (QR code, Pocket ID, e-mail)",
+      "backToLocal": "Utiliser Popcornn sur ce PC uniquement (compte local)",
+      "errors": {
+        "invalidEmail": "Saisissez une adresse e-mail valide (par exemple vous@exemple.com).",
+        "passwordTooShort": "Le mot de passe doit contenir au moins {min} caractères.",
+        "passwordMismatch": "Les mots de passe ne correspondent pas.",
+        "failed": "Impossible de créer le compte local : {message}"
+      }
     }
   },
   "account": {

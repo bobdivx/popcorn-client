@@ -17,6 +17,17 @@ const translations: Record<SupportedLanguage, TranslationDictionary> = {
 
 type Listener = (language: SupportedLanguage) => void;
 
+/** First supported language among the browser / OS preferred languages (e.g. "en-US" → "en"). */
+export function detectSystemLanguage(
+  languages: readonly string[] | undefined = typeof navigator !== 'undefined' ? navigator.languages ?? [navigator.language] : undefined
+): SupportedLanguage | null {
+  for (const raw of languages ?? []) {
+    const code = String(raw || '').toLowerCase().split('-')[0] as SupportedLanguage;
+    if (AVAILABLE_LANGUAGES.includes(code)) return code;
+  }
+  return null;
+}
+
 class I18nStore {
   private language: SupportedLanguage = DEFAULT_LANGUAGE;
   private listeners: Set<Listener> = new Set();
@@ -41,6 +52,11 @@ class I18nStore {
         if (prefs.language && AVAILABLE_LANGUAGES.includes(prefs.language)) {
           this.language = prefs.language;
         }
+      } else if (import.meta.env.PUBLIC_DISTRIBUTION === 'msstore') {
+        // Microsoft Store edition, first launch: follow the Windows display language
+        // (French by default elsewhere) so that the setup wizard is readable by everyone.
+        const systemLanguage = detectSystemLanguage();
+        if (systemLanguage) this.language = systemLanguage;
       }
     } catch (e) {
       console.warn('[i18n] Erreur lors de la lecture des préférences:', e);
