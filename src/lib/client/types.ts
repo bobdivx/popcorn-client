@@ -289,6 +289,10 @@ export interface ClientTorrentStats {
   tmdb_type?: 'movie' | 'tv' | null;
   /** Identifiant TMDB lorsqu'il est connu (correction manuelle, binding ou bibliothèque). */
   tmdb_id?: number | null;
+  /** Le tracker refuse les annonces de ce torrent : compte bloqué (ex. marge épuisée). */
+  tracker_account_blocked?: boolean;
+  /** Raison lisible du blocage (hôte + message tracker, sans passkey). */
+  tracker_account_block_reason?: string | null;
 }
 
 export interface AddTorrentResponse {

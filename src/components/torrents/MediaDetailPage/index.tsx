@@ -84,6 +84,7 @@ import {
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 import { isLocalMedia as isLocalMediaHash } from './actions/delete';
 import { getNextEpisodeInfo, getPreviousEpisodeInfo } from './utils/episodeNavigation';
+import { isAccountBlockedStalled } from './utils/accountBlockedTorrent';
 import { buildIndexerOrigin } from '../../../lib/torrents/indexerOrigin';
 
 /**
@@ -532,6 +533,8 @@ export default function MediaDetailPage({
   const [libraryEpisodesInfoHashMap, setLibraryEpisodesInfoHashMap] = useState<Record<string, string>>({});
   /** Map "season:episode" -> progression (0-100) pour les épisodes en cours de téléchargement */
   const [downloadingEpisodesMap, setDownloadingEpisodesMap] = useState<Record<string, number>>({});
+  /** Épisodes dont le torrent est bloqué par le tracker (compte sans marge, 0 octet) : `s:e` → info_hash. */
+  const [accountBlockedEpisodesMap, setAccountBlockedEpisodesMap] = useState<Record<string, string>>({});
 
   /** Chemin du fichier en bibliothÃ¨que (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
   const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(
@@ -2023,6 +2026,7 @@ export default function MediaDetailPage({
         }
 
         const downloadingMap: Record<string, number> = {};
+        const accountBlockedMap: Record<string, string> = {};
         // 2. Analyser les torrents (complétés ou en cours)
         for (const t of allTorrents) {
           const isCompleted =
@@ -2058,6 +2062,9 @@ export default function MediaDetailPage({
                  }
                  
                  const torrentInfoHash = ((t as any).info_hash || (t as any).infoHash || '').toString().trim();
+                 if (!episodesSet.has(key) && isAccountBlockedStalled(t)) {
+                   accountBlockedMap[key] = torrentInfoHash.toLowerCase();
+                 }
                  // Un hash torrent réel remplace toujours un stub local_* (lecture via librqbit).
                  if (torrentInfoHash && /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(torrentInfoHash)) {
                    const existing = infoHashMap[key];
@@ -2102,6 +2109,7 @@ export default function MediaDetailPage({
           setLibraryEpisodesPathMap((prev) => areRecordsEqual(prev, pathMap) ? prev : pathMap);
           setLibraryEpisodesInfoHashMap((prev) => areRecordsEqual(prev, infoHashMap) ? prev : infoHashMap);
           setDownloadingEpisodesMap((prev) => areRecordsEqual(prev, downloadingMap) ? prev : downloadingMap);
+          setAccountBlockedEpisodesMap((prev) => areRecordsEqual(prev, accountBlockedMap) ? prev : accountBlockedMap);
         }
       } catch (err) {
         console.error('[MediaDetailPage] Erreur updateDownloadedEpisodes:', err);
@@ -4027,6 +4035,7 @@ export default function MediaDetailPage({
                   savedPlaybackPosition={savedPlaybackPosition}
                   downloadedEpisodesSet={downloadedEpisodesSet}
                   downloadingEpisodesMap={downloadingEpisodesMap}
+                  accountBlockedEpisodesMap={accountBlockedEpisodesMap}
                   onEpisodeSourceChanged={reloadMediaDetail}
                   notify={addNotification}
                   isPackSelected={isPackSelected}
