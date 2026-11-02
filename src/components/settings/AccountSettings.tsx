@@ -4,6 +4,10 @@ import Avatar from '../ui/Avatar';
 import { getLocalProfile, updateLocalProfile, type LocalProfile } from '../../lib/client/profile';
 import { useI18n } from '../../lib/i18n';
 import { getCloudDevices, type CloudDevice } from '../../lib/api/popcorn-web';
+import { isLocalUser } from '../../lib/permissions';
+import { isServerAdmin, isServerAdminSync } from '../../lib/streaming/mediaToken';
+import { serverRoleLabel, signOutEverywhere } from '../../lib/client/signOut';
+import { redirectTo } from '../../lib/utils/navigation.js';
 
 export type AccountSection = 'profile' | 'info' | 'interface' | 'devices' | 'logout' | 'all';
 
@@ -12,7 +16,10 @@ interface AccountSettingsProps {
 }
 
 export default function AccountSettings({ section = 'all' }: AccountSettingsProps) {
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string; display_name?: string | null } | null>(null);
+  /** Rôle serveur confirmé par le serveur (media-token) : true admin, false membre, null inconnu. */
+  const [serverAdmin, setServerAdmin] = useState<boolean | null>(() => isServerAdminSync());
+  const [signingOut, setSigningOut] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<LocalProfile>(() => getLocalProfile());
@@ -27,6 +34,27 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   useEffect(() => {
     loadUser();
   }, []);
+
+  useEffect(() => {
+    if (section !== 'all' && section !== 'info') return;
+    let cancelled = false;
+    isServerAdmin()
+      .then((ok) => {
+        if (!cancelled) setServerAdmin(ok ? true : isServerAdminSync() === false ? false : null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [section]);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    if (typeof window !== 'undefined' && !window.confirm(t('account.logoutConfirm'))) return;
+    setSigningOut(true);
+    await signOutEverywhere();
+    redirectTo('/login');
+  };
 
   useEffect(() => {
     const p = getLocalProfile();
@@ -214,7 +242,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
       {showInfo && (
         <div class="sc-frame">
           <div class="sc-frame-header">
-            <div class="sc-frame-title">Informations du compte</div>
+            <div class="sc-frame-title">{t('account.subMenu.accountInfo')}</div>
           </div>
           <div class="sc-frame-body">
             <div class="space-y-6">
@@ -222,9 +250,43 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
                 <label class="block text-sm font-semibold ds-text-secondary mb-2">Email</label>
                 <p class="text-[var(--ds-text-primary)] text-lg">{user.email}</p>
               </div>
+              {user.display_name ? (
+                <div>
+                  <label class="block text-sm font-semibold ds-text-secondary mb-2">{t('account.info.displayName')}</label>
+                  <p class="text-[var(--ds-text-primary)]">{user.display_name}</p>
+                </div>
+              ) : null}
               <div>
                 <label class="block text-sm font-semibold ds-text-secondary mb-2">ID</label>
                 <p class="ds-text-secondary font-mono text-sm break-all">{user.id}</p>
+              </div>
+              <div class="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <label class="block text-sm font-semibold ds-text-secondary mb-2">{t('account.info.accountType')}</label>
+                  <p class="text-[var(--ds-text-primary)]" data-testid="account-type">
+                    {isLocalUser() ? t('account.info.accountTypeLocal') : t('account.info.accountTypeCloud')}
+                  </p>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold ds-text-secondary mb-2">{t('account.info.serverRole')}</label>
+                  <p class="text-[var(--ds-text-primary)]" data-testid="server-role">
+                    {t(`account.info.serverRole_${serverRoleLabel(serverAdmin)}`)}
+                  </p>
+                </div>
+              </div>
+              <div class="pt-2 border-t border-[var(--ds-border)]">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 mt-4 rounded-[var(--ds-radius-sm)] border border-red-500/40 bg-red-500/10 text-red-200 text-sm font-semibold hover:bg-red-500/20 disabled:opacity-60 form-tv-button tv:min-h-[56px] tv:px-6 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+                  onClick={() => void handleSignOut()}
+                  disabled={signingOut}
+                  tabIndex={0}
+                  data-focusable
+                >
+                  {signingOut ? <span class="loading loading-spinner loading-sm" /> : null}
+                  {t('account.logout')}
+                </button>
+                <p class="ds-text-tertiary text-xs mt-2">{t('account.info.logoutHint')}</p>
               </div>
             </div>
           </div>

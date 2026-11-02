@@ -501,6 +501,17 @@
     "noUserInfo": "No user information available",
     "logout": "Sign out",
     "logoutConfirm": "Are you sure you want to sign out?",
+    "info": {
+      "displayName": "Display name",
+      "accountType": "Account type",
+      "accountTypeLocal": "Local user (server guest)",
+      "accountTypeCloud": "Popcornn account (cloud)",
+      "serverRole": "Role on this server",
+      "serverRole_admin": "Administrator",
+      "serverRole_member": "Member (not administrator)",
+      "serverRole_unknown": "Unknown (server unreachable)",
+      "logoutHint": "Ends the session on this device (server and cloud account). You will need to sign in again."
+    },
     "twoFactor": {
       "title": "Two-Factor Authentication",
       "enabled": "Enabled",
