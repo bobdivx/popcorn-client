@@ -1531,7 +1531,14 @@
     "redownloadOtherReleaseRunning": "Recherche d'une autre release…",
     "redownloadOtherReleaseDone": "Nouvelle release : {name} ({seeders} seeders)",
     "redownloadOtherReleaseNone": "Aucune autre release compatible trouvée",
-    "redownloadOtherReleaseError": "Impossible de changer de release"
+    "redownloadOtherReleaseError": "Impossible de changer de release",
+    "resnatchOtherAccount": "Relancer avec un autre compte",
+    "resnatchOtherAccountHint": "Compte tracker bloqué (marge épuisée) : re-télécharge le même fichier avec un autre compte du serveur",
+    "resnatchOtherAccountConfirm": "Le compte tracker utilisé pour {label} est bloqué (marge épuisée).\n\nRelancer le téléchargement avec un autre compte ? Le torrent actuel (0 octet reçu) est remplacé.",
+    "resnatchOtherAccountRunning": "Compte bloqué, relance en cours avec un autre compte…",
+    "resnatchOtherAccountDone": "Relancé avec le compte « {account} »",
+    "resnatchOtherAccountError": "Impossible de relancer avec un autre compte",
+    "resnatchOtherAccountBlockedStatus": "Compte tracker bloqué"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",

@@ -44,6 +44,8 @@ export function EpisodesArea(props: {
   savedPlaybackPosition: number | null;
   downloadedEpisodesSet?: Set<string>;
   downloadingEpisodesMap?: Record<string, number>;
+  /** `s:e` → info_hash des torrents bloqués par le tracker (compte sans marge). */
+  accountBlockedEpisodesMap?: Record<string, string>;
   /** Après « autre release » réussi. */
   onEpisodeSourceChanged?: () => void;
   notify?: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -159,6 +161,7 @@ export function EpisodesArea(props: {
           downloadProgress={downloadProgress}
           statusMessage={statusMessage}
           downloadingEpisodesMap={downloadingEpisodesMap}
+          accountBlockedEpisodesMap={props.accountBlockedEpisodesMap}
           onEpisodeSourceChanged={props.onEpisodeSourceChanged}
           notify={props.notify}
         />

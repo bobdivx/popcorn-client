@@ -8,6 +8,7 @@ import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
 import { isServerAdmin, isServerAdminSync } from '../../../../lib/streaming/mediaToken';
 import { notificationService } from '../../../../lib/services/notification-service';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
+import { resnatchFailureMessage } from '../utils/accountBlockedTorrent';
 
 function extractTmdbStillsAndNames(
   seasonNum: number,
@@ -69,6 +70,8 @@ export interface SeriesEpisodesSectionProps {
   downloadProgress?: number;
   statusMessage?: string | null;
   downloadingEpisodesMap?: Record<string, number>;
+  /** `s:e` → info_hash des torrents bloqués par le tracker (compte sans marge, 0 octet reçu). */
+  accountBlockedEpisodesMap?: Record<string, string>;
   /** Appelé après un changement de release réussi (rafraîchir la liste des épisodes). */
   onEpisodeSourceChanged?: () => void;
   /** Toast de la page (sinon notification système). */
@@ -92,6 +95,7 @@ export function SeriesEpisodesSection({
   downloadProgress,
   statusMessage,
   downloadingEpisodesMap,
+  accountBlockedEpisodesMap,
   onEpisodeSourceChanged,
   notify,
 }: SeriesEpisodesSectionProps) {
@@ -141,6 +145,36 @@ export function SeriesEpisodesSection({
       }
     } catch (e) {
       report('error', e instanceof Error ? e.message : t('mediaDetail.redownloadOtherReleaseError'));
+    } finally {
+      setSwitchingKey(null);
+    }
+  };
+  /** « Relancer avec un autre compte » : tout membre connecté (le serveur revérifie et limite). */
+  const resnatchOtherAccount = async (season: number, episode: number, infoHash: string) => {
+    if (switchingKey) return;
+    const key = `${season}:${episode}`;
+    const label = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+    if (typeof window !== 'undefined' && !window.confirm(t('mediaDetail.resnatchOtherAccountConfirm', { label }))) {
+      return;
+    }
+    setSwitchingKey(key);
+    const title = `${t('mediaDetail.resnatchOtherAccount')} — ${label}`;
+    const report = (type: 'success' | 'error' | 'info', message: string) => {
+      if (notify) notify(type, `${label} : ${message}`);
+      else if (type === 'success') void notificationService.notifySuccess(title, message);
+      else if (type === 'error') void notificationService.notifyError(title, message);
+    };
+    report('info', t('mediaDetail.resnatchOtherAccountRunning'));
+    try {
+      const res = await serverApi.resnatchTorrentOtherAccount(infoHash);
+      if (res.success && res.data) {
+        report('success', t('mediaDetail.resnatchOtherAccountDone', { account: res.data.account_name }));
+        onEpisodeSourceChanged?.();
+      } else {
+        report('error', resnatchFailureMessage(res, t('mediaDetail.resnatchOtherAccountError')));
+      }
+    } catch (e) {
+      report('error', e instanceof Error ? e.message : t('mediaDetail.resnatchOtherAccountError'));
     } finally {
       setSwitchingKey(null);
     }
@@ -391,6 +425,7 @@ export function SeriesEpisodesSection({
                 // Pack MULTI : les épisodes 1..N n'ont pas de release dédiée mais le pack (ep 0) oui.
                 const availableViaSeasonPack = ep.episode > 0 && seasonHasPackSource;
                 const downloadingProgress = downloadingEpisodesMap?.[epKey];
+                const accountBlockedHash = accountBlockedEpisodesMap?.[epKey] ?? null;
                 const currentlyDownloading = downloadingProgress !== undefined;
 
                   const finalIsDownloaded = !!ep.file_path || downloaded;
@@ -425,9 +460,11 @@ export function SeriesEpisodesSection({
                     downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
                     statusMessage: isSelected
                       ? statusMessage
-                      : currentlyDownloading
-                        ? 'Téléchargement…'
-                        : null,
+                      : accountBlockedHash && !finalIsDownloaded
+                        ? t('mediaDetail.resnatchOtherAccountBlockedStatus')
+                        : currentlyDownloading
+                          ? 'Téléchargement…'
+                          : null,
                     seedCount,
                     leechCount,
                     resumePercent: resumePercent ?? undefined,
@@ -435,9 +472,18 @@ export function SeriesEpisodesSection({
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,
-                  // Épisode lancé mais pas (encore) en bibliothèque : proposer une autre source.
-                  secondaryAction:
-                    canSwitchRelease &&
+                  // Compte tracker bloqué (0 octet) : relance avec un autre compte, ouverte à tous.
+                  // Sinon, épisode lancé mais pas (encore) en bibliothèque : autre source (admin).
+                  secondaryAction: accountBlockedHash && !finalIsDownloaded
+                    ? {
+                        label: t('mediaDetail.resnatchOtherAccount'),
+                        title: t('mediaDetail.resnatchOtherAccountHint'),
+                        busy: switchingKey === epKey,
+                        onActivate: () => {
+                          void resnatchOtherAccount(ep.season, ep.episode, accountBlockedHash);
+                        },
+                      }
+                    : canSwitchRelease &&
                     typeof tmdbId === 'number' &&
                     ep.episode > 0 &&
                     !finalIsDownloaded &&

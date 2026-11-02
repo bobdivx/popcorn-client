@@ -1530,7 +1530,14 @@
     "redownloadOtherReleaseRunning": "Looking for another release…",
     "redownloadOtherReleaseDone": "New release: {name} ({seeders} seeders)",
     "redownloadOtherReleaseNone": "No other compatible release found",
-    "redownloadOtherReleaseError": "Could not switch release"
+    "redownloadOtherReleaseError": "Could not switch release",
+    "resnatchOtherAccount": "Retry with another account",
+    "resnatchOtherAccountHint": "Tracker account blocked (no ratio margin left): re-download the same file with another account of this server",
+    "resnatchOtherAccountConfirm": "The tracker account used for {label} is blocked (no ratio margin left).\n\nRestart the download with another account? The current torrent (0 bytes received) is replaced.",
+    "resnatchOtherAccountRunning": "Account blocked, restarting with another account…",
+    "resnatchOtherAccountDone": "Restarted with account \"{account}\"",
+    "resnatchOtherAccountError": "Could not restart with another account",
+    "resnatchOtherAccountBlockedStatus": "Tracker account blocked"
   },
   "torrentStats": {
     "downloading": "Downloading",

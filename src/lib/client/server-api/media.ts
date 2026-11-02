@@ -77,6 +77,15 @@ export type RedownloadOtherReleaseResult =
     }
   | { status: 'no_candidate'; detail: string };
 
+/** Résultat de `resnatchTorrentOtherAccount` (aucun secret : nom du compte uniquement). */
+export interface ResnatchOtherAccountResult {
+  old_info_hash: string;
+  new_info_hash: string;
+  same_release: boolean;
+  account_name: string;
+  tracker_host: string;
+}
+
 export const mediaMethods = {
   /**
    * Recherche de contenu
@@ -254,6 +263,22 @@ export const mediaMethods = {
         method: 'POST',
         body: JSON.stringify(opts?.infoHash ? { info_hash: opts.infoHash } : {}),
       },
+    );
+  },
+
+  /**
+   * « Relancer avec un autre compte » (tout membre connecté) : quand le compte tracker d'origine
+   * est bloqué (marge épuisée) et que le torrent n'a reçu aucune donnée, le serveur re-télécharge
+   * le même .torrent avec un autre compte du même tracker et remplace l'ancien.
+   * 409 = pas de blocage / déjà des données / aucun autre compte ; 429 = trop de relances.
+   */
+  async resnatchTorrentOtherAccount(
+    this: ServerApiClientMediaAccess,
+    infoHash: string,
+  ): Promise<ApiResponse<ResnatchOtherAccountResult>> {
+    return this.backendRequest(
+      `/api/client/torrents/${encodeURIComponent(infoHash)}/resnatch-other-account`,
+      { method: 'POST' },
     );
   },
 
