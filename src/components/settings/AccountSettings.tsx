@@ -8,6 +8,7 @@ import { isLocalUser } from '../../lib/permissions';
 import { isServerAdmin, isServerAdminSync } from '../../lib/streaming/mediaToken';
 import { serverRoleLabel, signOutEverywhere } from '../../lib/client/signOut';
 import { redirectTo } from '../../lib/utils/navigation.js';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 export type AccountSection = 'profile' | 'info' | 'interface' | 'devices' | 'logout' | 'all';
 
@@ -20,6 +21,8 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   /** Rôle serveur confirmé par le serveur (media-token) : true admin, false membre, null inconnu. */
   const [serverAdmin, setServerAdmin] = useState<boolean | null>(() => isServerAdminSync());
   const [signingOut, setSigningOut] = useState(false);
+  /** Modale de confirmation (window.confirm est inopérant dans les WebView de l'app : Android/TV/Tauri). */
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<LocalProfile>(() => getLocalProfile());
@@ -50,7 +53,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   const handleSignOut = async () => {
     if (signingOut) return;
-    if (typeof window !== 'undefined' && !window.confirm(t('account.logoutConfirm'))) return;
+    if (!(await confirm({ title: t('account.logout'), message: t('account.logoutConfirm'), danger: true }))) return;
     setSigningOut(true);
     await signOutEverywhere();
     redirectTo('/login');
@@ -153,6 +156,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   return (
     <div class="space-y-6 sm:space-y-8">
+      {confirmDialog}
       {showProfile && (
         <div class="sc-frame">
           <div class="sc-frame-header">

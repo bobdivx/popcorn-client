@@ -9,6 +9,7 @@ import { isServerAdmin, isServerAdminSync } from '../../../../lib/streaming/medi
 import { notificationService } from '../../../../lib/services/notification-service';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 import { resnatchFailureMessage } from '../utils/accountBlockedTorrent';
+import { useConfirmDialog } from '../../../ui/useConfirmDialog';
 
 function extractTmdbStillsAndNames(
   seasonNum: number,
@@ -103,6 +104,8 @@ export function SeriesEpisodesSection({
   /** Bouton « autre release » : propriétaire / admin du serveur uniquement (le serveur revérifie). */
   const [canSwitchRelease, setCanSwitchRelease] = useState<boolean>(() => isServerAdminSync() === true);
   const [switchingKey, setSwitchingKey] = useState<string | null>(null);
+  /** Modale de confirmation (window.confirm est inopérant dans les WebView de l'app : Android/TV/Tauri). */
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   useEffect(() => {
     let cancelled = false;
     isServerAdmin()
@@ -119,7 +122,12 @@ export function SeriesEpisodesSection({
     if (typeof tmdbId !== 'number' || switchingKey) return;
     const key = `${season}:${episode}`;
     const label = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-    if (typeof window !== 'undefined' && !window.confirm(t('mediaDetail.redownloadOtherReleaseConfirm', { label }))) {
+    if (
+      !(await confirm({
+        title: `${t('mediaDetail.redownloadOtherRelease')} — ${label}`,
+        message: t('mediaDetail.redownloadOtherReleaseConfirm', { label }),
+      }))
+    ) {
       return;
     }
     setSwitchingKey(key);
@@ -154,7 +162,12 @@ export function SeriesEpisodesSection({
     if (switchingKey) return;
     const key = `${season}:${episode}`;
     const label = `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-    if (typeof window !== 'undefined' && !window.confirm(t('mediaDetail.resnatchOtherAccountConfirm', { label }))) {
+    if (
+      !(await confirm({
+        title: `${t('mediaDetail.resnatchOtherAccount')} — ${label}`,
+        message: t('mediaDetail.resnatchOtherAccountConfirm', { label }),
+      }))
+    ) {
       return;
     }
     setSwitchingKey(key);
@@ -359,6 +372,7 @@ export function SeriesEpisodesSection({
 
   return (
     <div className="space-y-8">
+      {confirmDialog}
       {orderedSeasons.map((seasonData) => {
         const seasonNum = seasonData.season;
         const episodes = seasonData.episodes ?? [];
