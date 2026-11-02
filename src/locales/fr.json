@@ -501,6 +501,17 @@
     "noUserInfo": "Aucune information utilisateur disponible",
     "logout": "Se déconnecter",
     "logoutConfirm": "Êtes-vous sûr de vouloir vous déconnecter ?",
+    "info": {
+      "displayName": "Nom affiché",
+      "accountType": "Type de compte",
+      "accountTypeLocal": "Utilisateur local (invité du serveur)",
+      "accountTypeCloud": "Compte Popcornn (cloud)",
+      "serverRole": "Rôle sur ce serveur",
+      "serverRole_admin": "Administrateur",
+      "serverRole_member": "Membre (non administrateur)",
+      "serverRole_unknown": "Inconnu (serveur injoignable)",
+      "logoutHint": "Ferme la session sur cet appareil (serveur et compte cloud). Il faudra vous reconnecter."
+    },
     "twoFactor": {
       "title": "Authentification à deux facteurs",
       "enabled": "Activée",
