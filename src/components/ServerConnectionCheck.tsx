@@ -187,7 +187,9 @@ export default function ServerConnectionCheck() {
   useEffect(() => {
     const handler = () => {
       const p = window.location.pathname || '';
-      if (p !== '/login' && !p.startsWith('/login') && p !== '/register' && !p.startsWith('/register') && p !== '/setup' && !p.startsWith('/setup')) {
+      // Pages d'auth / configuration du serveur / diagnostics : laisser l'utilisateur y rester.
+      const keep = ['/login', '/register', '/setup', SERVER_SETTINGS_PATH, DIAG_PATH];
+      if (!keep.some((path) => p.startsWith(path))) {
         redirectTo('/login?reason=session_expired');
       }
     };

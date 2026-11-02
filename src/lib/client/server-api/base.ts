@@ -11,6 +11,7 @@ import { isBlockedApiUrl } from '../../distribution.js';
 // Utiliser la version client compatible navigateur pour JWT
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
 import { TokenManager } from '../storage.js';
+import { dispatchSessionExpiredOnce, shouldForceReloginOn401 } from '../server-auth-recovery.js';
 import { markAllSwrStale, swrPolicyFor, swrRequest } from './swrCache.js';
 import { blockedModuleCapability, moduleApiCapability, moduleNotInstalledCapability } from '../../module-errors.js';
 import { getCachedCapabilities, loadCapabilities } from '../../capabilities.js';
@@ -390,16 +391,21 @@ export class ServerApiClientBase {
           }
         } catch { /* ignore - gestion standard ci-dessous */ }
       }
-      // Session d'utilisateur local (invite) expiree ou revoquee : forcer une reconnexion.
+      // 401 sans token cloud : session d'utilisateur local (invite) expiree/revoquee, ou aucune
+      // identite verifiable par le serveur (seul le JWT local reste) -> forcer une reconnexion
+      // au lieu de rester sur le dashboard en boucle de 401.
       if (
-        response.status === 401 &&
-        !isAuthBootstrap &&
         typeof window !== 'undefined' &&
-        !TokenManager.getCloudAccessToken() &&
-        TokenManager.getServerSessionToken()
+        shouldForceReloginOn401({
+          status: response.status,
+          isAuthBootstrap,
+          hasCloudToken: !!TokenManager.getCloudAccessToken(),
+          hasServerSession: !!TokenManager.getServerSessionToken(),
+        })
       ) {
-        TokenManager.clearServerSessionToken();
-        window.dispatchEvent(new CustomEvent('popcorn:session-expired'));
+        // Retire aussi le JWT local : isAuthenticated() redevient coherent avec le serveur.
+        this.clearTokens();
+        dispatchSessionExpiredOnce();
       }
       // Client trop ancien pour le gate min-version : afficher l'ecran "Mets a jour Popcornn".
       if (response.status === 426 && typeof window !== 'undefined') {
