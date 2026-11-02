@@ -24,11 +24,11 @@ import {
   TORRENT_FEATURES_ENABLED,
   IS_STORE_BUILD,
   isRouteBlockedInStoreBuild,
-  isRequestsAvailable,
   missingCapabilityForRoute,
 } from '../../lib/distribution';
 import { canAccess } from '../../lib/permissions';
 import { useServerCapabilities } from '../../lib/capabilities';
+import { isRequestsUiVisible, isTorrentUiVisible } from '../../lib/module-visibility';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -174,13 +174,15 @@ export default function Navbar() {
 
   // Module torrent : présent dans ce build ET annoncé par le serveur (GET /api/client/capabilities).
   const serverCapabilities = useServerCapabilities();
-  const torrentUi = TORRENT_FEATURES_ENABLED && (serverCapabilities ? serverCapabilities.features.torrent : true);
+  // Masqués par défaut : affichés seulement si le serveur les annonce (ou serveur ancien « legacy »),
+  // jamais en mode démo ni quand les capacités sont encore inconnues (aucune info serveur).
+  const moduleCtx = { demo: demoMode || isDemoMode(), buildEnabled: TORRENT_FEATURES_ENABLED };
+  const torrentUi = isTorrentUiVisible(serverCapabilities, moduleCtx);
   // Recherche : toujours proposée hors version store (sans module Indexers, elle cherche dans la
-  // bibliothèque locale). Demandes : `requests` + Indexers.
-  // Capacités inconnues / serveur ancien → affichées (comportement historique).
+  // bibliothèque locale).
   const searchUi = TORRENT_FEATURES_ENABLED;
   // Demandes : capacité `requests` (module Indexers), indépendante du moteur torrent.
-  const requestsUi = isRequestsAvailable();
+  const requestsUi = isRequestsUiVisible(serverCapabilities, moduleCtx);
   const platformsUi = !isRouteBlockedInStoreBuild('/plateformes');
 
   // Page d'un module absent du serveur (lien direct, favori, module désinstallé) : plutôt qu'une page
