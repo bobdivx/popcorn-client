@@ -3208,5 +3208,14 @@
     "hardResetInProgress": "Resetting...",
     "hardResetConfirm": "Confirm Hard Reset? All backend data will be deleted.",
     "hardResetError": "Unable to perform hard reset."
+  },
+  "serverUnreachable": {
+    "title": "Server unreachable",
+    "description": "The server saved on this device is not responding. It may be stopped, or its address may have changed.",
+    "serverLabel": "Server:",
+    "retry": "Retry",
+    "retrying": "Checking…",
+    "changeServer": "Change server",
+    "changeServerHint": "\"Change server\" forgets the saved address (and demo mode), then opens the server connection screen."
   }
 }

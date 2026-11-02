@@ -3262,5 +3262,14 @@
     "hardResetInProgress": "Reset en cours...",
     "hardResetConfirm": "Confirmer le Hard Reset ? Toutes les données du backend seront supprimées.",
     "hardResetError": "Impossible d'effectuer le hard reset."
+  },
+  "serverUnreachable": {
+    "title": "Serveur injoignable",
+    "description": "Le serveur enregistré sur cet appareil ne répond pas. Il est peut-être arrêté, ou son adresse a changé.",
+    "serverLabel": "Serveur :",
+    "retry": "Réessayer",
+    "retrying": "Vérification…",
+    "changeServer": "Changer de serveur",
+    "changeServerHint": "« Changer de serveur » oublie l'adresse enregistrée (et le mode démo) puis ouvre la connexion à un serveur."
   }
 }

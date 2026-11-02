@@ -12,6 +12,9 @@ import {
   hasBackendUrl,
   isDemoLibraryBackendUrl,
   isUsableCloudBackendUrl,
+  getStoredBackendUrlToVerify,
+  probeBackendReachable,
+  forgetUnreachableBackend,
 } from '../lib/backend-config';
 import {
   EMBEDDED_DESKTOP_BACKEND_URL,
@@ -23,6 +26,7 @@ import {
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideo from './IntroVideo';
+import ServerUnreachableScreen from './ServerUnreachableScreen';
 import { initNativeSsoListener } from '../lib/auth/native-sso';
 import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
 import { isTVPlatform, isWebOSTV } from '../lib/utils/device-detection';
@@ -99,6 +103,10 @@ export default function IndexRedirect() {
   const pendingPathRef = useRef<string | null>(null);
   const [HomeComponent, setHomeComponent] = useState<ComponentType | null>(null);
   const homeInPlaceRef = useRef(false);
+  /** Serveur enregistré injoignable (web) : URL affichée sur l'écran « Serveur injoignable ». */
+  const [unreachableUrl, setUnreachableUrl] = useState<string | null>(null);
+  const unreachableRef = useRef(false);
+  const [unreachableRetrying, setUnreachableRetrying] = useState(false);
 
   /** Accueil monté sous l'intro : URL → /dashboard (comme dashboard.astro, même Layout). */
   const mountHomeInPlace = useCallback(() => {
@@ -172,6 +180,9 @@ export default function IndexRedirect() {
       // Accueil pré-rendu sous l'intro : s'il n'a pas encore ses données, écran unique jusque-là.
       if (!isHomeReady()) holdPageLoader(HOME_DATA_HOLD, 15000);
       releasePageLoader(INDEX_BOOT_HOLD);
+    } else if (unreachableRef.current) {
+      // Écran « Serveur injoignable » en attente : il s'affiche à la place du chargement.
+      releasePageLoader(INDEX_BOOT_HOLD);
     } else if (pendingPathRef.current) {
       const dest = pendingPathRef.current;
       pendingPathRef.current = null;
@@ -214,6 +225,46 @@ export default function IndexRedirect() {
     return checkAndRedirect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const showUnreachable = (url: string) => {
+    unreachableRef.current = true;
+    pendingPathRef.current = null;
+    setUnreachableUrl(url);
+    releasePageLoader(INDEX_BOOT_HOLD);
+    releasePageLoader(HOME_DATA_HOLD);
+    setPageLoaderMessage(null);
+  };
+
+  const handleUnreachableRetry = async () => {
+    const url = unreachableUrl;
+    if (!url || unreachableRetrying) return;
+    setUnreachableRetrying(true);
+    const probe = await probeBackendReachable(url);
+    setUnreachableRetrying(false);
+    if (!probe.reachable) return;
+    // Le serveur répond de nouveau : reprendre le démarrage normal.
+    unreachableRef.current = false;
+    setUnreachableUrl(null);
+    holdPageLoader(INDEX_BOOT_HOLD, 60000);
+    checkAndRedirect();
+  };
+
+  const handleUnreachableChangeServer = () => {
+    // Choix explicite : oublier serveur, « mon serveur » et mode démo, puis l'écran de connexion
+    // au serveur. Les jetons de session de l'ancien serveur ne doivent pas partir vers le nouveau.
+    forgetUnreachableBackend();
+    try {
+      serverApi.logout();
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.setItem(STORAGE_INTRO_SKIPPED, '1');
+    } catch {
+      // ignore
+    }
+    window.location.replace(`${window.location.origin}/setup`);
+  };
 
   const checkAndRedirect = () => {
     // Wrapper externe pour catch toutes les erreurs (imports, module init, etc.)
@@ -385,6 +436,24 @@ export default function IndexRedirect() {
             goTo('/setup');
             setLoading(false);
             return;
+          }
+        }
+
+        // Web : le serveur enregistré répond-il ? (ex. ancien domaine abandonné → 502 sans CORS,
+        // toutes les requêtes échouent et l'app reste bloquée, y compris pour quitter le mode démo.)
+        // Délai court + 1 réessai ; si toujours injoignable, on PROPOSE Réessayer / Changer de serveur
+        // sans rien effacer d'office. Pas en Tauri / file:// (serveur embarqué, Android, webOS) ni pour
+        // un backend fixé par le déploiement ou la bibliothèque de démo (voir getStoredBackendUrlToVerify).
+        if (!isTauri() && window.location.protocol !== 'file:') {
+          const storedUrl = getStoredBackendUrlToVerify();
+          if (storedUrl) {
+            const probe = await probeBackendReachable(storedUrl);
+            if (!mounted) return;
+            if (!probe.reachable) {
+              console.warn('[IndexRedirect] Serveur enregistré injoignable:', probe.reason, probe.status ?? '');
+              showUnreachable(storedUrl);
+              return;
+            }
           }
         }
 
@@ -575,6 +644,14 @@ export default function IndexRedirect() {
       {home}
       {showIntro ? (
         <IntroVideo onEnded={handleIntroEnded} onStarted={handleIntroStarted} variant="brand" />
+      ) : null}
+      {unreachableUrl && !showIntro ? (
+        <ServerUnreachableScreen
+          backendUrl={unreachableUrl}
+          retrying={unreachableRetrying}
+          onRetry={() => void handleUnreachableRetry()}
+          onChangeServer={handleUnreachableChangeServer}
+        />
       ) : null}
     </>
   );

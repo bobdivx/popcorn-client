@@ -636,3 +636,131 @@ export function loadRuntimeConfig(): Promise<{ urlChanged: boolean }> {
       return { urlChanged: false };
     });
 }
+
+/* -------------------------------------------------------------------------------------------------
+ * Serveur enregistré injoignable au démarrage (web)
+ *
+ * Cas réel : une ancienne URL serveur reste en localStorage (domaine abandonné qui répond 502 sans
+ * en-têtes CORS). Toutes les requêtes échouent et l'utilisateur ne peut plus sortir de l'app
+ * (ni du mode démo). Au démarrage on vérifie /api/client/health avec un délai court et un réessai,
+ * puis on PROPOSE (sans rien effacer d'office) « Réessayer » ou « Changer de serveur ».
+ * ----------------------------------------------------------------------------------------------- */
+
+/** Délai max d'une tentative de vérification du serveur enregistré (ms). */
+export const STORED_BACKEND_PROBE_TIMEOUT_MS = 5000;
+/** Pause entre les deux tentatives (évite un faux positif sur une coupure passagère). */
+export const STORED_BACKEND_PROBE_RETRY_DELAY_MS = 1500;
+
+export type BackendProbeFailureReason = 'network' | 'timeout' | 'server_error';
+
+export type BackendProbeResult =
+  | { reachable: true; status: number }
+  | { reachable: false; reason: BackendProbeFailureReason; status?: number };
+
+export interface BackendProbeOptions {
+  /** Délai max par tentative (défaut : STORED_BACKEND_PROBE_TIMEOUT_MS). */
+  timeoutMs?: number;
+  /** Nombre total de tentatives (défaut : 2 = 1 essai + 1 réessai). */
+  attempts?: number;
+  /** Pause entre deux tentatives (défaut : STORED_BACKEND_PROBE_RETRY_DELAY_MS). */
+  retryDelayMs?: number;
+  /** Injection pour les tests. */
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * URL serveur enregistrée par l'utilisateur qu'il faut vérifier au démarrage, ou null si la
+ * vérification ne s'applique pas :
+ * - aucune URL enregistrée (premier lancement → /setup, géré ailleurs) ;
+ * - bibliothèque de démonstration (DEMO_LIBRARY_BACKEND_URL : aucun serveur contacté) ;
+ * - backend fixé par le déploiement (env, /config.json, même origine que la page) : un tel
+ *   backend ne se « change » pas depuis le client, le flux existant (réessais) s'applique.
+ * L'appelant décide en plus de l'environnement (web uniquement : pas Tauri, pas file://).
+ */
+export function getStoredBackendUrlToVerify(): string | null {
+  if (typeof window === 'undefined') return null;
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  const url = (stored || '').trim().replace(/\/+$/, '');
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  if (isDemoLibraryBackendUrl(url)) return null;
+  if (hasDeploymentBackend()) return null;
+  return url;
+}
+
+async function probeBackendOnce(
+  baseUrl: string,
+  timeoutMs: number,
+  fetchImpl: typeof fetch,
+): Promise<BackendProbeResult> {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller?.abort();
+  }, timeoutMs);
+  let safetyTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      // Filet de sécurité si l'abort n'interrompt pas la requête.
+      safetyTimer = setTimeout(() => {
+        timedOut = true;
+        reject(new Error('timeout'));
+      }, timeoutMs + 50);
+    });
+    const response = await Promise.race([
+      fetchImpl(`${baseUrl}/api/client/health`, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit',
+        signal: controller?.signal,
+      }),
+      timeout,
+    ]);
+    // 5xx (ex. 502 d'un reverse proxy dont le backend a disparu) = serveur inutilisable.
+    if (response.status >= 500) return { reachable: false, reason: 'server_error', status: response.status };
+    // Toute autre réponse lisible (2xx, mais aussi 401/404…) prouve qu'un serveur répond avec CORS.
+    return { reachable: true, status: response.status };
+  } catch {
+    // Échec réseau, DNS, TLS ou CORS (fetch rejette sans détail) ; ou délai dépassé.
+    return { reachable: false, reason: timedOut ? 'timeout' : 'network' };
+  } finally {
+    clearTimeout(timer);
+    if (safetyTimer !== undefined) clearTimeout(safetyTimer);
+  }
+}
+
+/**
+ * Vérifie qu'un serveur répond sur GET {url}/api/client/health.
+ * Injoignable = échec réseau / CORS, délai dépassé ou réponse 5xx, sur TOUTES les tentatives.
+ * Ne modifie jamais le stockage.
+ */
+export async function probeBackendReachable(url: string, options: BackendProbeOptions = {}): Promise<BackendProbeResult> {
+  const baseUrl = (url || '').trim().replace(/\/+$/, '');
+  const fetchImpl = options.fetchImpl ?? (typeof fetch !== 'undefined' ? fetch.bind(globalThis) : undefined);
+  if (!baseUrl || !fetchImpl) return { reachable: false, reason: 'network' };
+  const timeoutMs = options.timeoutMs ?? STORED_BACKEND_PROBE_TIMEOUT_MS;
+  const attempts = Math.max(1, options.attempts ?? 2);
+  const retryDelayMs = options.retryDelayMs ?? STORED_BACKEND_PROBE_RETRY_DELAY_MS;
+
+  let last: BackendProbeResult = { reachable: false, reason: 'network' };
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0 && retryDelayMs > 0) await new Promise((r) => setTimeout(r, retryDelayMs));
+    last = await probeBackendOnce(baseUrl, timeoutMs, fetchImpl);
+    if (last.reachable) return last;
+  }
+  return last;
+}
+
+/**
+ * « Changer de serveur » depuis l'écran Serveur injoignable : oublie l'URL serveur, « mon serveur »
+ * et le mode démo (popcorn_backend_url, popcorn_my_backend_url, popcorn_demo_mode).
+ * Action explicite de l'utilisateur uniquement — jamais appelée automatiquement.
+ */
+export function forgetUnreachableBackend(): void {
+  clearAllBackendStorage();
+}
