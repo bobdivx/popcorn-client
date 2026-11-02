@@ -28,12 +28,15 @@ import {
 } from './utils/browsePriority';
 import {
   IS_STORE_BUILD,
+  TORRENT_FEATURES_ENABLED,
   isIndexersModuleAvailable,
   isRequestsAvailable,
   isTorrentCatalogAvailable,
   isTorrentModuleAvailable,
 } from '../../lib/distribution';
 import { useServerCapabilities } from '../../lib/capabilities';
+import { isTorrentUiVisible } from '../../lib/module-visibility';
+import { isDemoMode } from '../../lib/backend-config';
 import StoreLibraryHome from './StoreLibraryHome';
 import { markHomeReady } from '../../lib/boot/pageLoader';
 
@@ -80,6 +83,10 @@ function FullDashboard() {
   // Rangée « Nouveaux films disponibles » : seulement si le serveur annonce torrent + indexers.
   const canDownload = useMemo(
     () => isTorrentModuleAvailable() && isIndexersModuleAvailable(),
+    [capabilities]
+  );
+  const showTorrentRows = useMemo(
+    () => isTorrentUiVisible(capabilities, { demo: isDemoMode(), buildEnabled: TORRENT_FEATURES_ENABLED }),
     [capabilities]
   );
 
@@ -294,7 +301,9 @@ function FullDashboard() {
       });
     }
 
-    const mostDownloaded = uniqueByMedia([...popularMovies, ...popularSeries])
+    // « Les plus téléchargés » : seulement si le serveur annonce le moteur torrent (masqué par défaut,
+    // jamais en démo ni quand les capacités du serveur sont inconnues).
+    const mostDownloaded = (showTorrentRows ? uniqueByMedia([...popularMovies, ...popularSeries]) : [])
       .sort((a, b) => (b.seeds ?? 0) - (a.seeds ?? 0))
       .slice(0, 40);
     if (mostDownloaded.length > 0) {
@@ -320,6 +329,7 @@ function FullDashboard() {
     availabilityIndex,
     canRequest,
     canDownload,
+    showTorrentRows,
     freshMovies,
     titles,
     t,
