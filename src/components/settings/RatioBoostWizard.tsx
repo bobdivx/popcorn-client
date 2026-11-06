@@ -415,6 +415,7 @@ export default function RatioBoostWizard() {
                 <span className="label-text text-xs">{t('ratioBoost.qbitPass')}</span>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   className="input input-bordered input-sm bg-gray-900/60"
                   value={qbitPass}
                   onInput={(e) => {
